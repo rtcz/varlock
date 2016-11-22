@@ -80,9 +80,15 @@ then
 			SAMPLE=`get_sample_name "$FILE"`
 			if [[ `array_contains VISITED "$SAMPLE"` == false ]]
 			then
-				# TODO
-				if [[ $SAMPLE == "TEST_100" ]]
-				then
+#				# TODO
+#				if [[ $SAMPLE == "TEST_100" ]]
+#				then
+					QSUB_LOG_FILE="$LOG_DIR/$SAMPLE/qsub.log"
+					QSUB_ERR_FILE="$LOG_DIR/$SAMPLE/qsub.err"
+
+					mkdir -p `dirname "$QSUB_LOG_FILE"`
+					mkdir -p `dirname "$QSUB_ERR_FILE"`
+
 					echo "$SCRIPT_DIR/varlock.sh
 						-d "$WORK_DIR"
 						-s "$SAMPLE"
@@ -91,14 +97,14 @@ then
 						" | qsub \
 						-l thr=$QSUB_THREAD_COUNT \
 						-cwd \
-						-o "$LOG_DIR/$SAMPLE/qsub.log" \
-						-e "$LOG_DIR/$SAMPLE/qsub.err" \
+						-o $QSUB_LOG_FILE \
+						-e $QSUB_ERR_FILE \
 						-N _$SAMPLE \
 						-p 100
 						visited+=$SAMPLE
 				fi
 				VISITED+=("$SAMPLE")
-			fi
+#			fi
 		done
 			;;
 		*) exit 0 ;;
