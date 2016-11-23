@@ -31,7 +31,7 @@ IS_FORCED=false
 LOG2FILE=false
 
 # parse options
-while getopts hd:s:f:l opt
+while getopts hd:s:fl opt
 do
 	case $opt in
 		h) usage;;
@@ -80,31 +80,23 @@ then
 			SAMPLE=`get_sample_name "$FILE"`
 			if [[ `array_contains VISITED "$SAMPLE"` == false ]]
 			then
-#				# TODO
-#				if [[ $SAMPLE == "TEST_100" ]]
-#				then
-					QSUB_LOG_FILE="$LOG_DIR/$SAMPLE/qsub.log"
-					QSUB_ERR_FILE="$LOG_DIR/$SAMPLE/qsub.err"
+				QSUB_LOG_FILE="$LOG_DIR/$SAMPLE/qsub.log"
+				QSUB_ERR_FILE="$LOG_DIR/$SAMPLE/qsub.err"
 
-					mkdir -p `dirname "$QSUB_LOG_FILE"`
-					mkdir -p `dirname "$QSUB_ERR_FILE"`
+				mkdir -p `dirname "$QSUB_LOG_FILE"`
+				mkdir -p `dirname "$QSUB_ERR_FILE"`
 
-					echo "$SCRIPT_DIR/varlock.sh
-						-d "$WORK_DIR"
-						-s "$SAMPLE"
-						-f false
-						-l
-						" | qsub \
-						-l thr=$QSUB_THREAD_COUNT \
-						-cwd \
-						-o $QSUB_LOG_FILE \
-						-e $QSUB_ERR_FILE \
-						-N _$SAMPLE \
-						-p 100
-						visited+=$SAMPLE
-				fi
-				VISITED+=("$SAMPLE")
-#			fi
+				echo "$SCRIPT_DIR/varlock.sh -d "$WORK_DIR" -s "$SAMPLE" -l" \
+					| qsub \
+					-l thr=$QSUB_THREAD_COUNT \
+					-cwd \
+					-o $QSUB_LOG_FILE \
+					-e $QSUB_ERR_FILE \
+					-N _$SAMPLE \
+					-p 100
+					visited+=$SAMPLE
+			fi
+			VISITED+=("$SAMPLE")
 		done
 			;;
 		*) exit 0 ;;
