@@ -107,6 +107,10 @@ else
 		exec 1>>"$LOG_DIR/$SAMPLE/varlock.log"
 		exec 2>>"$LOG_DIR/$SAMPLE/varlock.err"
 	fi
+
+	# remove old logs
+	rm "$LOG_DIR/$SAMPLE/*"
+
 	# run specific sample
 	run_sample "$SAMPLE" \
 		"$READS_ORIG_DIR" \

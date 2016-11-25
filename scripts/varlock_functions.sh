@@ -333,7 +333,7 @@ function run_sample {
 
 	# mapping fastq files to sam files
 	echo `date $DATE_FORMAT` "- MAPPING"
-	fastq2bam "$SAMPLE" "$READS_ORIG_DIR" "$BAM_FILE" $IS_FORCED "$LOG_DIR/$SAMPLE/mapping.log"
+	fastq2bam "$SAMPLE" "$READS_TRIM_DIR" "$BAM_FILE" $IS_FORCED "$LOG_DIR/$SAMPLE/mapping.log"
 
 	# evaluating bam
 	echo `date $DATE_FORMAT` "- QUALIMAP"
