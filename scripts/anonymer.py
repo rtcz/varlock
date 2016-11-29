@@ -30,7 +30,7 @@ class Anonymer:
         :param out_dir: output directory
         :param gen_file: genome file .fa
         :param gen_idx: genome index file
-        :param verbose: print what is being done
+        :param verbose: explain what is being done
         :param threads: number of working threads
         :param keep_temp: keep temporary substitution files
         """
@@ -71,21 +71,16 @@ class Anonymer:
         )
         
         if self.verbose:
-            print "> saving anonymized R1 fastq with unique substitutions"
-        self.__save_subsitution(
-            in_fastq=self.r1,
-            subst1_fastq=self.r1 + temp_first_suffix,
-            subst2_fastq=self.r1 + temp_second_suffix,
-            out_fastq=self.__out_path(self.r1)
-        )
-        
-        if self.verbose:
-            print "> saving anonymized R2 fastq with unique substitutions"
-        self.__save_subsitution(
-            in_fastq=self.r2,
-            subst1_fastq=self.r2 + temp_first_suffix,
-            subst2_fastq=self.r2 + temp_second_suffix,
-            out_fastq=self.__out_path(self.r2)
+            print "> saving anonymized fastq pair with unique mappings"
+        self.__save_substitution(
+            r1_in=self.r1,
+            r2_in=self.r2,
+            r1_subst1=self.r1 + temp_first_suffix,
+            r2_subst1=self.r2 + temp_first_suffix,
+            r1_subst2=self.r1 + temp_second_suffix,
+            r2_subst2=self.r2 + temp_second_suffix,
+            r1_out=self.__out_path(self.r1),
+            r2_out=self.__out_path(self.r2)
         )
         
         if not self.keep_temp:
@@ -103,6 +98,50 @@ class Anonymer:
         return self.out_dir + "/" + \
                self.first_basename_segment(in_file) + \
                self.OUT_SUFFIX
+    
+    def __save_substitution(
+            self,
+            r1_in,
+            r2_in,
+            r1_subst1,
+            r2_subst1,
+            r1_subst2,
+            r2_subst2,
+            r1_out,
+            r2_out):
+        with \
+                open(r1_in, 'r') as r1_in_file, \
+                open(r2_in, 'r') as r2_in_file, \
+                open(r1_subst1, 'r') as r1_subst1_file, \
+                open(r2_subst1, 'r') as r2_subst1_file, \
+                open(r1_subst2, 'r') as r1_subst2_file, \
+                open(r2_subst2, 'r') as r2_subst2_file, \
+                open(r1_out, 'w') as r1_out_file, \
+                open(r2_out, 'w') as r2_out_file:
+            counter = 0
+            for r1_in_line in r1_in_file:
+                r2_in_line = r2_in_file.readline()
+                r1_subst1_line = r1_subst1_file.readline()
+                r2_subst1_line = r2_subst1_file.readline()
+                r1_subst2_line = r1_subst2_file.readline()
+                r2_subst2_line = r2_subst2_file.readline()
+
+                seq_line_id = counter % 4
+                if seq_line_id == self.SEQ_VALUE_LINE_ID:
+                    # line with sequence letters
+                    if r1_subst1_line == r1_subst2_line and r2_subst1_line == r2_subst2_line:
+                        # sequence is uniquely mapped, (mapping has not changed between subsitutions) use it
+                        r1_out_file.write(r1_subst1_line)
+                        r2_out_file.write(r2_subst1_line)
+                    else:
+                        # sequence is not uniquely mapped, use original sequence
+                        r1_out_file.write(r1_in_line)
+                        r2_out_file.write(r2_in_line)
+                else:
+                    # other than sequence letter lines are same as in the original fastq
+                    r1_out_file.write(r1_in_line)
+                    r2_out_file.write(r2_in_line)
+                counter += 1
     
     def __save_subsitution(self, in_fastq, subst1_fastq, subst2_fastq, out_fastq):
         with open(in_fastq, 'r') as in_file, \
