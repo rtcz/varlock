@@ -1,6 +1,7 @@
 import pyfaidx
 import subprocess
 import os
+import re
 
 
 class Anonymer:
@@ -11,8 +12,20 @@ class Anonymer:
     
     SEQ_VALUE_LINE_ID = 1  # second line
     
-    TEMP_SUFFIX = ".subst"
-    OUT_SUFFIX = ".anon.fastq"
+    SAM_SEQ_NAME_ID = 0
+    SAM_FLAG_ID = 1
+    SAM_CHR_ID = 2
+    SAM_POS_ID = 3
+    SAM_MAPQ_ID = 4
+    SAM_SEQ_ID = 9
+    SAM_QUAL_ID = 10
+    
+    SUBST_1_SUFFIX = ".subst1"
+    SUBST_2_SUFFIX = ".subst2"
+    OUT_FASTQ_SUFFIX = ".anon.fastq"
+    OUT_SAM_SUFFIX = ".sam"
+    
+    FASTQ_SUFFIX_PATTERN = "[-_]?(1,2)?[Rr]?[12]?\.fastq(.gz)?$"
     
     def __init__(
             self,
@@ -49,25 +62,26 @@ class Anonymer:
         """
         # sam_file = os.path.join(self.out_dir, 'sam.sam')
         
-        temp_first_suffix = self.TEMP_SUFFIX + "1"
-        temp_second_suffix = self.TEMP_SUFFIX + "2"
+        sample_name = self.__sample_name(self.r1)
         
         if self.verbose:
             print "> first substitution"
         self.__substitute_fastq_pair(
             r1_in=self.r1,
             r2_in=self.r2,
-            r1_out=self.r1 + temp_first_suffix,
-            r2_out=self.r2 + temp_first_suffix
+            r1_out=self.__out_file_path(self.r1, self.SUBST_1_SUFFIX + self.OUT_FASTQ_SUFFIX),
+            r2_out=self.__out_file_path(self.r2, self.SUBST_1_SUFFIX + self.OUT_FASTQ_SUFFIX),
+            sam_out=self.__out_file_path(sample_name, self.SUBST_1_SUFFIX + self.OUT_SAM_SUFFIX)
         )
         
         if self.verbose:
             print "> second substitution"
         self.__substitute_fastq_pair(
-            r1_in=self.r1 + temp_first_suffix,
-            r2_in=self.r2 + temp_first_suffix,
-            r1_out=self.r1 + temp_second_suffix,
-            r2_out=self.r2 + temp_second_suffix
+            r1_in=self.__out_file_path(self.r1, self.SUBST_1_SUFFIX + self.OUT_FASTQ_SUFFIX),
+            r2_in=self.__out_file_path(self.r2, self.SUBST_1_SUFFIX + self.OUT_FASTQ_SUFFIX),
+            r1_out=self.__out_file_path(self.r1, self.SUBST_2_SUFFIX + self.OUT_FASTQ_SUFFIX),
+            r2_out=self.__out_file_path(self.r2, self.SUBST_2_SUFFIX + self.OUT_FASTQ_SUFFIX),
+            sam_out=self.__out_file_path(sample_name, self.SUBST_2_SUFFIX + self.OUT_SAM_SUFFIX)
         )
         
         if self.verbose:
@@ -75,29 +89,33 @@ class Anonymer:
         self.__save_substitution(
             r1_in=self.r1,
             r2_in=self.r2,
-            r1_subst1=self.r1 + temp_first_suffix,
-            r2_subst1=self.r2 + temp_first_suffix,
-            r1_subst2=self.r1 + temp_second_suffix,
-            r2_subst2=self.r2 + temp_second_suffix,
-            r1_out=self.__out_path(self.r1),
-            r2_out=self.__out_path(self.r2)
+            r1_subst1=self.__out_file_path(self.r1, self.SUBST_1_SUFFIX + self.OUT_FASTQ_SUFFIX),
+            r2_subst1=self.__out_file_path(self.r2, self.SUBST_1_SUFFIX + self.OUT_FASTQ_SUFFIX),
+            sam_subst1=self.__out_file_path(sample_name, self.SUBST_1_SUFFIX + self.OUT_SAM_SUFFIX),
+            r1_subst2=self.__out_file_path(self.r1, self.SUBST_2_SUFFIX + self.OUT_FASTQ_SUFFIX),
+            r2_subst2=self.__out_file_path(self.r2, self.SUBST_2_SUFFIX + self.OUT_FASTQ_SUFFIX),
+            sam_subst2=self.__out_file_path(sample_name, self.SUBST_2_SUFFIX + self.OUT_SAM_SUFFIX),
+            r1_out=self.__out_file_path(self.r1, self.OUT_FASTQ_SUFFIX),
+            r2_out=self.__out_file_path(self.r2, self.OUT_FASTQ_SUFFIX)
         )
         
         if not self.keep_temp:
             if self.verbose:
-                print "> deleting temporary substitution files"
-            os.remove(self.r1 + temp_first_suffix)
-            os.remove(self.r2 + temp_first_suffix)
-            os.remove(self.r1 + temp_second_suffix)
-            os.remove(self.r2 + temp_second_suffix)
+                print "> deleting temporary files"
+            os.remove(self.__out_file_path(self.r1, self.SUBST_1_SUFFIX + self.OUT_FASTQ_SUFFIX))
+            os.remove(self.__out_file_path(self.r2, self.SUBST_1_SUFFIX + self.OUT_FASTQ_SUFFIX))
+            os.remove(self.__out_file_path(self.r1, self.SUBST_2_SUFFIX + self.OUT_FASTQ_SUFFIX))
+            os.remove(self.__out_file_path(self.r2, self.SUBST_2_SUFFIX + self.OUT_FASTQ_SUFFIX))
+            os.remove(self.__out_file_path(sample_name, self.SUBST_1_SUFFIX + self.OUT_SAM_SUFFIX))
+            os.remove(self.__out_file_path(sample_name, self.SUBST_2_SUFFIX + self.OUT_SAM_SUFFIX))
         
         if self.verbose:
             print "> anonymization finished"
     
-    def __out_path(self, in_file):
+    def __out_file_path(self, file_name, suffix):
         return self.out_dir + "/" + \
-               self.first_basename_segment(in_file) + \
-               self.OUT_SUFFIX
+               self.first_basename_segment(file_name) + \
+               suffix
     
     def __save_substitution(
             self,
@@ -105,8 +123,10 @@ class Anonymer:
             r2_in,
             r1_subst1,
             r2_subst1,
+            sam_subst1,
             r1_subst2,
             r2_subst2,
+            sam_subst2,
             r1_out,
             r2_out):
         with \
@@ -114,22 +134,65 @@ class Anonymer:
                 open(r2_in, 'r') as r2_in_file, \
                 open(r1_subst1, 'r') as r1_subst1_file, \
                 open(r2_subst1, 'r') as r2_subst1_file, \
+                open(sam_subst1, 'r') as sam_subst1_file, \
                 open(r1_subst2, 'r') as r1_subst2_file, \
                 open(r2_subst2, 'r') as r2_subst2_file, \
+                open(sam_subst2, 'r') as sam_subst2_file, \
                 open(r1_out, 'w') as r1_out_file, \
                 open(r2_out, 'w') as r2_out_file:
             counter = 0
             for r1_in_line in r1_in_file:
                 r2_in_line = r2_in_file.readline()
+                
                 r1_subst1_line = r1_subst1_file.readline()
                 r2_subst1_line = r2_subst1_file.readline()
+                
+                # TODO use input fastq and bams only
+            
                 r1_subst2_line = r1_subst2_file.readline()
                 r2_subst2_line = r2_subst2_file.readline()
-
+                
                 seq_line_id = counter % 4
                 if seq_line_id == self.SEQ_VALUE_LINE_ID:
                     # line with sequence letters
-                    if r1_subst1_line == r1_subst2_line and r2_subst1_line == r2_subst2_line:
+                    
+                    # if self.is_sam_flag(sam_line_1[self.SAM_FLAG_ID], self.FLAG_FIRST):
+                    #     r1_sam_line = sam_line_1
+                    #     r2_sam_line = sam_line_2
+                    # else:
+                    #     r1_sam_line = sam_line_2
+                    #     r2_sam_line = sam_line_1
+
+                    sam_subst1_r1, sam_subst1_r2 = self.__sam_pair_2_arr(
+                        sam_subst1_file.readline(),
+                        sam_subst1_file.readline()
+                    )
+                    sam_subst2_r1, sam_subst2_r2 = self.__sam_pair_2_arr(
+                        sam_subst2_file.readline(),
+                        sam_subst2_file.readline()
+                    )
+                    
+                    # if sam_1_line[self.SAM_MAPQ_ID] != sam_2_line[self.SAM_MAPQ_ID]:
+                    #     raise ValueError("Unequal mapq between sam files at line " + str(counter / 4 + 1))
+
+                    # sequence is uniquely mapped, (mapping has not changed between subsitutions)
+                    # is_uniquely_mapped = r1_subst1_line == r1_subst2_line and r2_subst1_line == r2_subst2_line
+
+                    is_same_chr_r1 = sam_subst1_r1[self.SAM_CHR_ID] == sam_subst2_r1[self.SAM_CHR_ID]
+                    is_same_pos_r1 = sam_subst1_r1[self.SAM_POS_ID] == sam_subst2_r1[self.SAM_POS_ID]
+
+                    is_same_chr_r2 = sam_subst1_r2[self.SAM_CHR_ID] == sam_subst2_r2[self.SAM_CHR_ID]
+                    is_same_pos_r2 = sam_subst1_r2[self.SAM_POS_ID] == sam_subst2_r2[self.SAM_POS_ID]
+                    
+                    is_same_chr = is_same_chr_r1 and is_same_chr_r2
+                    is_same_pos = is_same_pos_r1 and is_same_pos_r2
+                    
+                    # sufficient mapping quality
+                    # r1_quality = int(sam_subst1_r1[self.SAM_MAPQ_ID])
+                    # r2_quality = int(sam_subst1_r2[self.SAM_MAPQ_ID])
+                    # has_sufficient_mapq = r1_quality > 1 and r2_quality > 1
+                    
+                    if is_same_chr and is_same_pos: # and is_uniquely_mapped: # and has_sufficient_mapq:
                         # sequence is uniquely mapped, (mapping has not changed between subsitutions) use it
                         r1_out_file.write(r1_subst1_line)
                         r2_out_file.write(r2_subst1_line)
@@ -142,6 +205,19 @@ class Anonymer:
                     r1_out_file.write(r1_in_line)
                     r2_out_file.write(r2_in_line)
                 counter += 1
+    
+    def __sam_pair_2_arr(self, first_line, second_line):
+        first_arr = self.__sam_line_2_arr(first_line)
+        second_arr = self.__sam_line_2_arr(second_line)
+    
+        if self.is_sam_flag(first_arr[self.SAM_FLAG_ID], self.FLAG_FIRST):
+            r1_arr = first_arr
+            r2_arr = second_arr
+        else:
+            r1_arr = second_arr
+            r2_arr = first_arr
+            
+        return r1_arr, r2_arr
     
     def __save_subsitution(self, in_fastq, subst1_fastq, subst2_fastq, out_fastq):
         with open(in_fastq, 'r') as in_file, \
@@ -168,8 +244,8 @@ class Anonymer:
                     out_file.write(in_line)
                 counter += 1
     
-    def __substitute_fastq_pair(self, r1_in, r2_in, r1_out, r2_out):
-        with open(r1_out, 'w') as r1_out_file, open(r2_out, 'w') as r2_out_file:  # open(sam_file, 'w') as sam_file:
+    def __substitute_fastq_pair(self, r1_in, r2_in, r1_out, r2_out, sam_out):
+        with open(r1_out, 'w') as r1_out_file, open(r2_out, 'w') as r2_out_file, open(sam_out, 'w') as sam_file:
             self.counter = 0
             command = self.__build_bowtie_command(r1_in, r2_in)
             proc = subprocess.Popen(command, stdout=subprocess.PIPE)
@@ -177,6 +253,7 @@ class Anonymer:
                 print "bowtie2 process started"
             while True:
                 line = proc.stdout.readline()
+                sam_file.write(line)
                 if line != '':
                     self.__substitute_fastq_line(line, r1_out_file, r2_out_file)
                 else:
@@ -185,19 +262,23 @@ class Anonymer:
             r2_out_file.close()
             # sam_file.close()
     
+    @staticmethod
+    def __sam_line_2_arr(line):
+        return line.rstrip().split('\t')
+    
     def __substitute_fastq_line(self, line, r1_file, r2_file):
-        alignment = line.strip().split('\t')
-        # sam_file.write(line)
-        seq_name = alignment[0]
-        bitwise_flag = alignment[1]
+        alignment = self.__sam_line_2_arr(line)
+        seq_name = alignment[self.SAM_SEQ_NAME_ID]
+        bitwise_flag = alignment[self.SAM_FLAG_ID]
         if self.is_sam_flag(bitwise_flag, self.FLAG_FIRST):
             # first member of a fastq pair
             self.__substitute_fastq_line_to_file(
                 bitwise_flag=bitwise_flag,
-                chr_id=alignment[2],
-                chr_pos=alignment[3],
-                seq=alignment[9],
-                seq_qual=alignment[10],
+                chr_id=alignment[self.SAM_CHR_ID],
+                chr_pos=alignment[self.SAM_POS_ID],
+                mapq=alignment[self.SAM_MAPQ_ID],
+                seq=alignment[self.SAM_SEQ_ID],
+                seq_qual=alignment[self.SAM_QUAL_ID],
                 out_file=r1_file,
                 seq_name=seq_name + "/1"
             )
@@ -205,10 +286,11 @@ class Anonymer:
             # last member of a fastq pair
             self.__substitute_fastq_line_to_file(
                 bitwise_flag=bitwise_flag,
-                chr_id=alignment[2],
-                chr_pos=alignment[3],
-                seq=alignment[9],
-                seq_qual=alignment[10],
+                chr_id=alignment[self.SAM_CHR_ID],
+                chr_pos=alignment[self.SAM_POS_ID],
+                mapq=alignment[self.SAM_MAPQ_ID],
+                seq=alignment[self.SAM_SEQ_ID],
+                seq_qual=alignment[self.SAM_QUAL_ID],
                 out_file=r2_file,
                 seq_name=seq_name + "/2"
             )
@@ -235,7 +317,7 @@ class Anonymer:
         command.append('--threads ' + str(self.threads))
         return command
     
-    def __substitute_fastq_line_to_file(self, bitwise_flag, seq, seq_qual, chr_id, chr_pos, out_file, seq_name):
+    def __substitute_fastq_line_to_file(self, bitwise_flag, seq, seq_qual, mapq, chr_id, chr_pos, out_file, seq_name):
         if not self.is_sam_flag(bitwise_flag, self.FLAG_UNMAPPED):
             # is mapped sequence, substitute it with reference sequence
             chr_pos_start = int(chr_pos) - 1
@@ -247,13 +329,20 @@ class Anonymer:
         if self.is_sam_flag(bitwise_flag, self.FLAG_REVERSE_COMPLEMENT):
             # reversed complemented sequence
             out_file.write(self.reverse_complement(seq) + "\n")
-            out_file.write("+\n")
+            out_file.write("+" + mapq + "\n")
             out_file.write(seq_qual[::-1] + "\n")
         else:
             # straight sequence
             out_file.write(seq + "\n")
             out_file.write("+\n")
             out_file.write(seq_qual + "\n")
+    
+    def __sample_name(self, fastq):
+        """
+        extracts name from fastq file, keeps file path
+        example: path/file_R1.fasq -> path/file
+        """
+        return re.sub(self.FASTQ_SUFFIX_PATTERN, "", fastq)
     
     @staticmethod
     def is_sam_flag(bitwise_flag, bit_value):

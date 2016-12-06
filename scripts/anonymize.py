@@ -3,7 +3,9 @@
 # /data/projects/dante/scripts/arguments/input.py
 # /data/projects/dante/scripts/parser/readfile.py
 
-# python anonymize.py -1 "../reads/original/TEST_10000_R1.fastq" -2 "../reads/original/TEST_10000_R2.fastq" -o "../reads/original/" -v
+# python anonymize.py -1 "../reads/original/TEST_10000_R1.fastq" -2 "../reads/original/TEST_10000_R2.fastq" -o "../reads/original/" -v -k
+
+# bowtie2 -x /data/genome/human/hg38/bowtie2_index/hg38 -1 ../reads/original/TEST_10000_R1.fastq -2 ../reads/original/TEST_10000_R2.fastq -S ../reads/original/TEST_10000.sam --very-sensitive --reorder --no-head --threads 8
 
 import argparse
 import os
@@ -24,8 +26,8 @@ def main():
                       gen_file=GENOME_FILE,
                       gen_idx=GENOME_INDEX,
                       threads=THREAD_COUNT,
-                      keep_temp=True,
-                      verbose=True)
+                      keep_temp=args.verbose,
+                      verbose=args.keep_temp)
     anonym.substitute()
 
 
@@ -39,7 +41,7 @@ def parse_args():
     optional.add_argument('-o', '--out-dir', type=is_dir, help="output directory", default=os.getcwd())
     optional.add_argument('-t', '--threads', type=is_pos_int, help="number of working threads", default=THREAD_COUNT)
     optional.add_argument('-v', '--verbose', action='store_true', help="explain what is being done")
-    # optional.add_argument('-s', '--sam', help="sam file name for saving sam file")
+    optional.add_argument('-k', '--keep-temp', action='store_true', help="do not delete temporary files")
     return parser.parse_args()
 
 
