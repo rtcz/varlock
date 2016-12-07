@@ -26,8 +26,8 @@ def main():
                       gen_file=GENOME_FILE,
                       gen_idx=GENOME_INDEX,
                       threads=THREAD_COUNT,
-                      keep_temp=args.verbose,
-                      verbose=args.keep_temp)
+                      keep_temp=args.keep_temp,
+                      verbose=args.verbose)
     anonym.substitute()
 
 
