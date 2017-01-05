@@ -1,3 +1,5 @@
+from StringIO import StringIO
+
 import Crypto
 from Crypto.PublicKey import RSA
 from Crypto import Random
@@ -12,52 +14,66 @@ from aes import BinAES
 from bitarray import bitarray
 from seq_differ import SeqDiffer
 import gzip
+import zlib
 
-DIFF_RAW_FILE = 'hg_raw_diff'
-DIFF_ENC_FILE = 'hg_raw_diff.enc'
-DIFF_GZIP_FILE = 'hg_raw_diff.gz'
-DIFF_ENC_GZIP_FILE = 'hg_raw_diff.enc.gz'
-DIFF_GZIP_ENC_FILE = 'hg_raw_diff.enc.gz'
+DIFF_FILE = 'abs_pos_diff_40'
 
 
-def generate_diff(out=DIFF_RAW_FILE):
+def generate_diff(out, use_rel_pos=True):
     rnd = SystemRandom()
     differ = SeqDiffer()
-    abs_pos = 0
     counter = 0
     with open(out, 'wb') as diff_file:
-        # putative variant cout in HG
+        # putative variant count in HG
         length = 3914717
         while counter < length:
             if counter % 1e5 == 0:
                 print("%.2f%% done" % (float(counter) / length * 100))
-            rel_pos = int(rnd.expovariate(20) * 2 ** 14)
-            var_bytes = differ.var2bytes(rel_pos, rnd.choice(SeqDiffer.BASES))
+            if use_rel_pos:
+                pos = int(rnd.expovariate(20) * 2 ** 14)
+            else:
+                pos = int((float(counter) / length) * 3.2e9)
+            # base = SeqDiffer.BASE_2_BIN[rnd.choice(SeqDiffer.BASES)]
+            basemap = bin(rnd.randint(0, 23))[2:]
+            basemap = "0" * (5 - len(basemap)) + basemap
+            if len(basemap) != 5:
+                raise ValueError(basemap)
+            var_bytes = differ.var2bytes(pos, basemap, max_pos_bits=32)
+            
+            print len(var_bytes)
+            print len(var_bytes.tobytes())
+            exit(0)
+            
+            if len(var_bytes) != 37:
+                raise ValueError(var_bytes)
             diff_file.write(var_bytes)
-            abs_pos = counter
             counter += 1
 
 
-# generate_diff()
+generate_diff(DIFF_FILE, False)
 
 aes = BinAES('password')
 
-with open(DIFF_RAW_FILE, 'rb') as diff_file:
-    
+with open(DIFF_FILE, 'rb') as diff_file:
     content = diff_file.read()
     enc_content = aes.encrypt(content)
     
-    with open(DIFF_ENC_FILE, 'wb') as enc_file:
+    with open(DIFF_FILE + ".enc", 'wb') as enc_file:
         enc_file.write(enc_content)
+    
+    with gzip.open(DIFF_FILE + ".gz", 'wb') as gz_file:
+        gz_file.write(content)
+    
+    with gzip.open(DIFF_FILE + ".enc.gz", 'wb') as enc_gz_file:
+        enc_gz_file.write(enc_content)
         
-    with gzip.open(DIFF_GZIP_FILE, 'wb') as gzip_file:
-        gzip_file.write(content)
+    with open(DIFF_FILE + ".gz.enc", 'wb') as gz_enc_file:
+        gzip_compress = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16)
+        gzipped_content = gzip_compress.compress(content)
+        gz_enc_file.write(gzipped_content)
         
-    with gzip.open(DIFF_ENC_GZIP_FILE, 'wb') as enc_gzip_file:
-        enc_gzip_file.write(enc_content)
 
 exit(0)
-    
 
 mut_p = 0.1
 mut_map_p = {

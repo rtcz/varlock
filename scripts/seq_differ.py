@@ -5,12 +5,13 @@ from random import SystemRandom
 class SeqDiffer:
     BASE_2_BIN = {'A': '00', 'T': '01', 'G': '10', 'C': '11'}
     BIN_2_BASE = {'00': 'A', '01': 'T', '10': 'G', '11': 'C'}
+    
     BASES = ['A', 'T', 'G', 'C']
     
     # variant bit size
     VAR_BIT_SIZE = 16
     VAR_POS_BIT_SIZE = 14
-    MAX_VARIANT_POS = 2 ** VAR_POS_BIT_SIZE
+    # MAX_VARIANT_POS = 2**VAR_POS_BIT_SIZE-1
     
     def __init__(self):
         self.rnd = SystemRandom()
@@ -30,31 +31,32 @@ class SeqDiffer:
         for i in range(len(seq)):
             if seq[i] != mut_seq[i]:
                 # variant found
-                diff += SeqDiffer.var2bytes(i - abs_pos, seq[i])
+                bin_base = SeqDiffer.BASE_2_BIN[seq[i]]
+                diff += SeqDiffer.var2bytes(i - abs_pos, bin_base)
                 abs_pos = i
         
         return diff
     
     @staticmethod
-    def var2bytes(rel_pos, base):
+    def var2bytes(pos, base, max_pos_bits=VAR_POS_BIT_SIZE):
         """
-        :param rel_pos: Relative position.
-        :param base: Base.
+        :param pos: Relative position.
+        :param base: Base as binary string.
+        :param max_pos_bits: Max position bin length
         :return: Encoded variant in 2 bytes (16 bits).
         """
         variant = bitarray()
         # use position relative to last difference
-        bin_pos = bitarray(bin(rel_pos)[2:])
-        if bin_pos.length() > SeqDiffer.VAR_POS_BIT_SIZE:
-            raise Exception("relative position is too big %d" % rel_pos)
+        bin_pos = bitarray(bin(pos)[2:])
+        if bin_pos.length() > max_pos_bits:
+            raise Exception("position is too big %d" % pos)
         
-        padding_size = (SeqDiffer.VAR_POS_BIT_SIZE - bin_pos.length())
+        padding_size = (max_pos_bits - bin_pos.length())
         bin_padding = bitarray('0' * padding_size)
         
         # add variant
         variant += bin_padding + bin_pos
-        variant += SeqDiffer.BASE_2_BIN[base]
-        # variant += SeqDiffer.BASE_2_BIN[seq[i]]
+        variant += base
         
         return variant
     
@@ -100,20 +102,38 @@ class SeqDiffer:
             seq = seq[:absolute_pos] + SeqDiffer.BIN_2_BASE[base_bits.to01()] + seq[absolute_pos + 1:]
         
         return seq
-    
+
     def multi_random(self, p_dist):
         """
         Secure multinomial random.
-        :param p_dist: Array of probabilities such that sum(p_dist) == 1.
+        :param rnd: (secure) random generator
+        :param p_dist: Array of probabilities. When all probabilities are zero, each outcome has equal probability.
         Each value represents probability of one outcome.
-        :return: Index of drawed outcome.
+        :return: Always returns index of outcome in p_dist array.
         """
+    
+        if len(p_dist) == 1:
+            # no other choice
+            return 0
+    
+        if sum(p_dist) == 0:
+            # zero probabilities, return random index
+            return self.rnd.integer(0, len(p_dist) - 1)
+    
         p_level = 0
-        p_value = self.rnd.random()
+        rnd_value = self.rnd.random()
+        p_value = rnd_value * sum(p_dist)
+    
+        #     print(p_dist)
+        #     print("random %f" % rnd_value)
+        #     print("sum(p_dist) %f" % sum(p_dist))
+        #     print("p_value %f" % p_value)
+        #     print("------")
+    
         for i in range(len(p_dist)):
             p_level += p_dist[i]
             if p_value < p_level:
                 return i
-        
+    
         raise ValueError(
-            "sum of probability distribution %d must be greater then probability value %d" % (p_dist, p_value))
+            "sum of probability distribution %d must be greater then the probability value %d" % (sum(p_dist), p_value))

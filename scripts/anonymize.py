@@ -33,11 +33,13 @@ def main():
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    
     required = parser.add_argument_group("Required")
     required.add_argument('-1', '--r1', type=is_fastq_file, help="read 1 fastq file", required=True)
     required.add_argument('-2', '--r2', type=is_fastq_file, help="read 2 fastq file", required=True)
     
     optional = parser.add_argument_group("Optional")
+    optional.add_argument('-i', '--fai', type=is_file, help="fai file")
     optional.add_argument('-o', '--out-dir', type=is_dir, help="output directory", default=os.getcwd())
     optional.add_argument('-t', '--threads', type=is_pos_int, help="number of working threads", default=THREAD_COUNT)
     optional.add_argument('-v', '--verbose', action='store_true', help="explain what is being done")
@@ -50,6 +52,13 @@ def is_dir(value):
         return os.path.realpath(value)
     else:
         raise argparse.ArgumentTypeError("Value %s is not a directory." % value)
+
+
+def is_file(value):
+    if os.path.isfile(value):
+        return os.path.realpath(value)
+    else:
+        raise argparse.ArgumentTypeError("Value %s is not a file." % value)
 
 
 def is_pos_int(value):
