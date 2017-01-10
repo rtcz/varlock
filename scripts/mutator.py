@@ -19,6 +19,7 @@ BASES = ["A", "T", "G", "C"]
 
 
 def multi_random(rnd, p_dist):
+    
     """
     Secure multinomial random.
     :param rnd: (secure) random generator

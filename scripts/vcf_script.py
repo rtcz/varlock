@@ -103,10 +103,7 @@ def is_snp(ref, alt):
     :param alt: array of alleles
     :return: True if variant is SNP
     """
-    is_snp = False
-    if len(ref) == 1 and all(len(value) == 1 for value in alt):
-        is_snp = True
-    return is_snp
+    return len(ref) == 1 and all(len(value) == 1 for value in alt)
 
 
 MAX_BASE_COUNT = 2 ** 16 - 1
@@ -226,18 +223,17 @@ def parse_ac(ac_filename):
 
 # parse_ac()
 
-vcf2vac(VCF_GZ_FILE, CHR_FAI_FILE, "in/chr22.ac")
+# vcf2vac(VCF_GZ_FILE, CHR_FAI_FILE, "in/chr22.ac")
 # parse_ac("out/chr22.ac")
 
-
-# with open(VCF_GZ_FILE, "r") as vcf_file:
-#     counter = 0
-#     for line in vcf_file:
-#         if line[0] == '#':
-#             counter += 1
-#         else:
-#             print counter
-#             break
+with gzip.open(VCF_GZ_FILE, "r") as vcf_file:
+    counter = 0
+    for line in vcf_file:
+        if line[0] == '#':
+            continue
+        else:
+            counter += 1
+print counter
 
 # chr22 length 51304566
 # chr22 vcf total lines 1103800
