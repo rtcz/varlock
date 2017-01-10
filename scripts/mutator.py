@@ -71,20 +71,16 @@ class Mutator:
             "sum of probability distribution %d must be greater then the probability value %d" % (sum(p_dist), p_value))
     
     @staticmethod
-    def strip_prefix(value, prefix):
-        if value.startswith(prefix):
-            return value[len(prefix):]
-        else:
-            return value
-    
-    @classmethod
-    def strip_chr(cls, value):
+    def strip_chr(value):
         """
         Strip 'chr' prefix from string.
         :param value: string ot strip
         :return: stripped string
         """
-        return cls.strip_prefix(value, 'chr')
+        if value[:3] == 'chr':
+            return value[3:]
+        else:
+            return value
     
     def index2pos(self, index):
         """
@@ -96,7 +92,7 @@ class Mutator:
         for ref in self.fai_list:
             new_ref_pos = ref_pos - ref["length"]
             if new_ref_pos < 0:
-                return self.strip_chr(ref["name"]), ref_pos
+                return ref["name"], ref_pos
             else:
                 ref_pos = new_ref_pos
         raise ValueError("reference position for index %d not found" % index)
@@ -110,14 +106,14 @@ class Mutator:
         """
         sum_ref_pos = 0
         for ref in self.fai_list:
-            if self.strip_chr(ref["name"]) == self.strip_chr(ref_name):
+            if ref["name"] == self.strip_chr(ref_name):
                 return int(ref_pos) + sum_ref_pos
             else:
                 sum_ref_pos += ref["length"]
         raise ValueError("sequence name %s not found" % ref_name)
     
-    @staticmethod
-    def parse_fai(fai_filename):
+    @classmethod
+    def parse_fai(cls, fai_filename):
         """
         Parse fasta index file.
         :param fai_filename: filename
@@ -132,7 +128,7 @@ class Mutator:
                 ref_data = map(int, raw_record[1:])
                 
                 # noinspection PyTypeChecker
-                ref = [ref_name] + list(ref_data)
+                ref = [cls.strip_chr(ref_name)] + list(ref_data)
                 record_map = dict(zip(ref_keys, ref))
                 data.append(record_map)
         
@@ -225,6 +221,7 @@ class Mutator:
         byte_string = vac_file.read(12)
         if byte_string == "":
             return None
+        self.snv_counter += 1
         data_list = list(struct.unpack('<IHHHH', byte_string))
         ref_name, ref_pos = self.index2pos(data_list[0])
         return {'index': data_list[0], 'ref_name': ref_name, 'ref_pos': ref_pos, 'ac': data_list[1:]}
@@ -244,8 +241,14 @@ class Mutator:
         return None
     
     def __write_alignment(self, out_file, alignment):
+        """
+        :param out_file:
+        :param alignment: pysam.AlignedSegment
+        :return:
+        """
         out_file.write(alignment)
         self.alignment_counter += 1
+        
         if self.verbose and self.alignment_counter % 10000 == 0:
             print("%d alignments processed" % self.alignment_counter)
     
@@ -331,11 +334,11 @@ class Mutator:
                         self.overlapping_counter += 1
             
             if self.verbose:
-                print("alignments %d" % self.alignment_counter)
+                print("written alignments %d" % self.alignment_counter)
                 print("unmapped alignments %d" % self.unmapped_counter)
                 print("overlapping alignments %d" % self.overlapping_counter)
                 print("max snv alignments %d" % self.max_snv_alignments)
-                print("snvs %d" % self.snv_counter)
+                print("read snvs %d" % self.snv_counter)
                 print("mutations %d" % self.mut_counter)
                 print("ns mutations %d" % self.ns_mut_counter)
     
@@ -353,6 +356,12 @@ class Mutator:
                 snv_alignment.snv_pos = None
     
     def mutate_alignment(self, alignment, snv_pos, mut_map):
+        """
+        Mutate alignment by mutation map at snv position.
+        :param alignment: pysam.AlignedSegment
+        :param snv_pos: position of snv in alignment sequence
+        :param mut_map: mutation map
+        """
         # there is base to be mutated
         self.mut_counter += 1
         
@@ -364,11 +373,11 @@ class Mutator:
         if base != mut_base:
             # base has been mutated to another base
             self.ns_mut_counter += 1
-            self.mutate_alignment(alignment, snv_pos, mut_base)
-            self.check_cigar_str(alignment)
+            self.mutate_sequence(alignment, snv_pos, mut_base)
+            self.check_cigar_str(alignment, snv_pos)
     
     @staticmethod
-    def mutate_alignment(alignment, mut_pos, mut_base):
+    def mutate_sequence(alignment, mut_pos, mut_base):
         """
         Replace base at snv position with mutated base
         :param alignment: pysam.AlignedSegment
@@ -383,27 +392,28 @@ class Mutator:
         alignment.query_sequence = mut_seq
     
     @classmethod
-    def check_cigar_str(cls, snv_alignment):
+    def check_cigar_str(cls, alignment, snv_pos):
         """
         Validate cigar operation at snv position.
         TODO: Update cigar and quality strings.
-        :param snv_alignment:
+        :param alignment: pysam.AlignedSegment
+        :param snv_pos: position of snv in alignment sequence
         """
         # start at -1 to work with 0-based position
         seq_pos = -1
-        for cig_op_id, cig_op_len in snv_alignment.alignment.cigartuples:
+        for cig_op_id, cig_op_len in alignment.cigartuples:
             if cig_op_id == cls.CIGAR_MATCH or cig_op_id == cls.CIGAR_INS:
                 # match and insert are present in the query_alignment_sequence
-                curr_seq_pos = seq_pos + cig_op_len
+                tmp_seq_pos = seq_pos + cig_op_len
             elif cig_op_id == cls.CIGAR_DEL:
                 # deletion is not present in the query_alignment_sequence
                 continue
             else:
                 raise ValueError("Unsupported CIGAR operation %d" % cig_op_id)
             
-            if curr_seq_pos < snv_alignment.seq_pos:
+            if tmp_seq_pos < snv_pos:
                 # curr_seq_pos has not reached snv_seq_pos
-                seq_pos = curr_seq_pos
+                seq_pos = tmp_seq_pos
             else:
                 # cigar segment covers snv position, it must be a match
                 if cig_op_id != cls.CIGAR_MATCH:
@@ -411,10 +421,10 @@ class Mutator:
                     # TODO update mapping quality
                     # TODO update cigar string
                     
-                    print("snv_seq_pos %d" % snv_alignment.seq_pos)
+                    print("snv_pos %d" % snv_pos)
                     print("seq_pos %d" % seq_pos)
-                    print(snv_alignment.cigarstring)
-                    print(snv_alignment.get_aligned_pairs(matches_only=False, with_seq=False))
+                    print(alignment.cigarstring)
+                    print(alignment.get_aligned_pairs(matches_only=False, with_seq=False))
                     
                     raise ValueError("Unexpected CIGAR operation %d" % cig_op_id)
                 break
@@ -428,13 +438,12 @@ class Mutator:
         :return: list of remaining alignments
         """
         new_snv_alignments = snv_alignments[:]
-        for i in range(len(snv_alignments)):
-            snv_alignment = snv_alignments[i]
+        for snv_alignment in snv_alignments:
             # new_snv alignment is either before or overlapping next new_snv
             if self.is_before_snv(snv_alignment.alignment, new_snv):
                 self.__write_alignment(out_file, snv_alignment.alignment)
                 # remove written alignment
-                del new_snv_alignments[i]
+                new_snv_alignments.remove(snv_alignment)
             else:  # is overlapping new_snv
                 # find sequence position of new_snv
                 snv_seq_pos = self.ref_pos2seq_pos(snv_alignment.alignment, new_snv['ref_pos'])
@@ -459,16 +468,19 @@ if __name__ == "__main__":
     BAM_FILENAME = "/data/projects/varlock/mapping/1020b_S23_chr22.bam"
     FAI_FILENAME = "/data/genome/human/hg19/hg19.fa.fai"
     VAC_FILENAME = "/data/projects/varlock/scripts/in/chr22.vac"
-    OUT_FILENAME = "/data/projects/varlock/mapping/1020b_S23_chr22_mut.bam"
+    OUT_FILENAME = "/data/projects/varlock/mapping/1020b_S23_chr22_mut1.bam"
     
     # python3 /data/projects/varlock/scripts/mutate.py
     
+    # EOF BAM
     # written alignments 517362
     # unmapped alignments 0
     # overlapping alignments 495465
     # max snv alignments 667
-    # read snvs 1059416, 101 omitted
     # total snvs 1059517
+    # read snvs 1059417, 100 omitted
+    # mutations 2373839
+    # ns mutations 53775
     
-    mutator = Mutator(fai_filename=FAI_FILENAME, verbose=True)
+    mutator = Mutator(fai_filename=FAI_FILENAME, rnd=random.Random(0), verbose=True)
     mutator.mutate(vac_filename=VAC_FILENAME, bam_filename=BAM_FILENAME, out_filename=OUT_FILENAME)
