@@ -52,7 +52,7 @@ class Mutator:
             return 0
         
         if sum(p_dist) == 0:
-            # each outcome has the equal probability
+            # each outcome has equal probability
             return rnd.randint(0, len(p_dist) - 1)
         
         p_level = 0
@@ -85,7 +85,7 @@ class Mutator:
     def index2pos(self, index):
         """
         Convert absolute position (index) on genome to reference position.
-        :param index: absolute position on genome
+        :param index: 0-based position on genome
         :return: reference position as tuple (<reference name>, <0-based position>)
         """
         ref_pos = index
@@ -102,7 +102,7 @@ class Mutator:
         Convert reference position to absolute position (index) on genome.
         :param ref_name: reference name
         :param ref_pos: 0-based reference position
-        :return: absolute position on genome
+        :return: 0-based position on genome
         """
         sum_ref_pos = 0
         for ref in self.fai_list:
@@ -134,7 +134,7 @@ class Mutator:
         
         return data
     
-    def is_before_snv(self, alignment, snv):
+    def __is_before_snv(self, alignment, snv):
         """
         Check if alignment is mapped before snv.
         :return: True if alignment end is mapped before snv
@@ -144,7 +144,7 @@ class Mutator:
         alignment_end = self.pos2index(alignment.reference_name, ref_end)
         return alignment_end < snv['index']
     
-    def is_after_snv(self, alignment, snv):
+    def __is_after_snv(self, alignment, snv):
         """
         Check if alignment is mapped after snv.
         :return: True if alignment start is mapped after snv
@@ -211,13 +211,13 @@ class Mutator:
         return mut_map
     
     @staticmethod
-    def next_item(iterable):
+    def __next_item(iterable):
         try:
             return next(iter(iterable))
         except StopIteration:
             return None
     
-    def read_vac_snv(self, vac_file):
+    def __read_vac_snv(self, vac_file):
         byte_string = vac_file.read(12)
         if byte_string == "":
             return None
@@ -234,11 +234,16 @@ class Mutator:
         :param ref_pos: reference position of base
         :return: 0-based position of base with specified reference position in sequence string
         """
-        for seq_pos, current_ref_pos in alignment.get_aligned_pairs(matches_only=True, with_seq=False):
+        seq_pos = None
+        for current_seq_pos, current_ref_pos in alignment.get_aligned_pairs(matches_only=True, with_seq=False):
             # search for base in snv position
             if current_ref_pos == ref_pos:
-                return seq_pos
-        return None
+                seq_pos = current_seq_pos
+                break
+            elif current_ref_pos > ref_pos:
+                break
+        
+        return seq_pos
     
     def __write_alignment(self, out_file, alignment):
         """
@@ -252,17 +257,49 @@ class Mutator:
         if self.verbose and self.alignment_counter % 10000 == 0:
             print("%d alignments processed" % self.alignment_counter)
     
-    @staticmethod
-    def get_base_pileup(snv_alignments):
+    @classmethod
+    def get_base_pileup(cls, snv_alignments):
         pileup_col = []
         for snv_alignment in snv_alignments:
             if snv_alignment.snv_pos is not None:
                 # alignment is mapped at snv position
-                # not sure if query_sequence or query_alignment_sequence
-                base = snv_alignment.alignment.query_alignment_sequence[snv_alignment.snv_pos]
-                pileup_col.append(base)
+                snv_base = cls.get_base(snv_alignment.alignment, snv_alignment.snv_pos)
+                pileup_col.append(snv_base)
         
         return pileup_col
+    
+    @staticmethod
+    def get_base(alignment, pos):
+        """
+        :param alignment: pysam.AlignedSegment
+        :param pos: position in sequence
+        :return: base at pos
+        """
+        # query_sequence is <class 'bytes'>
+        return chr(alignment.query_sequence[pos])
+    
+    @staticmethod
+    def set_base(alignment, pos, base):
+        """
+        Replace base at snv position
+        :param alignment: pysam.AlignedSegment
+        :param pos: position in sequence
+        :param base: mutated base letter
+        :return: mutated sequence string
+        """
+        mut_seq = alignment.query_sequence[:pos]
+        mut_seq += base.encode()  # mut_seq is <class 'bytes'>
+        mut_seq += alignment.query_sequence[pos + 1:]
+        alignment.query_sequence = mut_seq
+    
+    def finish(self, snv_alignments, sam_file, out_file):
+        # write remaining snv alignments
+        for snv_alignment in snv_alignments:
+            self.__write_alignment(out_file, snv_alignment.alignment)
+        # write remaining alignments (in EOF VAC case only)
+        while alignment is not None:
+            self.__write_alignment(out_file, alignment)
+            alignment = self.__next_item(sam_file)
     
     def mutate(self, vac_filename, bam_filename, out_filename):
         """
@@ -286,8 +323,8 @@ class Mutator:
                 pysam.AlignmentFile(out_filename, "wb", template=sam_file) as out_file:
             
             snv_alignments = []
-            alignment = self.next_item(sam_file)
-            snv = self.read_vac_snv(vac_file)
+            alignment = self.__next_item(sam_file)
+            snv = self.__read_vac_snv(vac_file)
             
             while True:
                 if snv is None or alignment is None:
@@ -296,38 +333,32 @@ class Mutator:
                             print("EOF VAC")
                         else:
                             print("EOF BAM")
-                    # write remaining snv alignments
-                    for snv_alignment in snv_alignments:
-                        self.__write_alignment(out_file, snv_alignment.alignment)
-                    # write remaining alignments (in EOF VAC case only)
-                    while alignment is not None:
-                        self.__write_alignment(out_file, alignment)
-                        alignment = self.next_item(sam_file)
+                    self.finish(snv_alignments, sam_file, out_file)
                     break
                 
                 elif alignment.is_unmapped:
                     self.__write_alignment(out_file, alignment)
                     self.unmapped_counter += 1
                 
-                elif self.is_before_snv(alignment, snv):
+                elif self.__is_before_snv(alignment, snv):
                     # print("alignment is before snv")
                     # time.sleep(0.1)
                     self.__write_alignment(out_file, alignment)
-                    alignment = self.next_item(sam_file)
+                    alignment = self.__next_item(sam_file)
                 
-                elif self.is_after_snv(alignment, snv):
-                    self.mutate_snv_alignments(snv_alignments, snv)
+                elif self.__is_after_snv(alignment, snv):
+                    self.__mutate_snv_alignments(snv_alignments, snv['ac'])
                     # done with this snv, read next
-                    snv = self.read_vac_snv(vac_file)
+                    snv = self.__read_vac_snv(vac_file)
                     # process snv_alignments with new snv
-                    snv_alignments = self.process_snv_alignments(snv_alignments, snv, out_file)
+                    snv_alignments = self.__process_snv_alignments(snv_alignments, snv, out_file)
                 
                 else:  # alignment is overlapping snv
                     # alignment dont have to be mapped to the snv (indel)
                     # find sequence position of snv
                     snv_seq_pos = self.ref_pos2seq_pos(alignment, snv['ref_pos'])
                     snv_alignments.append(SnvAlignment(alignment, snv_seq_pos))
-                    alignment = self.next_item(sam_file)
+                    alignment = self.__next_item(sam_file)
                     
                     if self.verbose:
                         self.max_snv_alignments = max(len(snv_alignments), self.max_snv_alignments)
@@ -342,54 +373,43 @@ class Mutator:
                 print("mutations %d" % self.mut_counter)
                 print("ns mutations %d" % self.ns_mut_counter)
     
-    def mutate_snv_alignments(self, snv_alignments, snv):
+    def __mutate_snv_alignments(self, snv_alignments, snv_ac):
+        """
+        Mutate alignments at snv position by allele frequencies of the snv
+        :param snv_alignments: alignments together with snv positions
+        :param snv_ac: list of allele frequencies
+        """
         # get pileup of bases from alignments at snv mapping position
         base_pileup = self.get_base_pileup(snv_alignments)
         alt_ac = self.count_bases(base_pileup)
-        mut_map = self.create_mut_map(alt_ac=alt_ac, ref_ac=snv['ac'], rnd=self.rnd)
+        mut_map = self.create_mut_map(alt_ac=alt_ac, ref_ac=snv_ac, rnd=self.rnd)
         
         for snv_alignment in snv_alignments:
             if snv_alignment.snv_pos is not None:
                 # alignment has snv to mutate
-                self.mutate_alignment(snv_alignment.alignment, snv_alignment.snv_pos, mut_map)
+                self.__mutate_alignment(snv_alignment.alignment, snv_alignment.snv_pos, mut_map)
                 # mutation can be done only once
                 snv_alignment.snv_pos = None
     
-    def mutate_alignment(self, alignment, snv_pos, mut_map):
+    def __mutate_alignment(self, alignment, snv_pos, mut_map):
         """
         Mutate alignment by mutation map at snv position.
         :param alignment: pysam.AlignedSegment
-        :param snv_pos: position of snv in alignment sequence
+        :param snv_pos: position of snv in aligned sequence
         :param mut_map: mutation map
         """
         # there is base to be mutated
         self.mut_counter += 1
         
         # alignment is mapped at snv position
-        # not sure if query_sequence or query_alignment_sequence
-        base = alignment.query_alignment_sequence[snv_pos]
-        mut_base = mut_map[base]
+        snv_base = self.get_base(alignment, snv_pos)
+        mut_base = mut_map[snv_base]
         
-        if base != mut_base:
+        if snv_base != mut_base:
             # base has been mutated to another base
             self.ns_mut_counter += 1
-            self.mutate_sequence(alignment, snv_pos, mut_base)
+            self.set_base(alignment, snv_pos, mut_base)
             self.check_cigar_str(alignment, snv_pos)
-    
-    @staticmethod
-    def mutate_sequence(alignment, mut_pos, mut_base):
-        """
-        Replace base at snv position with mutated base
-        :param alignment: pysam.AlignedSegment
-        :param mut_pos: 0-based position to mutate
-        :param mut_base: mutated base
-        :return: mutated sequence string
-        """
-        mut_pos = mut_pos + alignment.query_alignment_start
-        mut_seq = str(alignment.query_sequence[:mut_pos])
-        mut_seq += str(mut_base)
-        mut_seq += str(alignment.query_sequence[mut_pos + 1:])
-        alignment.query_sequence = mut_seq
     
     @classmethod
     def check_cigar_str(cls, alignment, snv_pos):
@@ -403,10 +423,10 @@ class Mutator:
         seq_pos = -1
         for cig_op_id, cig_op_len in alignment.cigartuples:
             if cig_op_id == cls.CIGAR_MATCH or cig_op_id == cls.CIGAR_INS:
-                # match and insert are present in the query_alignment_sequence
+                # match and insert are present in aligned sequence
                 tmp_seq_pos = seq_pos + cig_op_len
             elif cig_op_id == cls.CIGAR_DEL:
-                # deletion is not present in the query_alignment_sequence
+                # deletion is not present in aligned sequence
                 continue
             else:
                 raise ValueError("Unsupported CIGAR operation %d" % cig_op_id)
@@ -426,10 +446,10 @@ class Mutator:
                     print(alignment.cigarstring)
                     print(alignment.get_aligned_pairs(matches_only=False, with_seq=False))
                     
-                    raise ValueError("Unexpected CIGAR operation %d" % cig_op_id)
+                    raise ValueError("Unsupported CIGAR operation %d" % cig_op_id)
                 break
     
-    def process_snv_alignments(self, snv_alignments, new_snv, out_file):
+    def __process_snv_alignments(self, snv_alignments, new_snv, out_file):
         """
         Update ovelapping alignments with new snv. Save alignments before new snv to file
         :param snv_alignments: snv alignments overlapping previous snvs
@@ -440,7 +460,7 @@ class Mutator:
         new_snv_alignments = snv_alignments[:]
         for snv_alignment in snv_alignments:
             # new_snv alignment is either before or overlapping next new_snv
-            if self.is_before_snv(snv_alignment.alignment, new_snv):
+            if self.__is_before_snv(snv_alignment.alignment, new_snv):
                 self.__write_alignment(out_file, snv_alignment.alignment)
                 # remove written alignment
                 new_snv_alignments.remove(snv_alignment)
