@@ -1,3 +1,4 @@
+import struct
 import unittest
 from random import Random
 
@@ -7,11 +8,18 @@ from mutator import Mutator, SnvAlignment
 
 
 class MutatorTest(unittest.TestCase):
-    BAM_FILENAME = "/data/projects/varlock/scripts/mapping/1020b_S23_chr22.bam"
     FAI_FILENAME = "/data/projects/varlock/scripts/test/hg19.fa.fai"
     FAI2_FILENAME = "/data/projects/varlock/scripts/test/hs37d5.fa.fai"
-    VAC_FILENAME = "/data/projects/varlock/scripts/test/in/chr22.vac"
-    OUT_FILENAME = "/data/projects/varlock/scripts/test/1020b_S23_chr22_mut1.bam"
+    
+    TEXT_VAC_FILENAME = "/data/projects/varlock/scripts/test/input.vac.txt"
+    VAC_FILENAME = "/data/projects/varlock/scripts/test/input.vac"
+    
+    SAM_FILENAME = "/data/projects/varlock/scripts/test/input.sam"
+    BAM_FILENAME = "/data/projects/varlock/scripts/test/input.bam"
+    
+    DESIRED_BAM_FILENAME = "/data/projects/varlock/scripts/test/desired.bam"
+    OUT_BAM_FILENAME = "/data/projects/varlock/scripts/test/output.bam"
+    OUT_SAM_FILENAME = "/data/projects/varlock/scripts/test/output.sam"
     
     RND_OUT = [0.8444218515250481,
                0.7579544029403025,
@@ -94,14 +102,18 @@ class MutatorTest(unittest.TestCase):
     
     def test_fai_parsing(self):
         fai_list = Mutator.parse_fai(self.FAI_FILENAME)
-        fai_line = fai_list[21]
-        desired_fail_line = {"name": '22', "length": 51304566, "offset": 2886323449, "linebases": 50}
-        self.assertDictEqual(desired_fail_line, fai_line)
+        reference = fai_list[21]
+        self.assertEqual(reference.ref_id, 21)
+        self.assertEqual(reference.name, '22')
+        self.assertEqual(reference.start, 2829728720)
+        self.assertEqual(reference.length, 51304566)
         
         fai_list = Mutator.parse_fai(self.FAI2_FILENAME)
-        fai_line = fai_list[21]
-        desired_fail_line = {"name": '22', "length": 51304566, "offset": 2876892038, "linebases": 60}
-        self.assertDictEqual(desired_fail_line, fai_line)
+        reference = fai_list[21]
+        self.assertEqual(reference.ref_id, 21)
+        self.assertEqual(reference.name, '22')
+        self.assertEqual(reference.start, 2829728720)
+        self.assertEqual(reference.length, 51304566)
     
     def test_test(self):
         self.assertListEqual([3, 2, 1, 1], Mutator.count_bases(['A', 'A', 'G', 'T', 'C', 'T', 'A']))
@@ -183,11 +195,68 @@ class MutatorTest(unittest.TestCase):
         self.assertDictEqual({'A': 'G', 'T': 'T', 'G': 'C', 'C': 'A', 'N': 'N'}, mut_map)
     
     def test_method(self):
-        mut = Mutator(self.FAI_FILENAME, rnd=Random(0))
-        # mut.mutate(vac_filename=self.VAC_FILENAME, bam_filename=self.BAM_FILENAME, out_filename=self.OUT_FILENAME)
-        # TODO
+        mut = Mutator(self.FAI_FILENAME, rnd=RandomMockup())
+        mut.mutate(vac_filename=self.VAC_FILENAME, bam_filename=self.BAM_FILENAME, out_filename=self.OUT_BAM_FILENAME)
+        self.bam2sam(self.OUT_BAM_FILENAME, self.OUT_SAM_FILENAME)
+    
+    
+    @staticmethod
+    def text2vac(text_filename, vac_filename):
+        with open(text_filename, "r") as text_file, \
+                open(vac_filename, "wb") as vac_file:
+            for line in text_file:
+                data = list(map(int, line.strip().split("\t")))
+                vac_file.write(struct.pack('<IHHHH', *data))
+    
+    @staticmethod
+    def vac2list(vac_filename):
+        data = []
+        with open(vac_filename, "rb") as vac_file:
+            while True:
+                byte_string = vac_file.read(12)
+                if len(byte_string) == 0:
+                    break
+                data.append(struct.unpack('<IHHHH', byte_string))
+                
+        return data
+    
+    @staticmethod
+    def sam2bam(sam_filename, bam_filename):
+        with pysam.AlignmentFile(sam_filename, "r") as sam_file, \
+                pysam.AlignmentFile(bam_filename, "wb", template=sam_file) as bam_file:
+            for alignment in sam_file:
+                bam_file.write(alignment)
+                
+    @staticmethod
+    def bam2sam(bam_filename, sam_filename):
+        with pysam.AlignmentFile(bam_filename, "rb") as bam_file, \
+                pysam.AlignmentFile(sam_filename, "w", template=bam_file) as sam_file:
+            for alignment in bam_file:
+                sam_file.write(alignment)
+
+
+class RandomMockup:
+    def __init__(self):
         pass
+    
+    @staticmethod
+    def random():
+        return 0.5
+    
+    @staticmethod
+    def randint(a, b):
+        return 0
 
 
 if __name__ == '__main__':
+    # python3 /usr/local/bin/nosetests -s /data/projects/varlock/scripts/mutator_test.py
+    # python3 -m cProfile -s tottime /data/projects/varlock/scripts/mutator.py
+    
+    MutatorTest.text2vac(MutatorTest.TEXT_VAC_FILENAME, MutatorTest.VAC_FILENAME)
+    # vac_list = MutatorTest.vac2list(MutatorTest.VAC_FILENAME)
+    # print(vac_list)
+    
+    MutatorTest.sam2bam(MutatorTest.SAM_FILENAME, MutatorTest.BAM_FILENAME)
+    # bam_list = MutatorTest.bam2list(MutatorTest.BAM_FILENAME)
+    # print(bam_list)
     unittest.main()

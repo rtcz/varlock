@@ -27,6 +27,8 @@ class Mutator:
         :param verbose:
         """
         self.fai_list = self.parse_fai(fai_filename)
+        # create dict for fast access
+        self.fai_dict = dict((reference.name, reference) for reference in self.fai_list)
         self.rnd = rnd
         self.verbose = verbose
         
@@ -90,9 +92,9 @@ class Mutator:
         """
         ref_pos = index
         for ref in self.fai_list:
-            new_ref_pos = ref_pos - ref["length"]
+            new_ref_pos = ref_pos - ref.length
             if new_ref_pos < 0:
-                return ref["name"], ref_pos
+                return ref.name, ref_pos
             else:
                 ref_pos = new_ref_pos
         raise ValueError("reference position for index %d not found" % index)
@@ -104,13 +106,7 @@ class Mutator:
         :param ref_pos: 0-based reference position
         :return: 0-based position on genome
         """
-        sum_ref_pos = 0
-        for ref in self.fai_list:
-            if ref["name"] == self.strip_chr(ref_name):
-                return int(ref_pos) + sum_ref_pos
-            else:
-                sum_ref_pos += ref["length"]
-        raise ValueError("sequence name %s not found" % ref_name)
+        return self.fai_dict[self.strip_chr(ref_name)].start + ref_pos
     
     @classmethod
     def parse_fai(cls, fai_filename):
@@ -120,17 +116,18 @@ class Mutator:
         :return: list of references from fasta index file
         """
         data = []
-        ref_keys = ["name", "length", "offset", "linebases"]
         with open(fai_filename, "r") as fai_file:
+            counter = 0
+            start = 0
             for line in fai_file:
                 raw_record = line.rstrip().split()
-                ref_name = raw_record[0]
-                ref_data = map(int, raw_record[1:])
+                name = cls.strip_chr(raw_record[0])
+                length = int(raw_record[1])
                 
-                # noinspection PyTypeChecker
-                ref = [cls.strip_chr(ref_name)] + list(ref_data)
-                record_map = dict(zip(ref_keys, ref))
-                data.append(record_map)
+                reference = FaiReference(ref_id=counter, name=name, start=start, length=length)
+                data.append(reference)
+                counter += 1
+                start += reference.length
         
         return data
     
@@ -219,7 +216,7 @@ class Mutator:
     
     def __read_vac_snv(self, vac_file):
         byte_string = vac_file.read(12)
-        if byte_string == "":
+        if len(byte_string) == 0:
             return None
         self.snv_counter += 1
         data_list = list(struct.unpack('<IHHHH', byte_string))
@@ -234,15 +231,16 @@ class Mutator:
         :param ref_pos: reference position of base
         :return: 0-based position of base with specified reference position in sequence string
         """
+        
+        pair_id = ref_pos - alignment.reference_start
+        
         seq_pos = None
-        for current_seq_pos, current_ref_pos in alignment.get_aligned_pairs(matches_only=True, with_seq=False):
+        for current_seq_pos, current_ref_pos in alignment.get_aligned_pairs(matches_only=False, with_seq=False):
             # search for base in snv position
             if current_ref_pos == ref_pos:
                 seq_pos = current_seq_pos
                 break
-            elif current_ref_pos > ref_pos:
-                break
-        
+                
         return seq_pos
     
     def __write_alignment(self, out_file, alignment):
@@ -256,6 +254,8 @@ class Mutator:
         
         if self.verbose and self.alignment_counter % 10000 == 0:
             print("%d alignments processed" % self.alignment_counter)
+            # TODO remove
+            exit(0)
     
     @classmethod
     def get_base_pileup(cls, snv_alignments):
@@ -275,8 +275,7 @@ class Mutator:
         :param pos: position in sequence
         :return: base at pos
         """
-        # query_sequence is <class 'bytes'>
-        return chr(alignment.query_sequence[pos])
+        return alignment.query_sequence[pos]
     
     @staticmethod
     def set_base(alignment, pos, base):
@@ -288,11 +287,11 @@ class Mutator:
         :return: mutated sequence string
         """
         mut_seq = alignment.query_sequence[:pos]
-        mut_seq += base.encode()  # mut_seq is <class 'bytes'>
+        mut_seq += base
         mut_seq += alignment.query_sequence[pos + 1:]
         alignment.query_sequence = mut_seq
     
-    def finish(self, snv_alignments, sam_file, out_file):
+    def finish(self, alignment, snv_alignments, sam_file, out_file):
         # write remaining snv alignments
         for snv_alignment in snv_alignments:
             self.__write_alignment(out_file, snv_alignment.alignment)
@@ -333,7 +332,7 @@ class Mutator:
                             print("EOF VAC")
                         else:
                             print("EOF BAM")
-                    self.finish(snv_alignments, sam_file, out_file)
+                    self.finish(alignment, snv_alignments, sam_file, out_file)
                     break
                 
                 elif alignment.is_unmapped:
@@ -484,13 +483,27 @@ class SnvAlignment:
         self.snv_pos = snv_pos
 
 
+class FaiReference:
+    def __init__(self, ref_id, name, start, length):
+        """
+        :param ref_id: reference id
+        :param name: reference name
+        :param start: 0-based first position
+        :param length: reference length - number of bases
+        """
+        self.ref_id = ref_id
+        self.name = name
+        self.start = start
+        self.length = length
+
+
 if __name__ == "__main__":
+    # python3 /data/projects/varlock/scripts/mutate.py
+    
     BAM_FILENAME = "/data/projects/varlock/mapping/1020b_S23_chr22.bam"
     FAI_FILENAME = "/data/genome/human/hg19/hg19.fa.fai"
     VAC_FILENAME = "/data/projects/varlock/scripts/in/chr22.vac"
     OUT_FILENAME = "/data/projects/varlock/mapping/1020b_S23_chr22_mut1.bam"
-    
-    # python3 /data/projects/varlock/scripts/mutate.py
     
     # EOF BAM
     # written alignments 517362
@@ -501,6 +514,10 @@ if __name__ == "__main__":
     # read snvs 1059417, 100 omitted
     # mutations 2373839
     # ns mutations 53775
+
+    # 10000 time 10.991
+    
+    # TODO add option for choosing GRCh37 vs hg19 BAM file
     
     mutator = Mutator(fai_filename=FAI_FILENAME, rnd=random.Random(0), verbose=True)
     mutator.mutate(vac_filename=VAC_FILENAME, bam_filename=BAM_FILENAME, out_filename=OUT_FILENAME)
