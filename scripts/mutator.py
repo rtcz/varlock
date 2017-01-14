@@ -240,7 +240,7 @@ class Mutator:
             if current_ref_pos == ref_pos:
                 seq_pos = current_seq_pos
                 break
-                
+        
         return seq_pos
     
     def __write_alignment(self, out_file, alignment):
@@ -291,10 +291,29 @@ class Mutator:
         mut_seq += alignment.query_sequence[pos + 1:]
         alignment.query_sequence = mut_seq
     
-    def finish(self, alignment, snv_alignments, sam_file, out_file):
-        # write remaining snv alignments
+    def __finish(self, snv, alignment, snv_alignments, sam_file, out_file):
+        """
+        Write remaining alignments to BAM file.
+        :param snv:
+        :param alignment:
+        :param snv_alignments:
+        :param sam_file:
+        :param out_file:
+        :return:
+        """
+        if self.verbose:
+            if snv is None:
+                print("EOF VAC")
+            else:
+                print("EOF BAM")
+        
+        # last mutation
+        if snv is not None:
+            self.__mutate_snv_alignments(snv_alignments, snv['ac'])
+        
         for snv_alignment in snv_alignments:
             self.__write_alignment(out_file, snv_alignment.alignment)
+        
         # write remaining alignments (in EOF VAC case only)
         while alignment is not None:
             self.__write_alignment(out_file, alignment)
@@ -311,7 +330,7 @@ class Mutator:
         self.alignment_counter = 0  # counts written alignments
         self.mut_counter = 0
         self.ns_mut_counter = 0  # non synonymous mutation counter
-        self.snv_counter = 1  # counts read snvs
+        self.snv_counter = 0  # counts read snvs
         
         self.unmapped_counter = 0
         self.overlapping_counter = 0
@@ -327,12 +346,7 @@ class Mutator:
             
             while True:
                 if snv is None or alignment is None:
-                    if self.verbose:
-                        if snv is None:
-                            print("EOF VAC")
-                        else:
-                            print("EOF BAM")
-                    self.finish(alignment, snv_alignments, sam_file, out_file)
+                    self.__finish(snv, alignment, snv_alignments, sam_file, out_file)
                     break
                 
                 elif alignment.is_unmapped:
@@ -355,13 +369,11 @@ class Mutator:
                 else:  # alignment is overlapping snv
                     # alignment dont have to be mapped to the snv (indel)
                     # find sequence position of snv
-                    snv_seq_pos = self.ref_pos2seq_pos(alignment, snv['ref_pos'])
-                    snv_alignments.append(SnvAlignment(alignment, snv_seq_pos))
+                    snv_pos = self.ref_pos2seq_pos(alignment, snv['ref_pos'])
+                    snv_alignments.append(SnvAlignment(alignment, snv_pos))
                     alignment = self.__next_item(sam_file)
-                    
-                    if self.verbose:
-                        self.max_snv_alignments = max(len(snv_alignments), self.max_snv_alignments)
-                        self.overlapping_counter += 1
+                    self.overlapping_counter += 1
+                    self.max_snv_alignments = max(len(snv_alignments), self.max_snv_alignments)
             
             if self.verbose:
                 print("written alignments %d" % self.alignment_counter)
@@ -399,7 +411,6 @@ class Mutator:
         """
         # there is base to be mutated
         self.mut_counter += 1
-        
         # alignment is mapped at snv position
         snv_base = self.get_base(alignment, snv_pos)
         mut_base = mut_map[snv_base]
@@ -465,10 +476,10 @@ class Mutator:
                 new_snv_alignments.remove(snv_alignment)
             else:  # is overlapping new_snv
                 # find sequence position of new_snv
-                snv_seq_pos = self.ref_pos2seq_pos(snv_alignment.alignment, new_snv['ref_pos'])
-                if snv_seq_pos is not None:
+                snv_pos = self.ref_pos2seq_pos(snv_alignment.alignment, new_snv['ref_pos'])
+                if snv_pos is not None:
                     # alignment is mapped at another new_snv position
-                    snv_alignment.snv_pos = snv_seq_pos
+                    snv_alignment.snv_pos = snv_pos
         
         return new_snv_alignments
 
@@ -514,7 +525,7 @@ if __name__ == "__main__":
     # read snvs 1059417, 100 omitted
     # mutations 2373839
     # ns mutations 53775
-
+    
     # 10000 time 10.991
     
     # TODO add option for choosing GRCh37 vs hg19 BAM file

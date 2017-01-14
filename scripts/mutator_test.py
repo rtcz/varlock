@@ -1,5 +1,6 @@
 import struct
 import unittest
+import filecmp
 from random import Random
 
 import pysam
@@ -14,10 +15,10 @@ class MutatorTest(unittest.TestCase):
     TEXT_VAC_FILENAME = "/data/projects/varlock/scripts/test/input.vac.txt"
     VAC_FILENAME = "/data/projects/varlock/scripts/test/input.vac"
     
-    SAM_FILENAME = "/data/projects/varlock/scripts/test/input.sam"
-    BAM_FILENAME = "/data/projects/varlock/scripts/test/input.bam"
+    IN_SAM_FILENAME = "/data/projects/varlock/scripts/test/input.sam"
+    IN_BAM_FILENAME = "/data/projects/varlock/scripts/test/input.bam"
     
-    DESIRED_BAM_FILENAME = "/data/projects/varlock/scripts/test/desired.bam"
+    DESIRED_SAM_FILENAME = "/data/projects/varlock/scripts/test/desired.sam"
     OUT_BAM_FILENAME = "/data/projects/varlock/scripts/test/output.bam"
     OUT_SAM_FILENAME = "/data/projects/varlock/scripts/test/output.sam"
     
@@ -195,10 +196,17 @@ class MutatorTest(unittest.TestCase):
         self.assertDictEqual({'A': 'G', 'T': 'T', 'G': 'C', 'C': 'A', 'N': 'N'}, mut_map)
     
     def test_method(self):
-        mut = Mutator(self.FAI_FILENAME, rnd=RandomMockup())
-        mut.mutate(vac_filename=self.VAC_FILENAME, bam_filename=self.BAM_FILENAME, out_filename=self.OUT_BAM_FILENAME)
+        mut = Mutator(self.FAI_FILENAME, rnd=RandomMockup(), verbose=False)
+        mut.mutate(vac_filename=self.VAC_FILENAME, bam_filename=self.IN_BAM_FILENAME, out_filename=self.OUT_BAM_FILENAME)
         self.bam2sam(self.OUT_BAM_FILENAME, self.OUT_SAM_FILENAME)
-    
+        self.assertEqual(True, filecmp.cmp(self.OUT_SAM_FILENAME, self.DESIRED_SAM_FILENAME))
+        self.assertEqual(15, mut.alignment_counter)
+        self.assertEqual(0, mut.unmapped_counter)
+        self.assertEqual(12, mut.overlapping_counter)
+        self.assertEqual(5, mut.max_snv_alignments)
+        self.assertEqual(5, mut.snv_counter)
+        self.assertEqual(13, mut.mut_counter)
+        self.assertEqual(12, mut.ns_mut_counter)
     
     @staticmethod
     def text2vac(text_filename, vac_filename):
@@ -217,7 +225,7 @@ class MutatorTest(unittest.TestCase):
                 if len(byte_string) == 0:
                     break
                 data.append(struct.unpack('<IHHHH', byte_string))
-                
+        
         return data
     
     @staticmethod
@@ -226,7 +234,7 @@ class MutatorTest(unittest.TestCase):
                 pysam.AlignmentFile(bam_filename, "wb", template=sam_file) as bam_file:
             for alignment in sam_file:
                 bam_file.write(alignment)
-                
+    
     @staticmethod
     def bam2sam(bam_filename, sam_filename):
         with pysam.AlignmentFile(bam_filename, "rb") as bam_file, \
@@ -256,7 +264,5 @@ if __name__ == '__main__':
     # vac_list = MutatorTest.vac2list(MutatorTest.VAC_FILENAME)
     # print(vac_list)
     
-    MutatorTest.sam2bam(MutatorTest.SAM_FILENAME, MutatorTest.BAM_FILENAME)
-    # bam_list = MutatorTest.bam2list(MutatorTest.BAM_FILENAME)
-    # print(bam_list)
+    MutatorTest.sam2bam(MutatorTest.IN_SAM_FILENAME, MutatorTest.IN_BAM_FILENAME)
     unittest.main()
