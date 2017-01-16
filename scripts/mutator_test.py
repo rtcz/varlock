@@ -36,7 +36,7 @@ class MutatorTest(unittest.TestCase):
         "/data/projects/varlock/scripts/test/output_01.sam",
         "/data/projects/varlock/scripts/test/output_02.sam"
     ]
-    
+
     RND_OUT = [0.8444218515250481,
                0.7579544029403025,
                0.420571580830845,
@@ -101,20 +101,20 @@ class MutatorTest(unittest.TestCase):
     #     print("teardown_class() after any methods in this class")
     
     def test_multi_random(self):
-        self.assertEqual(3, Mutator.multi_random([1, 1, 1, 1], Random(0)))
-        self.assertEqual(0, Mutator.multi_random([1, 0, 0, 0], Random(0)))
-        self.assertEqual(3, Mutator.multi_random([0, 0, 0, 1], Random(0)))
-        self.assertEqual(2, Mutator.multi_random([0, 1, 1, 0], Random(0)))
-        self.assertEqual(1, Mutator.multi_random([1, 1, 0, 0], Random(0)))
-        self.assertEqual(3, Mutator.multi_random([0, 0, 1, 1], Random(0)))
-        self.assertEqual(3, Mutator.multi_random([0, 0, 0, 0], Random(0)))
-        self.assertEqual(1, Mutator.multi_random([1, 1], Random(0)))
-        self.assertEqual(1, Mutator.multi_random([0, 1], Random(0)))
-        self.assertEqual(0, Mutator.multi_random([1, 0], Random(0)))
-        self.assertEqual(1, Mutator.multi_random([0, 0], Random(0)))
-        self.assertEqual(0, Mutator.multi_random([0], Random(0)))
-        self.assertEqual(2, Mutator.multi_random([0.8, 0.5, 1.5, 0], Random(0)))
-        self.assertEqual(3, Mutator.multi_random([1, 0, 0, 1], Random(0)))
+        self.assertEqual(2, Mutator.multi_random([1, 1, 1, 1], RandomMockup()))
+        self.assertEqual(0, Mutator.multi_random([1, 0, 0, 0], RandomMockup()))
+        self.assertEqual(3, Mutator.multi_random([0, 0, 0, 1], RandomMockup()))
+        self.assertEqual(2, Mutator.multi_random([0, 1, 1, 0], RandomMockup()))
+        self.assertEqual(1, Mutator.multi_random([1, 1, 0, 0], RandomMockup()))
+        self.assertEqual(3, Mutator.multi_random([0, 0, 1, 1], RandomMockup()))
+        self.assertEqual(0, Mutator.multi_random([0, 0, 0, 0], RandomMockup()))
+        self.assertEqual(1, Mutator.multi_random([1, 1], RandomMockup()))
+        self.assertEqual(1, Mutator.multi_random([0, 1], RandomMockup()))
+        self.assertEqual(0, Mutator.multi_random([1, 0], RandomMockup()))
+        self.assertEqual(0, Mutator.multi_random([0, 0], RandomMockup()))
+        self.assertEqual(0, Mutator.multi_random([0], RandomMockup()))
+        self.assertEqual(0, Mutator.multi_random([0.8, 0.05, 0.15, 0], RandomMockup()))
+        self.assertEqual(3, Mutator.multi_random([1, 0, 0, 1], RandomMockup()))
     
     def test_fai_parsing(self):
         fai_list = Mutator.parse_fai(self.FAI_FILENAME)

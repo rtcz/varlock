@@ -62,7 +62,6 @@ class Mutator:
         
         # make relative
         p_value = rnd_value * sum(p_dist)
-        
         for i in range(len(p_dist)):
             p_level += p_dist[i]
             if p_level > p_value:
