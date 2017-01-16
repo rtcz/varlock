@@ -1,6 +1,6 @@
+import filecmp
 import struct
 import unittest
-import filecmp
 from random import Random
 
 import pysam
@@ -12,15 +12,30 @@ class MutatorTest(unittest.TestCase):
     FAI_FILENAME = "/data/projects/varlock/scripts/test/hg19.fa.fai"
     FAI2_FILENAME = "/data/projects/varlock/scripts/test/hs37d5.fa.fai"
     
-    TEXT_VAC_FILENAME = "/data/projects/varlock/scripts/test/input.vac.txt"
-    VAC_FILENAME = "/data/projects/varlock/scripts/test/input.vac"
+    TEXT_VAC_FILENAMES = [
+        "/data/projects/varlock/scripts/test/input_01.vac.txt",
+        "/data/projects/varlock/scripts/test/input_02.vac.txt"
+    ]
+    VAC_FILENAMES = [
+        "/data/projects/varlock/scripts/test/input_01.vac",
+        "/data/projects/varlock/scripts/test/input_02.vac",
+    ]
     
     IN_SAM_FILENAME = "/data/projects/varlock/scripts/test/input.sam"
     IN_BAM_FILENAME = "/data/projects/varlock/scripts/test/input.bam"
     
-    DESIRED_SAM_FILENAME = "/data/projects/varlock/scripts/test/desired.sam"
-    OUT_BAM_FILENAME = "/data/projects/varlock/scripts/test/output.bam"
-    OUT_SAM_FILENAME = "/data/projects/varlock/scripts/test/output.sam"
+    DESIRED_SAM_FILENAMES = [
+        "/data/projects/varlock/scripts/test/desired_01.sam",
+        "/data/projects/varlock/scripts/test/desired_02.sam"
+    ]
+    OUT_BAM_FILENAMES = [
+        "/data/projects/varlock/scripts/test/output_01.bam",
+        "/data/projects/varlock/scripts/test/output_02.bam"
+    ]
+    OUT_SAM_FILENAMES = [
+        "/data/projects/varlock/scripts/test/output_01.sam",
+        "/data/projects/varlock/scripts/test/output_02.sam"
+    ]
     
     RND_OUT = [0.8444218515250481,
                0.7579544029403025,
@@ -196,10 +211,12 @@ class MutatorTest(unittest.TestCase):
         self.assertDictEqual({'A': 'G', 'T': 'T', 'G': 'C', 'C': 'A', 'N': 'N'}, mut_map)
     
     def test_method(self):
+        # EOF BAM case
         mut = Mutator(self.FAI_FILENAME, rnd=RandomMockup(), verbose=False)
-        mut.mutate(vac_filename=self.VAC_FILENAME, bam_filename=self.IN_BAM_FILENAME, out_filename=self.OUT_BAM_FILENAME)
-        self.bam2sam(self.OUT_BAM_FILENAME, self.OUT_SAM_FILENAME)
-        self.assertEqual(True, filecmp.cmp(self.OUT_SAM_FILENAME, self.DESIRED_SAM_FILENAME))
+        mut.mutate(vac_filename=self.VAC_FILENAMES[0], bam_filename=self.IN_BAM_FILENAME,
+                   out_filename=self.OUT_BAM_FILENAMES[0])
+        self.bam2sam(self.OUT_BAM_FILENAMES[0], self.OUT_SAM_FILENAMES[0])
+        self.assertEqual(True, filecmp.cmp(self.OUT_SAM_FILENAMES[0], self.DESIRED_SAM_FILENAMES[0]))
         self.assertEqual(15, mut.alignment_counter)
         self.assertEqual(0, mut.unmapped_counter)
         self.assertEqual(12, mut.overlapping_counter)
@@ -207,6 +224,20 @@ class MutatorTest(unittest.TestCase):
         self.assertEqual(5, mut.snv_counter)
         self.assertEqual(13, mut.mut_counter)
         self.assertEqual(12, mut.ns_mut_counter)
+        
+        # EOF VAC case
+        mut = Mutator(self.FAI_FILENAME, rnd=RandomMockup(), verbose=False)
+        mut.mutate(vac_filename=self.VAC_FILENAMES[1], bam_filename=self.IN_BAM_FILENAME,
+                   out_filename=self.OUT_BAM_FILENAMES[1])
+        self.bam2sam(self.OUT_BAM_FILENAMES[1], self.OUT_SAM_FILENAMES[1])
+        self.assertEqual(True, filecmp.cmp(self.OUT_SAM_FILENAMES[1], self.DESIRED_SAM_FILENAMES[1]))
+        self.assertEqual(15, mut.alignment_counter)
+        self.assertEqual(0, mut.unmapped_counter)
+        self.assertEqual(7, mut.overlapping_counter)
+        self.assertEqual(3, mut.max_snv_alignments)
+        self.assertEqual(4, mut.snv_counter)
+        self.assertEqual(8, mut.mut_counter)
+        self.assertEqual(7, mut.ns_mut_counter)
     
     @staticmethod
     def text2vac(text_filename, vac_filename):
@@ -260,9 +291,10 @@ if __name__ == '__main__':
     # python3 /usr/local/bin/nosetests -s /data/projects/varlock/scripts/mutator_test.py
     # python3 -m cProfile -s tottime /data/projects/varlock/scripts/mutator.py
     
-    MutatorTest.text2vac(MutatorTest.TEXT_VAC_FILENAME, MutatorTest.VAC_FILENAME)
-    # vac_list = MutatorTest.vac2list(MutatorTest.VAC_FILENAME)
-    # print(vac_list)
+    for i in range(2):
+        MutatorTest.text2vac(MutatorTest.TEXT_VAC_FILENAMES[i], MutatorTest.VAC_FILENAMES[i])
+        # vac_list = MutatorTest.vac2list(MutatorTest.VAC_FILENAME)
+        # print(vac_list)
     
     MutatorTest.sam2bam(MutatorTest.IN_SAM_FILENAME, MutatorTest.IN_BAM_FILENAME)
     unittest.main()

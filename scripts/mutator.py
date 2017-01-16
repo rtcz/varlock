@@ -463,10 +463,14 @@ class Mutator:
         """
         Update ovelapping alignments with new snv. Save alignments before new snv to file
         :param snv_alignments: snv alignments overlapping previous snvs
-        :param new_snv:
+        :param new_snv: Next SNV from VAC file. This SNV must not be present in current snv_alignments yet.
         :param out_file:
         :return: list of remaining alignments
         """
+        if new_snv is None:
+            # could be end of VAC file
+            return snv_alignments
+        
         new_snv_alignments = snv_alignments[:]
         for snv_alignment in snv_alignments:
             # new_snv alignment is either before or overlapping next new_snv
