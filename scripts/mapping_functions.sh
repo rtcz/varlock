@@ -125,7 +125,7 @@ function generate_qualimap {
 
 	local BAM_FILE="$1"
 	local BAM_DIR=`dirname $BAM_FILE`
-	# local BAM_FILENAME=`basename $BAM_FILE` # ???
+	# local IN_BAM_FILENAME=`basename $BAM_FILE` # ???
 	local SAMPLE=`get_true_basename "$BAM_FILE"`
 
 	local QUALIMAP_DIR="$BAM_DIR/$QUALIMAP_DIRNAME/$SAMPLE"

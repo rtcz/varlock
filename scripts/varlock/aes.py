@@ -12,12 +12,14 @@ class BinAES:
     """
     AES encryption for binary input
     """
+    
     def __init__(self, key):
         """
-        transforms key to 32 bytes long hash
-        :param key: text key
+        :param key: byte string
+        The secret key to use in the symmetric cipher.
+        It must be 16 (*AES-128*), 24 (*AES-192*), or 32 (*AES-256*) bytes long.
         """
-        self.key = hashlib.sha256(key.encode()).digest()
+        self.key = key
     
     def encrypt(self, raw_bytes):
         """
@@ -40,12 +42,12 @@ class BinAES:
     
     def key_hash(self):
         return self.key
-
+    
     @staticmethod
     def pad(value):
         pad_count = AES.block_size - len(value) % AES.block_size
         return value + pad_count * b"\0"
-
+    
     @staticmethod
     def unpad(value):
         return value.rstrip(b"\0")
@@ -55,6 +57,7 @@ class TextAES:
     """
     AES encryption for text input
     """
+    
     def __init__(self, key):
         """
         transforms key to 32 bytes long hash

@@ -62,12 +62,12 @@ class Anonymer:
         """
         substitutes uniquely mapped sequences with reference sequences
         """
-        # sam_file = os.path.join(self.out_dir, 'sam.sam')
+        # in_bam_file = os.path.join(self.out_dir, 'sam.sam')
         
         sample_name = self.__sample_name(self.r1)
         
         if self.verbose:
-            print "> first substitution"
+            print("> first substitution")
         self.__substitute_fastq_pair1(
             r1_in=self.r1,
             r2_in=self.r2,
@@ -77,7 +77,7 @@ class Anonymer:
         )
         
         if self.verbose:
-            print "> second substitution"
+            print("> second substitution")
         self.__substitute_fastq_pair2(
             r1_in=self.__out_file_path(self.r1, self.SUBST_1_SUFFIX + self.OUT_FASTQ_SUFFIX),
             r2_in=self.__out_file_path(self.r2, self.SUBST_1_SUFFIX + self.OUT_FASTQ_SUFFIX),
@@ -85,7 +85,7 @@ class Anonymer:
         )
         
         if self.verbose:
-            print "> saving anonymized fastq pair with unique mappings"
+            print("> saving anonymized fastq pair with unique mappings")
         self.__save_substitution(
             r1_in=self.r1,
             r2_in=self.r2,
@@ -97,14 +97,14 @@ class Anonymer:
         
         if not self.keep_temp:
             if self.verbose:
-                print "> deleting temporary files"
+                print("> deleting temporary files")
             os.remove(self.__out_file_path(self.r1, self.SUBST_1_SUFFIX + self.OUT_FASTQ_SUFFIX))
             os.remove(self.__out_file_path(self.r2, self.SUBST_1_SUFFIX + self.OUT_FASTQ_SUFFIX))
             os.remove(self.__out_file_path(sample_name, self.SUBST_1_SUFFIX + self.OUT_SAM_SUFFIX))
             os.remove(self.__out_file_path(sample_name, self.SUBST_2_SUFFIX + self.OUT_SAM_SUFFIX))
         
         if self.verbose:
-            print "> anonymization finished"
+            print("> anonymization finished")
     
     def __out_file_path(self, file_name, suffix):
         return self.out_dir + "/" + \
@@ -133,11 +133,11 @@ class Anonymer:
                 seq_line_id = counter % 4
                 if seq_line_id == self.SEQ_VALUE_LINE_ID:
                     # line with sequence letters
-                    sam_subst1_r1, sam_subst1_r2 = self.sam_pair_2_arr(
+                    sam_subst1_r1, sam_subst1_r2 = self.sam_pair_2_list(
                         sam_subst1_file.readline(),
                         sam_subst1_file.readline()
                     )
-                    sam_subst2_r1, sam_subst2_r2 = self.sam_pair_2_arr(
+                    sam_subst2_r1, sam_subst2_r2 = self.sam_pair_2_list(
                         sam_subst2_file.readline(),
                         sam_subst2_file.readline()
                     )
@@ -184,7 +184,7 @@ class Anonymer:
         return is_same_chr and is_same_pos
     
     @staticmethod
-    def sam_pair_2_arr(first_line, second_line):
+    def sam_pair_2_list(first_line, second_line):
         first_arr = Anonymer.sam_line_2_arr(first_line)
         second_arr = Anonymer.sam_line_2_arr(second_line)
         
@@ -228,7 +228,7 @@ class Anonymer:
             command = self.__build_mapping_command(r1_in, r2_in)
             proc = subprocess.Popen(command, stdout=subprocess.PIPE)
             if self.verbose:
-                print "bowtie2 process started"
+                print("bowtie2 process started")
             while True:
                 line = proc.stdout.readline()
                 if line != '':
@@ -236,7 +236,7 @@ class Anonymer:
                     self.__substitute_fastq_line(line, r1_out_file, r2_out_file)
                     counter += 1
                     if self.verbose and counter % self.LINE_COUNT_LOG == 0:
-                        print "%d read pairs processed" % (counter / 2)
+                        print("%d read pairs processed" % (counter / 2))
                 else:
                     break
     
@@ -246,14 +246,14 @@ class Anonymer:
             command = self.__build_mapping_command(r1_in, r2_in)
             proc = subprocess.Popen(command, stdout=subprocess.PIPE)
             if self.verbose:
-                print "bowtie2 process started"
+                print("bowtie2 process started")
             while True:
                 line = proc.stdout.readline()
                 if line != '':
                     sam_file.write(line)
                     counter += 1
                     if self.verbose and counter % self.LINE_COUNT_LOG == 0:
-                        print "%d read pairs processed" % (counter / 2)
+                        print("%d read pairs processed" % (counter / 2))
                 else:
                     break
     
@@ -383,27 +383,27 @@ def sam_pos_equals(sam1, sam2):
             if sam1_line1 == '':
                 break
             if not __sam_pos_equals(sam1_line1, sam1_line2, sam2_line1, sam2_line2):
-                print sam1_line1.rstrip()
-                print sam1_line2.rstrip()
-                print sam2_line1.rstrip()
-                print sam2_line2.rstrip()
+                print(sam1_line1.rstrip())
+                print(sam1_line2.rstrip())
+                print(sam2_line1.rstrip())
+                print(sam2_line2.rstrip())
             counter += 1
             if counter % Anonymer.LINE_COUNT_LOG == 0:
-                print "%d read pairs processed" % counter
+                print("%d read pairs processed" % counter)
         return True
 
 
 def __sam_pos_equals(sam1_line1, sam1_line2, sam2_line1, sam2_line2):
     """
-    :param sam1: sam file
-    :param sam2: sam file
+    :param sam1_line2: sam file
+    :param sam2_line1: sam file
     :return: true if the next read pair is mapped to same position
     """
-    sam1_r1, sam1_r2 = Anonymer.sam_pair_2_arr(
+    sam1_r1, sam1_r2 = Anonymer.sam_pair_2_list(
         sam1_line1,
         sam1_line2
     )
-    sam2_r1, sam2_r2 = Anonymer.sam_pair_2_arr(
+    sam2_r1, sam2_r2 = Anonymer.sam_pair_2_list(
         sam2_line1,
         sam2_line2
     )
