@@ -9,30 +9,53 @@ TEXT_VAC_FILENAMES = [
     os.path.join(RESOURCES_DIR, "input_01.vac.txt"),
     os.path.join(RESOURCES_DIR, "input_02.vac.txt")
 ]
-IN_VAC_FILENAMES = [
+VAC_FILENAMES = [
     os.path.join(RESOURCES_DIR, "input_01.vac"),
     os.path.join(RESOURCES_DIR, "input_02.vac")
 ]
 
-IN_SAM_FILENAME = os.path.join(RESOURCES_DIR, "input.sam")
-IN_BAM_FILENAME = os.path.join(RESOURCES_DIR, "input.bam")
+SAM_FILENAME = os.path.join(RESOURCES_DIR, "input.sam")
+BAM_FILENAME = os.path.join(RESOURCES_DIR, "input.bam")
 
-DESIRED_BAM_FILENAMES = [
-    os.path.join(RESOURCES_DIR, "desired_01.sam"),
-    os.path.join(RESOURCES_DIR, "desired_02.sam")
+DESIRED_MUT_FILENAMES = [
+    os.path.join(RESOURCES_DIR, "desired_mut_01.sam"),
+    os.path.join(RESOURCES_DIR, "desired_mut_02.sam")
 ]
-OUT_BAM_FILENAMES = [
-    os.path.join(RESOURCES_DIR, "output_01.bam"),
-    os.path.join(RESOURCES_DIR, "output_02.bam")
+MUT_BAM_FILENAMES = [
+    os.path.join(RESOURCES_DIR, "mut_01.bam"),
+    os.path.join(RESOURCES_DIR, "mut_02.bam")
 ]
-OUT_SAM_FILENAMES = [
-    os.path.join(RESOURCES_DIR, "output_01.sam"),
-    os.path.join(RESOURCES_DIR, "output_02.sam")
-]
-
-OUT_DIFF_FILENAMES = [
-    os.path.join(RESOURCES_DIR, "output_01.diff"),
-    os.path.join(RESOURCES_DIR, "output_02.diff")
+MUT_SAM_FILENAMES = [
+    os.path.join(RESOURCES_DIR, "mut_01.sam"),
+    os.path.join(RESOURCES_DIR, "mut_02.sam")
 ]
 
-DIFF_FILENAME = 'output.diff'
+DIFF_FILENAMES = [
+    os.path.join(RESOURCES_DIR, "mut_01.diff"),
+    os.path.join(RESOURCES_DIR, "mut_02.diff")
+]
+
+TEXT_DIFF_FILENAMES = [
+    os.path.join(RESOURCES_DIR, "mut_01.diff.txt"),
+    os.path.join(RESOURCES_DIR, "mut_02.diff.txt")
+]
+
+DESIRED_DIFF_FILENAMES = [
+    os.path.join(RESOURCES_DIR, "desired_mut_01.diff.txt"),
+    os.path.join(RESOURCES_DIR, "desired_mut_02.diff.txt")
+]
+
+UNMUT_BAM_FILENAMES = [
+    os.path.join(RESOURCES_DIR, "unmut_01.bam"),
+    os.path.join(RESOURCES_DIR, "unmut_02.bam")
+]
+
+UNMUT_SAM_FILENAMES = [
+    os.path.join(RESOURCES_DIR, "unmut_01.sam"),
+    os.path.join(RESOURCES_DIR, "unmut_02.sam")
+]
+
+DESIRED_UNMUT_FILENAMES = [
+    os.path.join(RESOURCES_DIR, "desired_unmut_01.sam"),
+    os.path.join(RESOURCES_DIR, "desired_unmut_02.sam")
+]

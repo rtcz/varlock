@@ -4,26 +4,37 @@ BASES = ("A", "T", "G", "C")
 UNKNOWN_BASE = "N"
 
 
-class SnvAlignment:
-    def __init__(self, alignment, snv_pos):
-        """
-        :param alignment: pysam.AlignedSegment
-        :param snv_pos: reference position of snv
-        """
-        self.alignment = alignment
-        self.snv_pos = snv_pos
-
-
-class Snv:
-    def __init__(self, index, ref_name, ref_pos, ac):
+class SnvPosition(object):
+    def __init__(self, index, ref_name, ref_pos):
         self.index = index
         self.ref_name = ref_name
         self.ref_pos = ref_pos
+
+
+class DiffRecord(SnvPosition):
+    def __init__(self, index, ref_name, ref_pos, mut_map):
+        super().__init__(index, ref_name, ref_pos)
+        self.mut_map = mut_map
+
+
+class VacRecord(SnvPosition):
+    def __init__(self, index, ref_name, ref_pos, ac):
+        super().__init__(index, ref_name, ref_pos)
         self.ac = ac
 
 
+class SnvAlignment:
+    def __init__(self, alignment, pos):
+        """
+        :param alignment: pysam.AlignedSegment
+        :param pos: reference position of SNV
+        """
+        self.alignment = alignment
+        self.pos = pos
+
+
 class FaiReference:
-    def __init__(self, ref_id, name, start, length):
+    def __init__(self, ref_id, name, start, length, offset):
         """
         :param ref_id: reference id
         :param name: reference name
@@ -34,24 +45,26 @@ class FaiReference:
         self.name = name
         self.start = start
         self.length = length
+        self.offset = offset
 
 
-def parse_fai(fai_filename):
+def parse_fai(fai_filepath):
     """
     Parse fasta index file.
-    :param fai_filename: filename
+    :param fai_filepath: path to fai file
     :return: list of references from fasta index file
     """
     data = []
-    with open(fai_filename, "r") as fai_file:
+    with open(fai_filepath, "r") as fai_file:
         counter = 0
         start = 0
         for line in fai_file:
             raw_record = line.rstrip().split()
             name = strip_chr(raw_record[0])
             length = int(raw_record[1])
+            offset = int(raw_record[2])
             
-            reference = FaiReference(ref_id=counter, name=name, start=start, length=length)
+            reference = FaiReference(ref_id=counter, name=name, start=start, length=length, offset=offset)
             data.append(reference)
             counter += 1
             start += reference.length
@@ -165,6 +178,6 @@ def sam2bam(sam_filename, bam_filename):
 
 def bam2sam(bam_filename, sam_filename):
     with pysam.AlignmentFile(bam_filename, "rb") as bam_file, \
-            pysam.AlignmentFile(sam_filename, "w", template=bam_file) as sam_file:
+            pysam.AlignmentFile(sam_filename, "wh", template=bam_file) as sam_file:
         for alignment in bam_file:
             sam_file.write(alignment)

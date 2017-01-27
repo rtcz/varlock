@@ -29,8 +29,11 @@ class Vac:
     
     MAX_BASE_COUNT = 2 ** 16 - 1
     """
-    Max value of 2B
+    Max value of 2 bytes
     """
+    
+    STRUCT_FORMAT = "<IHHHH"  # int, short, short, short
+    STRUCT_LENGTH = 12  # bytes
     
     def __init__(self, fai_list, verbose=False):
         """
@@ -120,22 +123,7 @@ class Vac:
         
         index = pos2index(chrom, pos, self.fai_dict)
         ac_map = dict(zip(base_list, count_list))
-        return self.__pack2bytes(index, ac_map)
-    
-    @staticmethod
-    def __pack2bytes(index, ac_map):
-        # index is an integer
-        record = struct.pack('<I', index)
-        for base in BASES:
-            if base in ac_map:
-                # reference or alternative base
-                # base allele count is a short integer
-                record += struct.pack('<H', ac_map[base])
-            else:
-                # base is not present
-                record += bytes(2)
-        
-        return record
+        return struct.pack(self.STRUCT_FORMAT, index, ac_map['A'], ac_map['T'], ac_map['G'], ac_map['C'])
     
     def vcf2vac(self, vcf_filename, out_filename):
         """
@@ -181,21 +169,29 @@ class Vac:
             print("total SNVs %d" % snp_counter)
     
     @classmethod
+    def read_next(cls, vac_file):
+        byte_string = vac_file.read(cls.STRUCT_LENGTH)
+        if len(byte_string) == 0:
+            raise EOFError()
+        index, a_ac, t_ac, c_ac, g_ac = struct.unpack(cls.STRUCT_FORMAT, byte_string)
+        return index, (a_ac, t_ac, c_ac, g_ac)
+    
+    @classmethod
     def text2vac(cls, text_filename, vac_filename):
         with open(text_filename, "r") as text_file, \
                 open(vac_filename, "wb") as vac_file:
             for line in text_file:
-                data = list(map(int, line.strip().split(cls.COL_SEP)))
-                vac_file.write(struct.pack('<IHHHH', *data))
+                data = map(int, line.strip().split(cls.COL_SEP))
+                vac_file.write(struct.pack(cls.STRUCT_FORMAT, *data))
     
-    @staticmethod
-    def vac2list(vac_filename):
+    @classmethod
+    def vac2list(cls, vac_filename):
         data = []
         with open(vac_filename, "rb") as vac_file:
             while True:
                 byte_string = vac_file.read(12)
                 if len(byte_string) == 0:
                     break
-                data.append(struct.unpack('<IHHHH', byte_string))
+                data.append(struct.unpack(cls.STRUCT_FORMAT, byte_string))
         
         return data

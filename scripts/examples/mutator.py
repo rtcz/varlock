@@ -25,12 +25,14 @@ OUT_DIFF_FILENAME = os.path.join(RESOURCES_DIR, "sample.diff")
 
 # time 8.613
 
-# TODO ??? add option for choosing GRCh37 vs hg19 BAM file
-
-mutator = Mutator(parse_fai(FAI_FILENAME), rnd=random.Random(0), verbose=True)
-mutator.mutate(
-    in_vac_filename=IN_VAC_FILENAME,
-    in_bam_filename=IN_BAM_FILENAME,
-    out_bam_filename=OUT_BAM_FILENAME,
-    out_diff_filename=OUT_DIFF_FILENAME
-)
+mutator = Mutator(FAI_FILENAME, rnd=random.Random(0), verbose=True)
+with pysam.AlignmentFile(IN_BAM_FILENAME, "rb") as in_bam_file, \
+        open(IN_VAC_FILENAME, "rb") as in_vac_file, \
+        pysam.AlignmentFile(OUT_BAM_FILENAME, "wb", template=in_bam_file) as out_bam_file, \
+        open(OUT_DIFF_FILENAME, "wb") as out_diff_file:
+        mutator.mutate(
+            in_vac_file=in_vac_file,
+            in_bam_file=in_bam_file,
+            out_bam_file=out_bam_file,
+            out_diff_file=out_diff_file
+        )
