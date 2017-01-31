@@ -1,11 +1,3 @@
-# Contents
-
-### hg19.fa.fai
-HG fasta index
-
-### hs37d5.fa.fai
-GRCH fasta index
-
 ### sample.bam
 first 10000 alignments from chr22
 

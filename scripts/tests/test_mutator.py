@@ -117,7 +117,7 @@ class TestMutator(unittest.TestCase):
         sam2bam(SAM_FILENAME, BAM_FILENAME)
         
         # EOF BAM case
-        mut = Mutator(FAI_FILENAME, rnd=RandomMockup(), verbose=False)
+        mut = Mutator(rnd=RandomMockup(), verbose=False)
         with pysam.AlignmentFile(BAM_FILENAME, "rb") as in_bam_file, \
                 open(VAC_FILENAMES[0], "rb") as in_vac_file, \
                 pysam.AlignmentFile(MUT_BAM_FILENAMES[0], "wb", template=in_bam_file) as out_bam_file, \
@@ -128,7 +128,9 @@ class TestMutator(unittest.TestCase):
                 out_bam_file=out_bam_file,
                 out_diff_file=out_diff_file
             )
+        pysam.index(MUT_BAM_FILENAMES[0])
         bam2sam(MUT_BAM_FILENAMES[0], MUT_SAM_FILENAMES[0])
+        
         self.assertEqual(True, filecmp.cmp(MUT_SAM_FILENAMES[0], DESIRED_MUT_FILENAMES[0]))
         self.assertEqual(15, mut.alignment_counter)
         self.assertEqual(0, mut.unmapped_counter)
@@ -139,7 +141,7 @@ class TestMutator(unittest.TestCase):
         self.assertEqual(4, mut.diff_counter)
         
         # EOF VAC case
-        mut = Mutator(FAI_FILENAME, rnd=RandomMockup(), verbose=False)
+        mut = Mutator(rnd=RandomMockup(), verbose=False)
         with pysam.AlignmentFile(BAM_FILENAME, "rb") as in_bam_file, \
                 open(VAC_FILENAMES[1], "rb") as in_vac_file, \
                 pysam.AlignmentFile(MUT_BAM_FILENAMES[1], "wb", template=in_bam_file) as out_bam_file, \
@@ -151,6 +153,8 @@ class TestMutator(unittest.TestCase):
                 out_diff_file=out_diff_file
             )
         bam2sam(MUT_BAM_FILENAMES[1], MUT_SAM_FILENAMES[1])
+        pysam.index(MUT_BAM_FILENAMES[0])
+        
         self.assertEqual(True, filecmp.cmp(MUT_SAM_FILENAMES[1], DESIRED_MUT_FILENAMES[1]))
         self.assertEqual(15, mut.alignment_counter)
         self.assertEqual(0, mut.unmapped_counter)
@@ -192,8 +196,7 @@ class TestMutator(unittest.TestCase):
             self.assertEqual(0, Diff.seek_index(diff_file, 0, 2830728806))
     
     def test_unmutate(self):
-        mut = Mutator(FAI_FILENAME, rnd=RandomMockup(), verbose=False)
-        pysam.index(MUT_BAM_FILENAMES[0])
+        mut = Mutator(rnd=RandomMockup(), verbose=False)
         with pysam.AlignmentFile(MUT_BAM_FILENAMES[0], "rb") as in_bam_file, \
                 open(DIFF_FILENAMES[0], "rb") as in_diff_file, \
                 pysam.AlignmentFile(UNMUT_BAM_FILENAMES[0], "wb", template=in_bam_file) as out_bam_file:

@@ -1,13 +1,21 @@
-from varlock import *
+import gzip
 import os
+
+import pysam
+
+from varlock import *
 
 RESOURCES_DIR = os.path.join(os.path.dirname(__file__), 'resources')
 VCF_GZ_FILE = os.path.join(RESOURCES_DIR, "sample.vcf.gz")
-CHR_FAI_FILE = os.path.join(RESOURCES_DIR, "hs37d5.fa.fai")
-OUT_FILENAME = os.path.join(RESOURCES_DIR, "sample.vac")
+VAC_FILENAME = os.path.join(RESOURCES_DIR, "sample.vac")
+BAM_FILENAME = os.path.join(RESOURCES_DIR, "sample.bam")
 
-vac = Vac(parse_fai(CHR_FAI_FILE), verbose=True)
-vac.vcf2vac(vcf_filename=VCF_GZ_FILE, out_filename=OUT_FILENAME)
+with pysam.AlignmentFile(BAM_FILENAME, "rb") as bam_file:
+    vac = Vac(bam_file, verbose=True)
+
+    with gzip.open(VCF_GZ_FILE, "rt") as vcf_file, \
+            open(VAC_FILENAME, "wb") as ac_file:
+        vac.vcf2vac(vcf_file, ac_file)
 
 # CALLS
 # python3 /data/projects/varlock/scripts/varlock/vac.py

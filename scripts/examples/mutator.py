@@ -7,7 +7,6 @@ from varlock import *
 # python3 -m cProfile -s tottime /data/projects/varlock/scripts/varlock/vac.py
 
 RESOURCES_DIR = os.path.join(os.path.dirname(__file__), 'resources')
-FAI_FILENAME = os.path.join(RESOURCES_DIR, "hg19.fa.fai")
 IN_BAM_FILENAME = os.path.join(RESOURCES_DIR, "sample.bam")
 IN_VAC_FILENAME = os.path.join(RESOURCES_DIR, "sample.vac")
 OUT_BAM_FILENAME = os.path.join(RESOURCES_DIR, "sample.mut.bam")
@@ -25,7 +24,7 @@ OUT_DIFF_FILENAME = os.path.join(RESOURCES_DIR, "sample.diff")
 
 # time 8.613
 
-mutator = Mutator(FAI_FILENAME, rnd=random.Random(0), verbose=True)
+mutator = Mutator(rnd=random.Random(0), verbose=True)
 with pysam.AlignmentFile(IN_BAM_FILENAME, "rb") as in_bam_file, \
         open(IN_VAC_FILENAME, "rb") as in_vac_file, \
         pysam.AlignmentFile(OUT_BAM_FILENAME, "wb", template=in_bam_file) as out_bam_file, \

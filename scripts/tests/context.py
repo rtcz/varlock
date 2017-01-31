@@ -2,9 +2,6 @@ import os
 
 RESOURCES_DIR = os.path.join(os.path.dirname(__file__), 'resources')
 
-FAI_FILENAME = os.path.join(RESOURCES_DIR, "hg19.fa.fai")
-FAI2_FILENAME = os.path.join(RESOURCES_DIR, "hs37d5.fa.fai")
-
 TEXT_VAC_FILENAMES = [
     os.path.join(RESOURCES_DIR, "input_01.vac.txt"),
     os.path.join(RESOURCES_DIR, "input_02.vac.txt")

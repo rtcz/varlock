@@ -34,42 +34,32 @@ class SnvAlignment:
 
 
 class FaiReference:
-    def __init__(self, ref_id, name, start, length, offset):
+    def __init__(self, name, start, length):
         """
-        :param ref_id: reference id
         :param name: reference name
         :param start: 0-based first position
         :param length: reference length - number of bases
         """
-        self.ref_id = ref_id
         self.name = name
         self.start = start
         self.length = length
-        self.offset = offset
 
 
-def parse_fai(fai_filepath):
+def get_fai_list(bam_file):
     """
     Parse fasta index file.
-    :param fai_filepath: path to fai file
+    :param bam_file: pysam.AlignmentFile
     :return: list of references from fasta index file
     """
-    data = []
-    with open(fai_filepath, "r") as fai_file:
-        counter = 0
-        start = 0
-        for line in fai_file:
-            raw_record = line.rstrip().split()
-            name = strip_chr(raw_record[0])
-            length = int(raw_record[1])
-            offset = int(raw_record[2])
-            
-            reference = FaiReference(ref_id=counter, name=name, start=start, length=length, offset=offset)
-            data.append(reference)
-            counter += 1
-            start += reference.length
+    fai_list = []
+    counter = 0
+    start = 0
+    for record in bam_file.header['SQ']:
+        fai_list.append(FaiReference(name=record['SN'], start=start, length=record['LN']))
+        counter += 1
+        start += record['LN']
     
-    return data
+    return fai_list
 
 
 def fai_list2dict(fai_list):
@@ -78,6 +68,8 @@ def fai_list2dict(fai_list):
     :return:
     """
     return dict((reference.name, reference) for reference in fai_list)
+
+
 
 
 def multi_random(p_dist, rnd):
@@ -136,8 +128,19 @@ def pos2index(ref_name, ref_pos, fai_dict):
     :param fai_dict: parsed fai as dict
     :return: 0-based position on genome
     """
-    return fai_dict[strip_chr(ref_name)].start + ref_pos
+    return fai_dict[ref_name].start + ref_pos
 
+
+# def strip_chr(value):
+#     """
+#     Strip 'chr' prefix from string.
+#     :param value: string ot strip
+#     :return: stripped string
+#     """
+#     if value[:3] == 'chr':
+#         return value[3:]
+#     else:
+#         return value
 
 def strip_chr(value):
     """

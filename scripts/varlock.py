@@ -181,7 +181,7 @@ class Varlock:
         :param in_vac_filepath:
         :param in_bam_filepath:
         """
-        mut = varlock.Mutator(self.fai_filepath)
+        mut = varlock.Mutator()
         
         # try to import public key before mutating
         # TODO check if users exists
@@ -253,7 +253,7 @@ class Varlock:
         
         # unmutate
         in_bam_filepath = os.path.join(self.sample_dirpath, sample_name + '.mut.bam')
-        mut = varlock.Mutator(self.fai_filepath)
+        mut = varlock.Mutator()
         with pysam.AlignmentFile(in_bam_filepath, "rb") as in_bam_file, \
                 pysam.AlignmentFile(out_bam_filepath, "wb") as out_bam_file:
             mut.unmutate(in_bam_file, diff_file, ref_name, start_pos, end_pos, out_bam_file)

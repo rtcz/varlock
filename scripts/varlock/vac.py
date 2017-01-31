@@ -1,4 +1,3 @@
-import gzip
 import struct
 
 import numpy as np
@@ -35,13 +34,16 @@ class Vac:
     STRUCT_FORMAT = "<IHHHH"  # int, short, short, short
     STRUCT_LENGTH = 12  # bytes
     
-    def __init__(self, fai_list, verbose=False):
+    def __init__(self, bam_file, verbose=False):
         """
-        :param fai_list:
+        :param bam_file: pysam.AlignmentFile
         :param verbose:
         """
         # create dict for fast access
-        self.fai_dict = fai_list2dict(fai_list)
+        self.fai_dict = {}
+        for fai_ref in get_fai_list(bam_file):
+            fai_ref.name = strip_chr(fai_ref.name)
+            self.fai_dict[fai_ref.name] = fai_ref
         
         self.current_pos = None
         self.current_chrom = None
@@ -121,48 +123,53 @@ class Vac:
         base_list = [ref] + alt_list
         count_list = self.compact_base_count([ref_ac] + info_ac)
         
-        index = pos2index(chrom, pos, self.fai_dict)
+        index = pos2index(strip_chr(chrom), pos, self.fai_dict)
+        
         ac_map = dict(zip(base_list, count_list))
+        
+        for base in BASES:
+            if base not in ac_map:
+                ac_map[base] = 0
+                
         return struct.pack(self.STRUCT_FORMAT, index, ac_map['A'], ac_map['T'], ac_map['G'], ac_map['C'])
     
-    def vcf2vac(self, vcf_filename, out_filename):
+    def vcf2vac(self, vcf_file, vac_file):
         """
         Converts VCF to binary VAC file
-        :param vcf_filename: input VCF filename, file must be gzipped
-        :param out_filename: output VAC filename
+        :param vcf_file: input VCF file
+        :param vac_file: output VAC file
         """
         variant_counter = 0
         snp_counter = 0
-        with gzip.open(vcf_filename, "rt") as vcf_file, \
-                open(out_filename, "wb") as ac_file:
-            for line in vcf_file:
-                if line[0] == "#":
-                    # skip header line
-                    continue
-                
-                variant_counter += 1
-                
-                # split until last used column only
-                data = line.split(self.COL_SEP, maxsplit=8)
-                ref = data[self.VCF_REF_ID]
-                alt_list = data[self.VCF_ALT_ID].split(self.LIST_SEP)
-                
-                if self.is_snp(ref, alt_list):
-                    snp_counter += 1
-                    chrom = data[self.VCF_CHROM_ID]
-                    pos = int(data[self.VCF_POS_ID]) - 1  # vcf has 1-based index, convert to 0-based index
-                    info_list = data[self.VCF_INFO_ID].split(self.INFO_SEP)
-                    byte_string = self.__snv2vac(
-                        chrom=chrom,
-                        pos=pos,
-                        ref=ref,
-                        alt_list=alt_list,
-                        info_list=info_list
-                    )
-                    ac_file.write(byte_string)
-                
-                if self.verbose and variant_counter % 10000 == 0:
-                    print("variant %d" % variant_counter)
+        
+        for line in vcf_file:
+            if line[0] == "#":
+                # skip header line
+                continue
+            
+            variant_counter += 1
+            
+            # split until last used column only
+            data = line.split(self.COL_SEP, maxsplit=8)
+            ref = data[self.VCF_REF_ID]
+            alt_list = data[self.VCF_ALT_ID].split(self.LIST_SEP)
+            
+            if self.is_snp(ref, alt_list):
+                snp_counter += 1
+                chrom = data[self.VCF_CHROM_ID]
+                pos = int(data[self.VCF_POS_ID]) - 1  # vcf has 1-based index, convert to 0-based index
+                info_list = data[self.VCF_INFO_ID].split(self.INFO_SEP)
+                byte_string = self.__snv2vac(
+                    chrom=chrom,
+                    pos=pos,
+                    ref=ref,
+                    alt_list=alt_list,
+                    info_list=info_list
+                )
+                vac_file.write(byte_string)
+            
+            if self.verbose and variant_counter % 10000 == 0:
+                print("variant %d" % variant_counter)
         
         if self.verbose:
             print("total variants %d" % variant_counter)
