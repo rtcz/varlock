@@ -166,53 +166,25 @@ class TestMutator(unittest.TestCase):
         
         # TODO test case with more references (chromosomes)
     
-    def test_diff(self):
-        Diff.diff2text(DIFF_FILENAMES[0], TEXT_DIFF_FILENAMES[0])
-        self.assertEqual(True, filecmp.cmp(TEXT_DIFF_FILENAMES[0], DESIRED_DIFF_FILENAMES[0]))
-        
-        Diff.diff2text(DIFF_FILENAMES[1], TEXT_DIFF_FILENAMES[1])
-        self.assertEqual(True, filecmp.cmp(TEXT_DIFF_FILENAMES[1], DESIRED_DIFF_FILENAMES[1]))
-        
-        with open(DIFF_FILENAMES[0], "rb") as diff_file:
-            # diff inside range
-            self.assertEqual(0, Diff.seek_index(diff_file, 0, 9999999999))
-            # diff after range
-            self.assertEqual(20, Diff.seek_index(diff_file, 0, 1111111111))
-            # diff before range
-            self.assertEqual(20, Diff.seek_index(diff_file, 3333333333, 9999999999))
-            # diff covers range
-            self.assertEqual(0, Diff.seek_index(diff_file, 2830728741, 2830728781))
-            self.assertEqual(5, Diff.seek_index(diff_file, 2830728781, 2830728786))
-            self.assertEqual(10, Diff.seek_index(diff_file, 2830728786, 2830728806))
-            # diff starts inside range and ends after range
-            self.assertEqual(0, Diff.seek_index(diff_file, 2830728741, 9999999999))
-            self.assertEqual(5, Diff.seek_index(diff_file, 2830728781, 9999999999))
-            self.assertEqual(10, Diff.seek_index(diff_file, 2830728786, 9999999999))
-            self.assertEqual(15, Diff.seek_index(diff_file, 2830728806, 9999999999))
-            # diff starts before range and ends inside range
-            self.assertEqual(0, Diff.seek_index(diff_file, 0, 2830728741))
-            self.assertEqual(0, Diff.seek_index(diff_file, 0, 2830728781))
-            self.assertEqual(0, Diff.seek_index(diff_file, 0, 2830728786))
-            self.assertEqual(0, Diff.seek_index(diff_file, 0, 2830728806))
-    
     def test_unmutate(self):
         mut = Mutator(rnd=RandomMockup(), verbose=False)
         with pysam.AlignmentFile(MUT_BAM_FILENAMES[0], "rb") as in_bam_file, \
                 open(DIFF_FILENAMES[0], "rb") as in_diff_file, \
                 pysam.AlignmentFile(UNMUT_BAM_FILENAMES[0], "wb", template=in_bam_file) as out_bam_file:
             mut.unmutate(
-                in_bam_file=in_bam_file,
-                in_diff_file=in_diff_file,
+                mut_bam_file=in_bam_file,
+                diff_file=in_diff_file,
                 ref_name='chr22',
-                start_pos=1000021,
-                end_pos=1000061,
+                start_ref_pos=1000021,
+                end_ref_pos=1000061,
                 out_bam_file=out_bam_file
             )
         bam2sam(UNMUT_BAM_FILENAMES[0], UNMUT_SAM_FILENAMES[0])
         self.assertEqual(True, filecmp.cmp(UNMUT_SAM_FILENAMES[0], DESIRED_UNMUT_FILENAMES[0]))
-
+        
         # TODO more tests (ranges etc.)
         # TODO test case with more references (chromosomes)
+
 
 if __name__ == '__main__':
     # python3 /usr/local/bin/nosetests -s /data/projects/varlock/scripts/mutator_test.py

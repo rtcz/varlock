@@ -9,12 +9,13 @@ class Vac:
     """
     Class for handling VAC file. VAC stands for Variant Allele Count.
     VAC is binary file, where each record represent one SNV from VCF.
-    SNV record is 12 bytes long and has following format:
-    index 4B -> absolute position of SNV in genome
-    A allele count 2B
-    T allele count 2B
-    C allele count 2B
-    G allele count 2B
+    
+    Vac record:
+    index, 4B, absolute position of SNV in genome
+    A allele count, 2B
+    T allele count, 2B
+    C allele count, 2B
+    G allele count, 2B
     """
     VCF_CHROM_ID = 0
     VCF_POS_ID = 1
@@ -130,12 +131,13 @@ class Vac:
         for base in BASES:
             if base not in ac_map:
                 ac_map[base] = 0
-                
+        
         return struct.pack(self.STRUCT_FORMAT, index, ac_map['A'], ac_map['T'], ac_map['G'], ac_map['C'])
     
     def vcf2vac(self, vcf_file, vac_file):
         """
-        Converts VCF to binary VAC file
+        Converts VCF to binary VAC file.
+        Preserves compatibility between different BAM and VCF reference genomes by stripping chr prefix.
         :param vcf_file: input VCF file
         :param vac_file: output VAC file
         """
@@ -176,7 +178,7 @@ class Vac:
             print("total SNVs %d" % snp_counter)
     
     @classmethod
-    def read_next(cls, vac_file):
+    def read_record(cls, vac_file):
         byte_string = vac_file.read(cls.STRUCT_LENGTH)
         if len(byte_string) == 0:
             raise EOFError()
@@ -196,7 +198,7 @@ class Vac:
         data = []
         with open(vac_filename, "rb") as vac_file:
             while True:
-                byte_string = vac_file.read(12)
+                byte_string = vac_file.read(cls.STRUCT_LENGTH)
                 if len(byte_string) == 0:
                     break
                 data.append(struct.unpack(cls.STRUCT_FORMAT, byte_string))

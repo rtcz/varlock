@@ -1,10 +1,26 @@
+import io
 import struct
 
 
 class Diff:
-    STRUCT_FORMAT = "<IB"  # int, char
-    STRUCT_LENGTH = 5  # bytes
+    """
+    Diff is binary file, where each record represent one SNV mapping from original BAM to mutated BAM.
+    
+    Diff record:
+    index, 4B, absolute position of SNV in genome
+    mapping, 1B, id of bases permutation
+
+    Diff header:
+    md5 checksum of mutated BAM file, 16B
+    start, first genome index of DIFF range, 4B
+    end, last genome index of DIFF range, 4B
+    """
+    RECORD_FORMAT = "<IB"  # int, char
+    RECORD_LENGTH = 5  # bytes
     INT_LENGTH = 4  # bytes
+    
+    HEADER_LENGTH = 24
+    MD5_LENGTH = 16
     
     INDEX_2_MUT = [
         ('A', 'T', 'G', 'C'),
@@ -61,80 +77,169 @@ class Diff:
     }
     
     @classmethod
-    def read_next(cls, diff_file):
-        byte_string = diff_file.read(cls.STRUCT_LENGTH)
+    def read_header(cls, diff_file):
+        diff_file.seek(0)
+        checksum = diff_file.read(cls.MD5_LENGTH)
+        start_index, end_index = struct.unpack('<II', diff_file.read(cls.INT_LENGTH * 2))
+        return checksum, start_index, end_index
+    
+    @classmethod
+    def validate_header_range(cls, diff_file):
+        # TODO empty case
+        # TODO move to diff validation
+        
+        checksum, header_start_index, header_end_index = cls.read_header(diff_file)
+        content_start_index = struct.unpack('<I', diff_file.read(cls.INT_LENGTH))[0]
+        diff_file.seek(-cls.RECORD_LENGTH, 2)
+        content_end_index = struct.unpack('<I', diff_file.read(cls.INT_LENGTH))[0]
+        
+        if header_start_index > content_start_index:
+            raise ValueError("Invalid header start index")
+        
+        if header_end_index < content_end_index:
+            raise ValueError("Invalid header end index")
+    
+    @classmethod
+    def write_header(cls, diff_file, bam_checksum, start_index, end_index):
+        assert start_index <= end_index
+        
+        if len(bam_checksum) != cls.MD5_LENGTH:
+            raise ValueError('Invalid checksum length')
+        
+        diff_file.write(bam_checksum)
+        diff_file.write(struct.pack('<II', start_index, end_index))
+    
+    @classmethod
+    def read_record(cls, diff_file):
+        byte_string = diff_file.read(cls.RECORD_LENGTH)
         if len(byte_string) == 0:
             raise EOFError()
-        index, mut_index = struct.unpack(cls.STRUCT_FORMAT, byte_string)
+        index, mut_index = struct.unpack(cls.RECORD_FORMAT, byte_string)
         return index, cls.INDEX_2_MUT[mut_index]
     
     @classmethod
-    def write_next(cls, diff_file, index, mut_tuple):
-        byte_string = struct.pack(cls.STRUCT_FORMAT, index, cls.MUT_2_INDEX[mut_tuple])
+    def write_record(cls, diff_file, index, mut_tuple):
+        byte_string = struct.pack(cls.RECORD_FORMAT, index, cls.MUT_2_INDEX[mut_tuple])
         diff_file.write(byte_string)
     
     @classmethod
-    def seek_index(cls, diff_file, start_range, end_range):
-        diff_file.seek(0, 0)
+    def get_start_pos(cls, diff_file):
+        diff_file.seek(cls.HEADER_LENGTH, 0)
+        return diff_file.tell()
+    
+    @classmethod
+    def get_end_pos(cls, diff_file):
+        diff_file.seek(0, 2)
+        return diff_file.tell()
+    
+    @classmethod
+    def seek_range(cls, diff_file, start_index, end_index):
+        assert start_index <= end_index
+        end_pos = cls.seek_pos(diff_file, end_index)
+        start_pos = cls.seek_pos(diff_file, start_index)
+        
+        if start_pos == end_pos == cls.get_start_pos(diff_file):
+            raise IndexError("Range is out of DIFF")
+        
+        if start_pos == end_pos == cls.get_end_pos(diff_file):
+            raise IndexError("Range is out of DIFF")
+        
+        return start_pos, end_pos
+    
+    @classmethod
+    def seek_pos(cls, diff_file, index):
+        """
+        Seek position in DIFF file at or right after specified index.
+        :param diff_file:
+        :param index:
+        :return: seeked position
+        :raises: IndexError
+        """
+        # TODO move to diff validation
+        diff_file.seek(0, 2)
+        full_size = diff_file.tell() - cls.HEADER_LENGTH
+        if full_size < 0:
+            raise IOError("Diff too short")
+        
+        if full_size == 0:
+            # file is empty - return position after header
+            return cls.HEADER_LENGTH
+        
+        if full_size % cls.RECORD_LENGTH != 0:
+            raise IOError("Diff file has invalid number of bytes")
+        
+        diff_file.seek(cls.HEADER_LENGTH, 0)
         start_diff = struct.unpack('<I', diff_file.read(cls.INT_LENGTH))[0]
-        diff_file.seek(-Diff.STRUCT_LENGTH, 2)
+        diff_file.seek(-Diff.RECORD_LENGTH, 2)
         end_diff = struct.unpack('<I', diff_file.read(cls.INT_LENGTH))[0]
         
-        if start_range > end_diff or end_range < start_diff:
-            # diff content is either before or after range
+        if index > end_diff:
+            # index is after DIFF content
             # go to EOF
             diff_file.seek(0, 2)
             return diff_file.tell()
         
-        if start_range < start_diff:
-            # first index is inside diff content
+        if index < start_diff:
+            # index is before DIFF content
             # go to SOF
-            diff_file.seek(0, 0)
+            diff_file.seek(cls.HEADER_LENGTH, 0)
+            return diff_file.tell()
+        
+        # mind diff with one record
+        if full_size == cls.RECORD_LENGTH:
+            diff_file.seek(cls.HEADER_LENGTH, 0)
             return diff_file.tell()
         
         # range start is inside diff content
-        
-        diff_file.seek(0, 2)
-        size = int(diff_file.tell() / 2)
-        
-        while size >= cls.STRUCT_LENGTH:
-            diff_file.seek(size)
+        curr_index = index
+        size = int(full_size / 2)
+        while size >= cls.RECORD_LENGTH:
+            diff_file.seek(cls.HEADER_LENGTH + size, 0)
             curr_index = struct.unpack('<I', diff_file.read(cls.INT_LENGTH))[0]
-            if curr_index > start_range:
+            if curr_index > index:
                 size -= int(size / 2)
-            elif curr_index < start_range:
+            elif curr_index < index:
                 size += int(size / 2)
             else:
                 break
         
-        # final move
-        if curr_index > start_range:
-            diff_file.seek(-cls.STRUCT_LENGTH, 1)
-        elif curr_index < start_range:
-            diff_file.seek(+cls.STRUCT_LENGTH, 1)
-        
         diff_file.seek(-cls.INT_LENGTH, 1)
+        
+        # final move
+        if curr_index > index:
+            diff_file.seek(-cls.RECORD_LENGTH, 1)
+        elif curr_index < index:
+            diff_file.seek(+cls.RECORD_LENGTH, 1)
+        
         return diff_file.tell()
     
     @classmethod
-    def diff2text(cls, diff_filepath, text_filepath):
-        with open(diff_filepath, "rb") as diff_file, \
-                open(text_filepath, "wt") as text_file:
-            while True:
-                try:
-                    index, mut_tuple = cls.read_next(diff_file)
-                    text_file.write("%d\t%s\n" % (index, mut_tuple))
-                except EOFError:
-                    break
-                    
-                    # @classmethod
-                    # def file2list(cls, diff_file):
-                    #     diff_list = []
-                    #     while True:
-                    #         byte_string = diff_file.read(cls.STRUCT_LENGTH)
-                    #         if byte_string == '':
-                    #             break
-                    #         record = Diff.bytes2record(byte_string)
-                    #         diff_list.append(record)
-                    #
-                    #     return diff_list
+    def slice(cls, diff_file, start_index, end_index):
+        """
+        :param diff_file: diff to slice from
+        :param start_index: start genome pos
+        :param end_index: end genome pos
+        :return:
+        """
+        assert start_index <= end_index
+        
+        start_pos = cls.seek_range(diff_file, start_index, end_index)
+        end_pos = cls.seek_pos(diff_file, end_index)
+        
+        end_pos = cls.seek_pos(diff_file, end_index)
+        
+        sliced_diff = io.BytesIO()
+        diff_file.seek(start_pos)
+        sliced_diff.write(diff_file.read(end_pos - start_pos))
+        return sliced_diff
+        
+        # @classmethod
+        # def diff2text(cls, diff_filepath, text_filepath):
+        #     with open(diff_filepath, "rb") as diff_file, \
+        #             open(text_filepath, "wt") as text_file:
+        #         while True:
+        #             try:
+        #                 index, mut_tuple = cls.read_record(diff_file)
+        #                 text_file.write("%d\t%s\n" % (index, mut_tuple))
+        #             except EOFError:
+        #                 break

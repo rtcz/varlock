@@ -98,7 +98,7 @@ class BinAES:
     @staticmethod
     def pad(value):
         pad_count = AES.block_size - len(value) % AES.block_size
-        return value + pad_count * b"\0"
+        return value + bytes(pad_count)
     
     @staticmethod
     def unpad(value):
