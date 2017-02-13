@@ -27,13 +27,13 @@ class TestDiff(unittest.TestCase):
     def test_seek_pos(self):
         diff_file = self.__build_diff_file()
         # position before diff - go to EOF
-        self.assertEqual(self.__position(4), Diff.seek_pos(diff_file, 2000000000))
-        self.assertEqual(self.__position(0), Diff.seek_pos(diff_file, 2830728741))
-        self.assertEqual(self.__position(1), Diff.seek_pos(diff_file, 2830728781))
-        self.assertEqual(self.__position(2), Diff.seek_pos(diff_file, 2830728786))
-        self.assertEqual(self.__position(3), Diff.seek_pos(diff_file, 2830728806))
+        self.assertEqual(self.__position(4), Diff.seek(diff_file, 2000000000))
+        self.assertEqual(self.__position(0), Diff.seek(diff_file, 2830728741))
+        self.assertEqual(self.__position(1), Diff.seek(diff_file, 2830728781))
+        self.assertEqual(self.__position(2), Diff.seek(diff_file, 2830728786))
+        self.assertEqual(self.__position(3), Diff.seek(diff_file, 2830728806))
         # position after diff - go to EOF
-        self.assertEqual(self.__position(4), Diff.seek_pos(diff_file, 3000000000))
+        self.assertEqual(self.__position(4), Diff.seek(diff_file, 3000000000))
     
     @staticmethod
     def __position(record_id):
@@ -63,7 +63,7 @@ class TestDiff(unittest.TestCase):
     
     def test_header_range(self):
         diff_file = io.BytesIO()
-        self.assertRaises(ValueError, lambda: Diff.write_header(diff_file, b'0123456789ABCDEF', 20, 10))
+        self.assertRaises(AssertionError, lambda: Diff.write_header(diff_file, b'0123456789ABCDEF', 20, 10))
         
         diff_file = io.BytesIO()
         Diff.write_header(diff_file, b'0123456789ABCDEF', 10, 20)
@@ -89,16 +89,14 @@ class TestDiff(unittest.TestCase):
         self.assertRaises(ValueError, lambda: Diff.validate_header_range(diff_file))
     
     def test_slice(self):
-        diff_file = io.BytesIO()
-        sliced_diff = Diff.slice(diff_file, 0, 0)
+        diff_file = self.__build_diff_file()
         
-        self.assertRaises(EOFError, lambda: Diff.slice(diff_file, ))
+        self.assertRaises(EOFError, lambda: Diff.slice(diff_file, 2830728781, 2830728786))
         
-        self.assertTupleEqual((b'0123456789ABCDEF', 2000000000, 3000000000), Diff.read_header(sliced_diff))
-        self.assertTupleEqual((2830728741, ('C', 'A', 'T', 'G')), Diff.read_record(sliced_diff))
+        sliced_diff = Diff.slice(diff_file, 2830728781, 2830728786)
+        self.assertTupleEqual((b'0123456789ABCDEF', 2830728781, 2830728786), Diff.read_header(sliced_diff))
         self.assertTupleEqual((2830728781, ('G', 'A', 'T', 'C')), Diff.read_record(sliced_diff))
         self.assertTupleEqual((2830728786, ('T', 'G', 'A', 'C')), Diff.read_record(sliced_diff))
-        self.assertTupleEqual((2830728806, ('G', 'C', 'A', 'T')), Diff.read_record(sliced_diff))
         self.assertRaises(EOFError, lambda: Diff.read_record(sliced_diff))
 
 

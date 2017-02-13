@@ -28,12 +28,14 @@ class SnvAlignment:
 
 
 class FaiRecord:
-    def __init__(self, name, start, length):
+    def __init__(self, index, name, start, length):
         """
+        :param id: reference id
         :param name: reference name
         :param start: 0-based first position
         :param length: reference length - number of bases
         """
+        self.id = index
         self.name = name
         self.start = start
         self.length = length

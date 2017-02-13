@@ -5,27 +5,17 @@ class FastaIndex:
     def __init__(self, bam_file):
         fai_list = []
         start = 0
+        counter = 0
         for record in bam_file.header['SQ']:
-            fai_list.append(FaiRecord(name=record['SN'], start=start, length=record['LN']))
+            fai_list.append(FaiRecord(index=counter, name=record['SN'], start=start, length=record['LN']))
             start += record['LN']
+            counter += 1
         
         if len(fai_list) == 0:
             raise ValueError("Empty BAM sequence header")
         
         self.list = fai_list
         self.dict = dict((reference.name, reference) for reference in self.list)
-    
-    def resolve_range(self, bam_range):
-        """
-        :param bam_range: tuple (start_ref_name, start_ref_pos, end_ref_name, end_ref_pos)
-        :return: tuple (start_index, end_index)
-        """
-        start_ref_name, start_ref_pos, end_ref_name, end_ref_pos = bam_range
-        
-        start_index = self.resolve_start_index(start_ref_name, start_ref_pos)
-        end_index = self.resolve_end_index(end_ref_name, end_ref_pos)
-        
-        return start_index, end_index
     
     def resolve_start_index(self, start_ref_name, start_ref_pos):
         if start_ref_name is None and start_ref_pos is not None:
@@ -82,6 +72,9 @@ class FastaIndex:
                 return i
         
         raise ValueError("Reference name not found in BAM sequence header.")
+    
+    def ref_name(self, ref_id):
+        return self.list[ref_id].name
     
     def index2pos(self, index):
         """

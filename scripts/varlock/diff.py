@@ -85,9 +85,6 @@ class Diff:
     
     @classmethod
     def validate_header_range(cls, diff_file):
-        # TODO empty case
-        # TODO move to diff validation
-        
         checksum, header_start_index, header_end_index = cls.read_header(diff_file)
         content_start_index = struct.unpack('<I', diff_file.read(cls.INT_LENGTH))[0]
         diff_file.seek(-cls.RECORD_LENGTH, 2)
@@ -135,8 +132,9 @@ class Diff:
     @classmethod
     def seek_range(cls, diff_file, start_index, end_index):
         assert start_index <= end_index
-        end_pos = cls.seek_pos(diff_file, end_index)
-        start_pos = cls.seek_pos(diff_file, start_index)
+        
+        start_pos = cls.seek(diff_file, start_index)
+        end_pos = cls.seek(diff_file, end_index)
         
         if start_pos == end_pos == cls.get_start_pos(diff_file):
             raise IndexError("Range is out of DIFF")
@@ -147,7 +145,7 @@ class Diff:
         return start_pos, end_pos
     
     @classmethod
-    def seek_pos(cls, diff_file, index):
+    def seek(cls, diff_file, index):
         """
         Seek position in DIFF file at or right after specified index.
         :param diff_file:
@@ -223,12 +221,14 @@ class Diff:
         """
         assert start_index <= end_index
         
-        start_pos = cls.seek_range(diff_file, start_index, end_index)
-        end_pos = cls.seek_pos(diff_file, end_index)
-        
-        end_pos = cls.seek_pos(diff_file, end_index)
+        start_pos, end_pos = cls.seek_range(diff_file, start_index, end_index)
         
         sliced_diff = io.BytesIO()
+        
+        # header
+        checksum = cls.read_header(diff_file)[0]
+        cls.write_header(diff_file, checksum, start_index, end_index)
+        # content
         diff_file.seek(start_pos)
         sliced_diff.write(diff_file.read(end_pos - start_pos))
         return sliced_diff

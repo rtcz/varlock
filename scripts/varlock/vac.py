@@ -35,17 +35,12 @@ class Vac:
     STRUCT_FORMAT = "<IHHHH"  # int, short, short, short
     STRUCT_LENGTH = 12  # bytes
     
-    def __init__(self, bam_file, verbose=False):
+    def __init__(self, fai, verbose=False):
         """
-        :param bam_file: pysam.AlignmentFile
+        :param fai: FastaIndex
         :param verbose:
         """
-        # create dict for fast access
-        self.fai_dict = {}
-        for fai_ref in get_fai_list(bam_file):
-            fai_ref.name = strip_chr(fai_ref.name)
-            self.fai_dict[fai_ref.name] = fai_ref
-        
+        self.fai = fai
         self.current_pos = None
         self.current_chrom = None
         self.verbose = verbose
@@ -124,7 +119,7 @@ class Vac:
         base_list = [ref] + alt_list
         count_list = self.compact_base_count([ref_ac] + info_ac)
         
-        index = pos2index(strip_chr(chrom), pos, self.fai_dict)
+        index = self.fai.pos2index(strip_chr(chrom), pos)
         
         ac_map = dict(zip(base_list, count_list))
         

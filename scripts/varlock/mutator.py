@@ -4,7 +4,9 @@ import numpy as np
 
 from .common import *
 from .diff import Diff
+from .fasta_index import FastaIndex
 from .iterator import BamIterator, DiffIterator, VacIterator
+from .po import SnvAlignment
 
 
 class Mutator:
@@ -26,25 +28,26 @@ class Mutator:
         """
         self.rnd = rnd
         self.verbose = verbose
+        self.fai = FastaIndex(bam_file)
+        self.bam_file = bam_file
+        self.bam_checksum = None
     
-    @staticmethod
-    def __is_before_index(alignment, index, fai):
+    def __is_before_index(self, alignment, index):
         """
         Check if alignment is mapped before index.
         :return: True if alignment end is mapped before index
         """
         # reference_end points to one past the last aligned residue
         ref_end = alignment.reference_end - 1
-        alignment_end = fai.pos2index(alignment.reference_name, ref_end)
+        alignment_end = self.fai.pos2index(alignment.reference_name, ref_end)
         return alignment_end < index
     
-    @staticmethod
-    def __is_after_index(alignment, index, fai_dict):
+    def __is_after_index(self, alignment, index):
         """
         Check if alignment is mapped after index.
         :return: True if alignment start is mapped after index
         """
-        alignment_start = pos2index(alignment.reference_name, alignment.reference_start, fai_dict)
+        alignment_start = self.fai.pos2index(alignment.reference_name, alignment.reference_start)
         return alignment_start > index
     
     @staticmethod
@@ -162,50 +165,74 @@ class Mutator:
         self.overlapping_counter = 0
         self.max_coverage = 0
     
-    @classmethod
-    def __resolve_diff_range(cls, diff_file, user_range, fai_list):
+    def __resolve_range(
+            self,
+            diff_file,
+            start_ref_name,
+            start_ref_pos,
+            end_ref_name,
+            end_ref_pos
+    ):
         Diff.validate_header_range(diff_file)
         checksum, diff_start_index, diff_end_index = Diff.read_header(diff_file)
-        return cls.resolve_range(diff_end_index, diff_end_index, user_range, fai_list)
+        if self.bam_checksum() != checksum:
+            raise ValueError("Checksum mismatch.")
+        return self.resolve_range(
+            diff_start_index,
+            diff_end_index,
+            start_ref_name,
+            start_ref_pos,
+            end_ref_name,
+            end_ref_pos
+        )
     
-    @staticmethod
-    def resolve_range(diff_start_index, diff_end_index, user_range, fai_list):
+    def resolve_range(
+            self,
+            diff_start_index,
+            diff_end_index,
+            start_ref_name,
+            start_ref_pos,
+            end_ref_name,
+            end_ref_pos
+    ):
         """
         Resolve between DIFF range and user specified range.
-        :param user_range:
         :param diff_start_index:
         :param diff_end_index:
-        :param fai_list:
-        :return:
+        :param start_ref_name:
+        :param start_ref_pos:
+        :param end_ref_name:
+        :param end_ref_pos:
+        :return: tuple (start_index, end_index)
         """
-        start_ref_name, start_ref_pos, end_ref_name, end_ref_pos = user_range
-        
-        if start_ref_pos is not None and start_ref_name is None:
-            raise ValueError("Start reference must be supplied along with start position.")
-        
-        if end_ref_pos is not None and end_ref_name is None:
-            raise ValueError("End reference must be supplied along with end position.")
-        
-        if start_ref_name is not None and end_ref_name is not None:
+        if start_ref_name is not None or end_ref_name is not None:
             # apply user range
-            user_start_index, user_end_index = pos_range2index_range(user_range, fai_list)
-            diff_range = (*index2pos(diff_start_index, fai_list), *index2pos(diff_end_index, fai_list))
+            start_index = self.fai.resolve_start_index(start_ref_name, start_ref_pos)
+            end_index = self.fai.resolve_end_index(end_ref_name, end_ref_pos)
             
-            if user_start_index < diff_start_index:
-                args = index2pos(user_start_index, fai_list) + diff_range
+            diff_range = self.fai.index2pos(diff_start_index) + self.fai.index2pos(diff_end_index)
+            
+            if start_index < diff_start_index:
+                args = self.fai.index2pos(start_index) + diff_range
                 # noinspection PyStringFormat
                 raise ValueError("Start position [%s, %d] must be within DIFF range [%s, %d]:[%s, %d]." % args)
-            if user_end_index > diff_end_index:
-                args = index2pos(user_end_index, fai_list) + diff_range
+            if end_index > diff_end_index:
+                args = self.fai.index2pos(end_index) + diff_range
                 # noinspection PyStringFormat
                 raise ValueError("End position [%s, %d] must be within DIFF range [%s, %d]:[%s, %d]." % args)
-            return user_start_index, user_end_index
+            return start_index, end_index
+        
         else:
+            # apply diff range
             return diff_start_index, diff_end_index
+    
+    def bam_checksum(self):
+        if self.bam_checksum is None:
+            self.bam_checksum = calc_checksum(self.bam_file)
+        return self.bam_checksum
     
     def unmutate(
             self,
-            mut_bam_file,
             diff_file,
             out_bam_file,
             start_ref_name=None,
@@ -215,7 +242,6 @@ class Mutator:
     ):
         """
         Unmutate BAM file in range specified by DIFF file or by parameters.
-        :param mut_bam_file: pysam.AlignmentFile
         :param diff_file: binary file
         :param out_bam_file: pysam.AlignmentFile
         :param start_ref_name:
@@ -226,17 +252,19 @@ class Mutator:
         """
         self.__init_counters()
         
-        fai_list = get_fai_list(mut_bam_file)
-        fai_dict = fai_list2dict(fai_list)
-        
-        user_range = (start_ref_name, start_ref_pos, end_ref_name, end_ref_pos)
-        start_index, end_index = self.__resolve_diff_range(diff_file, user_range, fai_list)
+        start_index, end_index = self.__resolve_range(
+            diff_file,
+            start_ref_name,
+            start_ref_pos,
+            end_ref_name,
+            end_ref_pos
+        )
         
         snv_alignments = []
-        bam_iter = BamIterator(mut_bam_file, start_index, end_index)
+        bam_iter = BamIterator(self.bam_file, start_index, end_index)
         alignment = next(bam_iter)
         
-        diff_iter = DiffIterator(diff_file, start_index, end_index)
+        diff_iter = DiffIterator(diff_file, self.fai, start_index, end_index)
         diff = next(diff_iter)
         
         while True:
@@ -268,17 +296,17 @@ class Mutator:
                 self.__write_alignment(out_bam_file, alignment)
                 alignment = next(bam_iter)
             
-            elif self.__is_before_index(alignment, diff.index, fai_dict):
+            elif self.__is_before_index(alignment, diff.index):
                 self.__write_alignment(out_bam_file, alignment)
                 alignment = next(bam_iter)
             
-            elif self.__is_after_index(alignment, diff.index, fai_dict):
+            elif self.__is_after_index(alignment, diff.index):
                 self.__unmutate_overlap(snv_alignments, diff.mut_map)
                 # done with this vac, read next
                 diff = next(diff_iter)
                 if diff is not None:
                     # could be end of DIFF file
-                    self.__write_before_index(out_bam_file, snv_alignments, diff.index, fai_dict)
+                    self.__write_before_index(out_bam_file, snv_alignments, diff.index)
                     self.__set_seq_positions(snv_alignments, diff.ref_pos)
             
             else:  # alignment is overlapping vac
@@ -317,24 +345,20 @@ class Mutator:
         """
         self.__init_counters()
         
-        fai_list = get_fai_list(in_bam_file)
-        fai_dict = fai_list2dict(fai_list)
-        
         snv_alignments = []
         
         bam_iter = BamIterator(in_bam_file)
         alignment = next(bam_iter)
         
-        vac_iter = VacIterator(in_vac_file, fai_list)
+        vac_iter = VacIterator(in_vac_file, self.fai)
         vac = next(vac_iter)
         
         Diff.write_header(
             diff_file=out_diff_file,
             bam_checksum=calc_checksum(in_bam_file),
-            start_index=min_index(),
-            end_index=max_index(fai_list)
+            start_index=self.fai.first_index(),
+            end_index=self.fai.last_index()
         )
-        
         while True:
             if vac is None or alignment is None:
                 # finish
@@ -364,23 +388,24 @@ class Mutator:
                 self.__write_alignment(out_bam_file, alignment)
                 alignment = next(bam_iter)
             
-            elif self.__is_before_index(alignment, vac.index, fai_dict):
+            elif self.__is_before_index(alignment, vac.index):
                 self.__write_alignment(out_bam_file, alignment)
                 alignment = next(bam_iter)
             
-            elif self.__is_after_index(alignment, vac.index, fai_dict):
+            elif self.__is_after_index(alignment, vac.index):
                 self.__mutate_overlap(out_diff_file, snv_alignments, vac)
                 # done with this vac, read next
                 vac = next(vac_iter)
                 if vac is not None:
                     # could be end of VAC file
-                    self.__write_before_index(out_bam_file, snv_alignments, vac.index, fai_dict)
+                    self.__write_before_index(out_bam_file, snv_alignments, vac.index)
                     self.__set_seq_positions(snv_alignments, vac.ref_pos)
             
             else:  # alignment is overlapping vac
                 # alignment dont have to be mapped to the vac (indel)
                 # find sequence position of vac
                 seq_pos = self.ref_pos2seq_pos(alignment, vac.ref_pos)
+                
                 snv_alignments.append(SnvAlignment(alignment, seq_pos))
                 
                 alignment = next(bam_iter)
@@ -495,7 +520,7 @@ class Mutator:
                     raise ValueError("Unsupported CIGAR operation %d" % cig_op_id)
                 break
     
-    def __write_before_index(self, out_bam_file, snv_alignments, index, fai_dict):
+    def __write_before_index(self, out_bam_file, snv_alignments, index):
         """
         Write snv alignments before index to file.
         :param out_bam_file:
@@ -506,7 +531,7 @@ class Mutator:
         tmp_snv_alignments = snv_alignments[:]
         for snv_alignment in tmp_snv_alignments:
             # new_snv alignment is either before or overlapping next new_snv
-            if self.__is_before_index(snv_alignment.alignment, index, fai_dict):
+            if self.__is_before_index(snv_alignment.alignment, index):
                 self.__write_alignment(out_bam_file, snv_alignment.alignment)
                 # remove written alignment
                 snv_alignments.remove(snv_alignment)

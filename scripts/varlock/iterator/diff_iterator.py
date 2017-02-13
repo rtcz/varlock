@@ -4,22 +4,14 @@ from ..po import DiffRecord
 
 
 class DiffIterator:
-    def __init__(self, diff_file, fai, start_index=None, end_index=None):
+    def __init__(self, diff_file, fai, start_index, end_index):
         assert start_index <= end_index
-        self.diff_file = diff_file
+        
+        self.diff_file = Diff.slice(diff_file, start_index, end_index)
         self.fai = fai
         self.start_index = start_index
         self.end_index = end_index
         self.counter = 0
-        
-        # TODO
-        
-        if start_index is not None:
-            Diff.seek_pos(diff_file, start_index)
-            
-        if end_index is not None:
-            end_pos = Diff.seek_pos(diff_file, end_index)
-            diff_file.truncate(end_pos)
     
     def __iter__(self):
         return self
