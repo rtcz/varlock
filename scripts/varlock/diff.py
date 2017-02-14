@@ -86,9 +86,9 @@ class Diff:
     @classmethod
     def validate_header_range(cls, diff_file):
         checksum, header_start_index, header_end_index = cls.read_header(diff_file)
-        content_start_index = struct.unpack('<I', diff_file.read(cls.INT_LENGTH))[0]
+        content_start_index = cls.__read_index(diff_file)
         diff_file.seek(-cls.RECORD_LENGTH, 2)
-        content_end_index = struct.unpack('<I', diff_file.read(cls.INT_LENGTH))[0]
+        content_end_index = cls.__read_index(diff_file)
         
         if header_start_index > content_start_index:
             raise ValueError("Invalid header start index")
@@ -130,86 +130,105 @@ class Diff:
         return diff_file.tell()
     
     @classmethod
-    def seek_range(cls, diff_file, start_index, end_index):
+    def seek_subrange(cls, diff_file, start_index, end_index):
         assert start_index <= end_index
         
-        start_pos = cls.seek(diff_file, start_index)
-        end_pos = cls.seek(diff_file, end_index)
+        start_offset = cls.seek_closest_index(diff_file, start_index, True)
+        end_offset = cls.seek_closest_index(diff_file, end_index, False)
         
-        if start_pos == end_pos == cls.get_start_pos(diff_file):
-            raise IndexError("Range is out of DIFF")
-        
-        if start_pos == end_pos == cls.get_end_pos(diff_file):
-            raise IndexError("Range is out of DIFF")
-        
-        return start_pos, end_pos
+        return start_offset, end_offset + cls.RECORD_LENGTH
     
     @classmethod
-    def seek(cls, diff_file, index):
-        """
-        Seek position in DIFF file at or right after specified index.
-        :param diff_file:
-        :param index:
-        :return: seeked position
-        :raises: IndexError
-        """
-        # TODO move to diff validation
+    def __read_index(cls, diff_file):
+        index = struct.unpack('<I', diff_file.read(cls.INT_LENGTH))[0]
+        # diff_file.seek(-cls.INT_LENGTH, 1)
+        return index
+    
+    @classmethod
+    def body_size(cls, diff_file):
         diff_file.seek(0, 2)
-        full_size = diff_file.tell() - cls.HEADER_LENGTH
-        if full_size < 0:
+        return diff_file.tell() - cls.HEADER_LENGTH
+    
+    @classmethod
+    def validate(cls, diff_file):
+        body_size = cls.body_size(diff_file)
+        if body_size < 0:
             raise IOError("Diff too short")
         
-        if full_size == 0:
+        if body_size == 0:
             # file is empty - return position after header
-            return cls.HEADER_LENGTH
+            raise EOFError("Diff is empty")
         
-        if full_size % cls.RECORD_LENGTH != 0:
+        if body_size % cls.RECORD_LENGTH != 0:
             raise IOError("Diff file has invalid number of bytes")
         
+        cls.validate_header_range(diff_file)
+    
+    @classmethod
+    def seek_closest_index(cls, diff_file, index, up=True):
+        """
+        :param diff_file:
+        :param index:
+        :param up:
+        :return:
+        """
+        cls.validate(diff_file)
+        
         diff_file.seek(cls.HEADER_LENGTH, 0)
-        start_diff = struct.unpack('<I', diff_file.read(cls.INT_LENGTH))[0]
+        start_index = cls.__read_index(diff_file)
         diff_file.seek(-Diff.RECORD_LENGTH, 2)
-        end_diff = struct.unpack('<I', diff_file.read(cls.INT_LENGTH))[0]
+        end_index = cls.__read_index(diff_file)
         
-        if index > end_diff:
+        if index > end_index:
             # index is after DIFF content
-            # go to EOF
-            diff_file.seek(0, 2)
-            return diff_file.tell()
-        
-        if index < start_diff:
-            # index is before DIFF content
-            # go to SOF
-            diff_file.seek(cls.HEADER_LENGTH, 0)
-            return diff_file.tell()
-        
-        # mind diff with one record
-        if full_size == cls.RECORD_LENGTH:
-            diff_file.seek(cls.HEADER_LENGTH, 0)
-            return diff_file.tell()
-        
-        # range start is inside diff content
-        curr_index = index
-        size = int(full_size / 2)
-        while size >= cls.RECORD_LENGTH:
-            diff_file.seek(cls.HEADER_LENGTH + size, 0)
-            curr_index = struct.unpack('<I', diff_file.read(cls.INT_LENGTH))[0]
-            if curr_index > index:
-                size -= int(size / 2)
-            elif curr_index < index:
-                size += int(size / 2)
+            if up:
+                raise IndexError("Upper index not found")
             else:
-                break
+                diff_file.seek(-cls.RECORD_LENGTH, 2)
+                return diff_file.tell()
         
-        diff_file.seek(-cls.INT_LENGTH, 1)
+        if index < start_index:
+            # index is before DIFF content
+            if up:
+                diff_file.seek(cls.HEADER_LENGTH, 0)
+                return diff_file.tell()
+            else:
+                raise IndexError("Lower index not found")
+        
+        first = 0
+        last = cls.body_size(diff_file) / cls.RECORD_LENGTH - 1
+        curr_index = index
+        while first <= last:
+            mid = int((first + last) / 2)
+            diff_file.seek(cls.HEADER_LENGTH + (mid * cls.RECORD_LENGTH))
+            curr_index = cls.__read_index(diff_file)
+            if index == curr_index:
+                break
+            else:
+                if index < curr_index:
+                    last = mid - 1
+                else:
+                    first = mid + 1
+        
+        offset = diff_file.tell()
         
         # final move
-        if curr_index > index:
+        if index < curr_index:
             diff_file.seek(-cls.RECORD_LENGTH, 1)
-        elif curr_index < index:
-            diff_file.seek(+cls.RECORD_LENGTH, 1)
+            prev_offset = diff_file.tell()
+            prev_index = cls.__read_index(diff_file)
+            if not up or index == prev_index:
+                offset = prev_offset
         
-        return diff_file.tell()
+        elif index > curr_index:
+            diff_file.seek(cls.RECORD_LENGTH, 1)
+            next_offset = diff_file.tell()
+            next_index = cls.__read_index(diff_file)
+            if up or index == next_index:
+                offset = next_offset
+        
+        diff_file.seek(offset)
+        return offset
     
     @classmethod
     def slice(cls, diff_file, start_index, end_index):
@@ -221,7 +240,7 @@ class Diff:
         """
         assert start_index <= end_index
         
-        start_pos, end_pos = cls.seek_range(diff_file, start_index, end_index)
+        start_offset, end_offset = cls.seek_subrange(diff_file, start_index, end_index)
         
         sliced_diff = io.BytesIO()
         
@@ -229,17 +248,17 @@ class Diff:
         checksum = cls.read_header(diff_file)[0]
         cls.write_header(diff_file, checksum, start_index, end_index)
         # content
-        diff_file.seek(start_pos)
-        sliced_diff.write(diff_file.read(end_pos - start_pos))
+        diff_file.seek(end_offset)
+        sliced_diff.write(diff_file.read(end_offset - start_offset))
         return sliced_diff
-        
-        # @classmethod
-        # def diff2text(cls, diff_filepath, text_filepath):
-        #     with open(diff_filepath, "rb") as diff_file, \
-        #             open(text_filepath, "wt") as text_file:
-        #         while True:
-        #             try:
-        #                 index, mut_tuple = cls.read_record(diff_file)
-        #                 text_file.write("%d\t%s\n" % (index, mut_tuple))
-        #             except EOFError:
-        #                 break
+
+# @classmethod
+# def diff2text(cls, diff_filepath, text_filepath):
+#     with open(diff_filepath, "rb") as diff_file, \
+#             open(text_filepath, "wt") as text_file:
+#         while True:
+#             try:
+#                 index, mut_tuple = cls.read_record(diff_file)
+#                 text_file.write("%d\t%s\n" % (index, mut_tuple))
+#             except EOFError:
+#                 break

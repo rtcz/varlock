@@ -7,7 +7,7 @@ from .random_mockup import RandomMockup
 class TestCommon(unittest.TestCase):
     @staticmethod
     def create_fai():
-        with pysam.AlignmentFile('resources/common/input.sam', "r") as sam_file:
+        with pysam.AlignmentFile('tests/resources/common/input.sam', "r") as sam_file:
             return FastaIndex(sam_file)
     
     def test_multi_random(self):

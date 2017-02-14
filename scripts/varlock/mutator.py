@@ -173,7 +173,6 @@ class Mutator:
             end_ref_name,
             end_ref_pos
     ):
-        Diff.validate_header_range(diff_file)
         checksum, diff_start_index, diff_end_index = Diff.read_header(diff_file)
         if self.bam_checksum() != checksum:
             raise ValueError("Checksum mismatch.")
@@ -251,7 +250,8 @@ class Mutator:
         :return:
         """
         self.__init_counters()
-        
+
+        Diff.validate(diff_file)
         start_index, end_index = self.__resolve_range(
             diff_file,
             start_ref_name,
