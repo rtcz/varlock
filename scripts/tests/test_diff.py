@@ -53,29 +53,52 @@ class TestDiff(unittest.TestCase):
     def test_seek_range(self):
         # build diff
         diff_file = self.__build_diff_file()
-        # diff inside range
-        self.assertTupleEqual((self.rec_offset(0), self.rec_offset(4)), Diff.seek_subrange(diff_file, 1000000000, 3000000000))
+        # invalid range
+        self.assertRaises(AssertionError, lambda: Diff.seek_subrange(diff_file, 2000000000, 1000000000))
+        
+        # outer range
+        self.assertTupleEqual((self.rec_offset(0), self.rec_offset(4)),
+                              Diff.seek_subrange(diff_file, 1000000000, 3000000000))
         self.assertRaises(IndexError, lambda: Diff.seek_subrange(diff_file, 1000000000, 2000000000))
         self.assertRaises(IndexError, lambda: Diff.seek_subrange(diff_file, 3000000000, 4000000000))
         self.assertRaises(IndexError, lambda: Diff.seek_subrange(diff_file, 1000000000, 2830728740))
         self.assertRaises(IndexError, lambda: Diff.seek_subrange(diff_file, 2830728807, 3000000000))
-        # diff covers range
-        self.assertTupleEqual((self.rec_offset(0), self.rec_offset(2)), Diff.seek_subrange(diff_file, 2830728741, 2830728781))
-        self.assertTupleEqual((self.rec_offset(1), self.rec_offset(3)), Diff.seek_subrange(diff_file, 2830728781, 2830728786))
-        self.assertTupleEqual((self.rec_offset(2), self.rec_offset(4)), Diff.seek_subrange(diff_file, 2830728786, 2830728806))
-        # diff starts inside range and ends after range
-        self.assertTupleEqual((self.rec_offset(0), self.rec_offset(1)), Diff.seek_subrange(diff_file, 2830728741, 2830728741))
-        self.assertTupleEqual((self.rec_offset(1), self.rec_offset(2)), Diff.seek_subrange(diff_file, 2830728781, 2830728781))
-        self.assertTupleEqual((self.rec_offset(3), self.rec_offset(4)), Diff.seek_subrange(diff_file, 2830728806, 2830728806))
-        self.assertTupleEqual((self.rec_offset(0), self.rec_offset(4)), Diff.seek_subrange(diff_file, 2830728741, 3000000000))
-        self.assertTupleEqual((self.rec_offset(1), self.rec_offset(4)), Diff.seek_subrange(diff_file, 2830728781, 3000000000))
-        self.assertTupleEqual((self.rec_offset(2), self.rec_offset(4)), Diff.seek_subrange(diff_file, 2830728786, 3000000000))
-        self.assertTupleEqual((self.rec_offset(3), self.rec_offset(4)), Diff.seek_subrange(diff_file, 2830728806, 3000000000))
-        # diff starts before range and ends inside range
-        self.assertTupleEqual((self.rec_offset(0), self.rec_offset(1)), Diff.seek_subrange(diff_file, 1000000000, 2830728741))
-        self.assertTupleEqual((self.rec_offset(0), self.rec_offset(2)), Diff.seek_subrange(diff_file, 1000000000, 2830728781))
-        self.assertTupleEqual((self.rec_offset(0), self.rec_offset(3)), Diff.seek_subrange(diff_file, 1000000000, 2830728786))
-        self.assertTupleEqual((self.rec_offset(0), self.rec_offset(4)), Diff.seek_subrange(diff_file, 1000000000, 2830728806))
+        
+        # inner range
+        self.assertTupleEqual((self.rec_offset(0), self.rec_offset(2)),
+                              Diff.seek_subrange(diff_file, 2830728741, 2830728781))
+        self.assertTupleEqual((self.rec_offset(1), self.rec_offset(3)),
+                              Diff.seek_subrange(diff_file, 2830728781, 2830728786))
+        self.assertTupleEqual((self.rec_offset(2), self.rec_offset(4)),
+                              Diff.seek_subrange(diff_file, 2830728786, 2830728806))
+        self.assertTupleEqual((self.rec_offset(0), self.rec_offset(1)),
+                              Diff.seek_subrange(diff_file, 2830728741, 2830728780))
+        self.assertTupleEqual((self.rec_offset(1), self.rec_offset(3)),
+                              Diff.seek_subrange(diff_file, 2830728780, 2830728790))
+        # right intersect range
+        self.assertTupleEqual((self.rec_offset(0), self.rec_offset(1)),
+                              Diff.seek_subrange(diff_file, 2830728741, 2830728741))
+        self.assertTupleEqual((self.rec_offset(1), self.rec_offset(2)),
+                              Diff.seek_subrange(diff_file, 2830728781, 2830728781))
+        self.assertTupleEqual((self.rec_offset(3), self.rec_offset(4)),
+                              Diff.seek_subrange(diff_file, 2830728806, 2830728806))
+        self.assertTupleEqual((self.rec_offset(0), self.rec_offset(4)),
+                              Diff.seek_subrange(diff_file, 2830728741, 3000000000))
+        self.assertTupleEqual((self.rec_offset(1), self.rec_offset(4)),
+                              Diff.seek_subrange(diff_file, 2830728781, 3000000000))
+        self.assertTupleEqual((self.rec_offset(2), self.rec_offset(4)),
+                              Diff.seek_subrange(diff_file, 2830728786, 3000000000))
+        self.assertTupleEqual((self.rec_offset(3), self.rec_offset(4)),
+                              Diff.seek_subrange(diff_file, 2830728806, 3000000000))
+        # left intersect range
+        self.assertTupleEqual((self.rec_offset(0), self.rec_offset(1)),
+                              Diff.seek_subrange(diff_file, 1000000000, 2830728741))
+        self.assertTupleEqual((self.rec_offset(0), self.rec_offset(2)),
+                              Diff.seek_subrange(diff_file, 1000000000, 2830728781))
+        self.assertTupleEqual((self.rec_offset(0), self.rec_offset(3)),
+                              Diff.seek_subrange(diff_file, 1000000000, 2830728786))
+        self.assertTupleEqual((self.rec_offset(0), self.rec_offset(4)),
+                              Diff.seek_subrange(diff_file, 1000000000, 2830728806))
     
     def test_header_range(self):
         diff_file = io.BytesIO()
@@ -105,16 +128,67 @@ class TestDiff(unittest.TestCase):
         self.assertRaises(ValueError, lambda: Diff.validate_header_range(diff_file))
     
     def test_slice(self):
-        # TODO
         diff_file = self.__build_diff_file()
         
-        self.assertRaises(EOFError, lambda: Diff.slice(diff_file, 2830728781, 2830728786))
+        # invalid range
+        self.assertRaises(AssertionError, lambda: Diff.slice(diff_file, 2000000000, 1000000000))
         
-        sliced_diff = Diff.slice(diff_file, 2830728781, 2830728786)
-        self.assertTupleEqual((b'0123456789ABCDEF', 2830728781, 2830728786), Diff.read_header(sliced_diff))
-        self.assertTupleEqual((2830728781, ('G', 'A', 'T', 'C')), Diff.read_record(sliced_diff))
-        self.assertTupleEqual((2830728786, ('T', 'G', 'A', 'C')), Diff.read_record(sliced_diff))
-        self.assertRaises(EOFError, lambda: Diff.read_record(sliced_diff))
+        # out of range
+        self.assertRaises(IndexError, lambda: Diff.slice(diff_file, 2000000000, 2000000000))
+        self.assertRaises(IndexError, lambda: Diff.slice(diff_file, 3000000000, 3000000000))
+        
+        # exact range
+        sliced_file = Diff.slice(diff_file, 2830728741, 2830728806)
+        self.assertTupleEqual((b'0123456789ABCDEF', 2830728741, 2830728806), Diff.read_header(sliced_file))
+        self.assertTupleEqual((2830728741, ('C', 'A', 'T', 'G')), Diff.read_record(sliced_file))
+        self.assertTupleEqual((2830728781, ('G', 'A', 'T', 'C')), Diff.read_record(sliced_file))
+        self.assertTupleEqual((2830728786, ('T', 'G', 'A', 'C')), Diff.read_record(sliced_file))
+        self.assertTupleEqual((2830728806, ('G', 'C', 'A', 'T')), Diff.read_record(sliced_file))
+        self.assertRaises(EOFError, lambda: Diff.read_record(sliced_file))
+        
+        # outer range
+        sliced_file = Diff.slice(diff_file, 2000000000, 3000000000)
+        self.assertTupleEqual((b'0123456789ABCDEF', 2000000000, 3000000000), Diff.read_header(sliced_file))
+        self.assertTupleEqual((2830728741, ('C', 'A', 'T', 'G')), Diff.read_record(sliced_file))
+        self.assertTupleEqual((2830728781, ('G', 'A', 'T', 'C')), Diff.read_record(sliced_file))
+        self.assertTupleEqual((2830728786, ('T', 'G', 'A', 'C')), Diff.read_record(sliced_file))
+        self.assertTupleEqual((2830728806, ('G', 'C', 'A', 'T')), Diff.read_record(sliced_file))
+        self.assertRaises(EOFError, lambda: Diff.read_record(sliced_file))
+        
+        # inner range
+        sliced_file = Diff.slice(diff_file, 2830728781, 2830728786)
+        self.assertTupleEqual((b'0123456789ABCDEF', 2830728781, 2830728786), Diff.read_header(sliced_file))
+        self.assertTupleEqual((2830728781, ('G', 'A', 'T', 'C')), Diff.read_record(sliced_file))
+        self.assertTupleEqual((2830728786, ('T', 'G', 'A', 'C')), Diff.read_record(sliced_file))
+        self.assertRaises(EOFError, lambda: Diff.read_record(sliced_file))
+        
+        sliced_file = Diff.slice(diff_file, 2830728780, 2830728790)
+        self.assertTupleEqual((b'0123456789ABCDEF', 2830728780, 2830728790), Diff.read_header(sliced_file))
+        self.assertTupleEqual((2830728781, ('G', 'A', 'T', 'C')), Diff.read_record(sliced_file))
+        self.assertTupleEqual((2830728786, ('T', 'G', 'A', 'C')), Diff.read_record(sliced_file))
+        self.assertRaises(EOFError, lambda: Diff.read_record(sliced_file))
+        
+        # right intersect range
+        sliced_file = Diff.slice(diff_file, 2830728806, 3000000000)
+        self.assertTupleEqual((b'0123456789ABCDEF', 2830728806, 3000000000), Diff.read_header(sliced_file))
+        self.assertTupleEqual((2830728806, ('G', 'C', 'A', 'T')), Diff.read_record(sliced_file))
+        self.assertRaises(EOFError, lambda: Diff.read_record(sliced_file))
+        
+        sliced_file = Diff.slice(diff_file, 2830728790, 3000000000)
+        self.assertTupleEqual((b'0123456789ABCDEF', 2830728790, 3000000000), Diff.read_header(sliced_file))
+        self.assertTupleEqual((2830728806, ('G', 'C', 'A', 'T')), Diff.read_record(sliced_file))
+        self.assertRaises(EOFError, lambda: Diff.read_record(sliced_file))
+        
+        # left intersect range
+        sliced_file = Diff.slice(diff_file, 2000000000, 2830728741)
+        self.assertTupleEqual((b'0123456789ABCDEF', 2000000000, 2830728741), Diff.read_header(sliced_file))
+        self.assertTupleEqual((2830728741, ('C', 'A', 'T', 'G')), Diff.read_record(sliced_file))
+        self.assertRaises(EOFError, lambda: Diff.read_record(sliced_file))
+        
+        sliced_file = Diff.slice(diff_file, 2000000000, 2830728750)
+        self.assertTupleEqual((b'0123456789ABCDEF', 2000000000, 2830728750), Diff.read_header(sliced_file))
+        self.assertTupleEqual((2830728741, ('C', 'A', 'T', 'G')), Diff.read_record(sliced_file))
+        self.assertRaises(EOFError, lambda: Diff.read_record(sliced_file))
 
 
 if __name__ == '__main__':

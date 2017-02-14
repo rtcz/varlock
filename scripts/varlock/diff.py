@@ -209,7 +209,8 @@ class Diff:
                     last = mid - 1
                 else:
                     first = mid + 1
-        
+
+        diff_file.seek(-cls.INT_LENGTH, 1)
         offset = diff_file.tell()
         
         # final move
@@ -241,14 +242,12 @@ class Diff:
         assert start_index <= end_index
         
         start_offset, end_offset = cls.seek_subrange(diff_file, start_index, end_index)
-        
         sliced_diff = io.BytesIO()
-        
         # header
         checksum = cls.read_header(diff_file)[0]
-        cls.write_header(diff_file, checksum, start_index, end_index)
-        # content
-        diff_file.seek(end_offset)
+        cls.write_header(sliced_diff, checksum, start_index, end_index)
+        # body
+        diff_file.seek(start_offset)
         sliced_diff.write(diff_file.read(end_offset - start_offset))
         return sliced_diff
 
