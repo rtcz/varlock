@@ -1,6 +1,8 @@
 import io
 import struct
 
+from .common import bin2hex, hex2bin
+
 
 class Diff:
     """
@@ -99,11 +101,7 @@ class Diff:
     @classmethod
     def write_header(cls, diff_file, bam_checksum, start_index, end_index):
         assert start_index <= end_index
-        
-        if len(bam_checksum) != cls.MD5_LENGTH:
-            raise ValueError('Invalid checksum length')
-        
-        diff_file.write(bam_checksum)
+        cls.write_checksum(diff_file, bam_checksum)
         diff_file.write(struct.pack('<II', start_index, end_index))
     
     @classmethod
@@ -118,6 +116,14 @@ class Diff:
     def write_record(cls, diff_file, index, mut_tuple):
         byte_string = struct.pack(cls.RECORD_FORMAT, index, cls.MUT_2_INDEX[mut_tuple])
         diff_file.write(byte_string)
+    
+    @classmethod
+    def write_checksum(cls, diff_file, bam_checksum):
+        diff_file.seek(0)
+        if len(bam_checksum) != cls.MD5_LENGTH:
+            raise ValueError('Invalid checksum length')
+        
+        diff_file.write(bam_checksum)
     
     @classmethod
     def get_start_pos(cls, diff_file):
@@ -209,7 +215,7 @@ class Diff:
                     last = mid - 1
                 else:
                     first = mid + 1
-
+        
         diff_file.seek(-cls.INT_LENGTH, 1)
         offset = diff_file.tell()
         
@@ -250,14 +256,26 @@ class Diff:
         diff_file.seek(start_offset)
         sliced_diff.write(diff_file.read(end_offset - start_offset))
         return sliced_diff
-
-# @classmethod
-# def diff2text(cls, diff_filepath, text_filepath):
-#     with open(diff_filepath, "rb") as diff_file, \
-#             open(text_filepath, "wt") as text_file:
-#         while True:
-#             try:
-#                 index, mut_tuple = cls.read_record(diff_file)
-#                 text_file.write("%d\t%s\n" % (index, mut_tuple))
-#             except EOFError:
-#                 break
+    
+    @classmethod
+    def diff2text(cls, diff_filepath, text_filepath):
+        with open(diff_filepath, 'rb') as diff_file, \
+                open(text_filepath, 'wt') as text_file:
+            checksum, start_index, end_index = cls.read_header(diff_file)
+            text_file.write('%s\t%d\t%d\n' % (bin2hex(checksum), start_index, end_index))
+            while True:
+                try:
+                    index, mut_tuple = cls.read_record(diff_file)
+                    text_file.write('%d\t%s\n' % (index, ','.join(mut_tuple)))
+                except EOFError:
+                    break
+    
+    @classmethod
+    def text2diff(cls, text_filepath, diff_filepath):
+        with open(diff_filepath, 'wb') as diff_file, \
+                open(text_filepath, 'rt') as text_file:
+            checksum_hex, start_index, end_index = text_file.readline().rstrip().split('\t')
+            cls.write_header(diff_file, hex2bin(checksum_hex), int(start_index), int(end_index))
+            for line in text_file:
+                index, mut = line.rstrip().split('\t')
+                Diff.write_record(diff_file, int(index), tuple(mut.split(',')))

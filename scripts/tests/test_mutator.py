@@ -5,7 +5,6 @@ from random import Random
 import pysam
 
 from varlock import *
-from .context import *
 from .random_mockup import RandomMockup
 
 
@@ -104,84 +103,85 @@ class TestMutator(unittest.TestCase):
         mut_map = Mutator.create_mut_map(alt_ac=[1, 1, 1, 1], ref_ac=[1, 1, 1, 1], rnd=Random(0))
         self.assertDictEqual({'A': 'G', 'T': 'T', 'G': 'C', 'C': 'A', 'N': 'N'}, mut_map)
     
-    def test_test(self):
-        # TODO
-        # Mutator.record2bytes()
-        pass
-    
     def test_mutate(self):
-        # convert input from text to binary format
-        for i in range(2):
-            Vac.text2vac(TEXT_VAC_FILENAMES[i], VAC_FILENAMES[i])
-        
-        sam2bam(SAM_FILENAME, BAM_FILENAME)
+        dir_path = 'tests/resources/mutator/mutate/'
+        sam2bam(dir_path + 'input.sam', dir_path + 'input.bam')
+        pysam.index(dir_path + 'input.bam')
         
         # EOF BAM case
-        mut = Mutator(rnd=RandomMockup(), verbose=False)
-        with pysam.AlignmentFile(BAM_FILENAME, "rb") as in_bam_file, \
-                open(VAC_FILENAMES[0], "rb") as in_vac_file, \
-                pysam.AlignmentFile(MUT_BAM_FILENAMES[0], "wb", template=in_bam_file) as out_bam_file, \
-                open(DIFF_FILENAMES[0], "wb") as out_diff_file:
-            mut.mutate(
-                in_vac_file=in_vac_file,
-                in_bam_file=in_bam_file,
-                out_bam_file=out_bam_file,
-                out_diff_file=out_diff_file
-            )
-        pysam.index(MUT_BAM_FILENAMES[0])
-        bam2sam(MUT_BAM_FILENAMES[0], MUT_SAM_FILENAMES[0])
+        Vac.text2vac(dir_path + 'input_01.vac.txt', dir_path + 'input_01.vac')
+        mut = MutatorCaller(rnd=RandomMockup())
+        diff_file = mut.mutate(
+            bam_filename=dir_path + 'input.bam',
+            vac_filename=dir_path + 'input_01.vac',
+            out_bam_filename=dir_path + 'output_01.bam'
+        )
+        with open(dir_path + 'output_01.diff', 'wb') as out_diff_file, diff_file:
+            out_diff_file.write(diff_file.read())
         
-        self.assertEqual(True, filecmp.cmp(MUT_SAM_FILENAMES[0], DESIRED_MUT_FILENAMES[0]))
-        self.assertEqual(15, mut.alignment_counter)
-        self.assertEqual(0, mut.unmapped_counter)
-        self.assertEqual(12, mut.overlapping_counter)
-        self.assertEqual(5, mut.max_coverage)
-        self.assertEqual(5, mut.variant_counter)
-        self.assertEqual(12, mut.mut_counter)
-        self.assertEqual(4, mut.diff_counter)
+        self.assertEqual(15, mut.stat(MutatorCaller.STAT_ALIGNMENT_COUNT))
+        self.assertEqual(0, mut.stat(MutatorCaller.STAT_UNMAPPED_COUNT))
+        self.assertEqual(12, mut.stat(MutatorCaller.STAT_OVERLAPPING_COUNT))
+        self.assertEqual(5, mut.stat(MutatorCaller.STAT_MAX_COVERAGE))
+        self.assertEqual(5, mut.stat(MutatorCaller.STAT_SNV_COUNT))
+        self.assertEqual(12, mut.stat(MutatorCaller.STAT_MUT_COUNT))
+        self.assertEqual(4, mut.stat(MutatorCaller.STAT_DIFF_COUNT))
+        
+        bam2sam(dir_path + 'output_01.bam', dir_path + 'output_01.sam')
+        self.assertEqual(True, filecmp.cmp(dir_path + 'desired_01.sam', dir_path + 'output_01.sam'))
+        Diff.diff2text(dir_path + 'output_01.diff', dir_path + 'output_01.diff.txt')
+        self.assertEqual(True, filecmp.cmp(dir_path + 'desired_01.diff.txt', dir_path + 'output_01.diff.txt'))
         
         # EOF VAC case
-        mut = Mutator(rnd=RandomMockup(), verbose=False)
-        with pysam.AlignmentFile(BAM_FILENAME, "rb") as in_bam_file, \
-                open(VAC_FILENAMES[1], "rb") as in_vac_file, \
-                pysam.AlignmentFile(MUT_BAM_FILENAMES[1], "wb", template=in_bam_file) as out_bam_file, \
-                open(DIFF_FILENAMES[1], "wb") as out_diff_file:
-            mut.mutate(
-                in_vac_file=in_vac_file,
-                in_bam_file=in_bam_file,
-                out_bam_file=out_bam_file,
-                out_diff_file=out_diff_file
-            )
-        bam2sam(MUT_BAM_FILENAMES[1], MUT_SAM_FILENAMES[1])
-        pysam.index(MUT_BAM_FILENAMES[0])
+        Vac.text2vac(dir_path + 'input_02.vac.txt', dir_path + 'input_02.vac')
+        mut = MutatorCaller(rnd=RandomMockup())
+        diff_file = mut.mutate(
+            bam_filename=dir_path + 'input.bam',
+            vac_filename=dir_path + 'input_02.vac',
+            out_bam_filename=dir_path + 'output_02.bam'
+        )
+        with open(dir_path + 'output_02.diff', 'wb') as out_diff_file, diff_file:
+            out_diff_file.write(diff_file.read())
         
-        self.assertEqual(True, filecmp.cmp(MUT_SAM_FILENAMES[1], DESIRED_MUT_FILENAMES[1]))
-        self.assertEqual(15, mut.alignment_counter)
-        self.assertEqual(0, mut.unmapped_counter)
-        self.assertEqual(7, mut.overlapping_counter)
-        self.assertEqual(3, mut.max_coverage)
-        self.assertEqual(4, mut.variant_counter)
-        self.assertEqual(7, mut.mut_counter)
-        self.assertEqual(3, mut.diff_counter)
+        self.assertEqual(15, mut.stat(MutatorCaller.STAT_ALIGNMENT_COUNT))
+        self.assertEqual(0, mut.stat(MutatorCaller.STAT_UNMAPPED_COUNT))
+        self.assertEqual(7, mut.stat(MutatorCaller.STAT_OVERLAPPING_COUNT))
+        self.assertEqual(3, mut.stat(MutatorCaller.STAT_MAX_COVERAGE))
+        self.assertEqual(4, mut.stat(MutatorCaller.STAT_SNV_COUNT))
+        self.assertEqual(7, mut.stat(MutatorCaller.STAT_MUT_COUNT))
+        self.assertEqual(3, mut.stat(MutatorCaller.STAT_DIFF_COUNT))
         
+        bam2sam(dir_path + 'output_02.bam', dir_path + 'output_02.sam')
+        self.assertEqual(True, filecmp.cmp(dir_path + 'desired_02.sam', dir_path + 'output_02.sam'))
+        Diff.diff2text(dir_path + 'output_02.diff', dir_path + 'output_02.diff.txt')
+        self.assertEqual(True, filecmp.cmp(dir_path + 'desired_02.diff.txt', dir_path + 'output_02.diff.txt'))
         # TODO test case with more references (chromosomes)
     
     def test_unmutate(self):
-        mut = Mutator(rnd=RandomMockup(), verbose=False)
-        with pysam.AlignmentFile(MUT_BAM_FILENAMES[0], "rb") as in_bam_file, \
-                open(DIFF_FILENAMES[0], "rb") as in_diff_file, \
-                pysam.AlignmentFile(UNMUT_BAM_FILENAMES[0], "wb", template=in_bam_file) as out_bam_file:
-            mut.unmutate(
-                mut_bam_file=in_bam_file,
-                diff_file=in_diff_file,
-                ref_name='chr22',
-                start_ref_pos=1000021,
-                end_ref_pos=1000061,
-                out_bam_file=out_bam_file
-            )
-        bam2sam(UNMUT_BAM_FILENAMES[0], UNMUT_SAM_FILENAMES[0])
-        self.assertEqual(True, filecmp.cmp(UNMUT_SAM_FILENAMES[0], DESIRED_UNMUT_FILENAMES[0]))
+        dir_path = 'tests/resources/mutator/unmutate/'
         
+        # case 1
+        sam2bam(dir_path + 'input_01.sam', dir_path + 'input_01.bam')
+        pysam.index(dir_path + 'input_01.bam')
+        Diff.text2diff(dir_path + 'input_01.diff.txt', dir_path + 'input_01.diff')
+        mut = MutatorCaller(rnd=RandomMockup())
+        mut.unmutate(
+            bam_filename=dir_path + 'input_01.bam',
+            diff_file=dir_path + 'input_01.diff',
+            out_bam_filename=dir_path + 'output_01.bam'
+        )
+        self.assertEqual(15, mut.stat(MutatorCaller.STAT_ALIGNMENT_COUNT))
+        self.assertEqual(0, mut.stat(MutatorCaller.STAT_UNMAPPED_COUNT))
+        self.assertEqual(12, mut.stat(MutatorCaller.STAT_OVERLAPPING_COUNT))
+        self.assertEqual(5, mut.stat(MutatorCaller.STAT_MAX_COVERAGE))
+        self.assertEqual(5, mut.stat(MutatorCaller.STAT_SNV_COUNT))
+        self.assertEqual(12, mut.stat(MutatorCaller.STAT_MUT_COUNT))
+        self.assertEqual(4, mut.stat(MutatorCaller.STAT_DIFF_COUNT))
+        
+        bam2sam(dir_path + 'output_01.bam', dir_path + 'output_01.sam')
+        self.assertEqual(True, filecmp.cmp(dir_path + 'desired_01.sam', dir_path + 'output_01.sam'))
+        
+        # case 2
         # TODO more tests (ranges etc.)
         # TODO test case with more references (chromosomes)
 

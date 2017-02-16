@@ -1,3 +1,4 @@
+import io
 import random
 
 import numpy as np
@@ -30,7 +31,7 @@ class Mutator:
         self.verbose = verbose
         self.fai = FastaIndex(bam_file)
         self.bam_file = bam_file
-        self.bam_checksum = None
+        self._bam_checksum = None
     
     def __is_before_index(self, alignment, index):
         """
@@ -159,7 +160,7 @@ class Mutator:
         self.alignment_counter = 0  # counts written alignments
         self.diff_counter = 0
         self.mut_counter = 0
-        self.variant_counter = 0  # counts read snvs
+        self.snv_counter = 0  # counts read snvs
         
         self.unmapped_counter = 0
         self.overlapping_counter = 0
@@ -174,8 +175,8 @@ class Mutator:
             end_ref_pos
     ):
         checksum, diff_start_index, diff_end_index = Diff.read_header(diff_file)
-        if self.bam_checksum() != checksum:
-            raise ValueError("Checksum mismatch.")
+        self.validate_checksum(checksum)
+        
         return self.resolve_range(
             diff_start_index,
             diff_end_index,
@@ -226,9 +227,16 @@ class Mutator:
             return diff_start_index, diff_end_index
     
     def bam_checksum(self):
-        if self.bam_checksum is None:
-            self.bam_checksum = calc_checksum(self.bam_file)
-        return self.bam_checksum
+        if self._bam_checksum is None:
+            self._bam_checksum = calc_checksum(self.bam_file.filename)
+        
+        return self._bam_checksum
+    
+    def validate_checksum(self, check_sum):
+        if self.bam_checksum() != check_sum:
+            print(bin2hex(self.bam_checksum()))
+            print(bin2hex(check_sum))
+            raise ValueError("Invalid checksum.")
     
     def unmutate(
             self,
@@ -250,7 +258,7 @@ class Mutator:
         :return:
         """
         self.__init_counters()
-
+        
         Diff.validate(diff_file)
         start_index, end_index = self.__resolve_range(
             diff_file,
@@ -319,9 +327,6 @@ class Mutator:
                 snv_alignments.append(SnvAlignment(alignment, seq_pos))
                 
                 alignment = next(bam_iter)
-        
-        if self.verbose:
-            self.__print_counters()
     
     def __unmutate_overlap(self, snv_alignments, mut_map):
         for snv_alignment in snv_alignments:
@@ -331,12 +336,11 @@ class Mutator:
                 # done with current vac
                 snv_alignment.pos = None
     
-    def mutate(self, in_vac_file, in_bam_file, out_bam_file, out_diff_file):
+    def mutate(self, in_vac_file, out_bam_file, out_diff_file):
         """
         Mutate BAM file SNVs.
         :param in_vac_file: binary file
         input variant allele count file
-        :param in_bam_file: pysam.AlignmentFile
         input bam file
         :param out_bam_file: pysam.AlignmentFile
         output bam file
@@ -347,7 +351,7 @@ class Mutator:
         
         snv_alignments = []
         
-        bam_iter = BamIterator(in_bam_file)
+        bam_iter = BamIterator(self.bam_file)
         alignment = next(bam_iter)
         
         vac_iter = VacIterator(in_vac_file, self.fai)
@@ -355,7 +359,7 @@ class Mutator:
         
         Diff.write_header(
             diff_file=out_diff_file,
-            bam_checksum=calc_checksum(in_bam_file),
+            bam_checksum=bytes(Diff.MD5_LENGTH),
             start_index=self.fai.first_index(),
             end_index=self.fai.last_index()
         )
@@ -414,17 +418,8 @@ class Mutator:
                 # noinspection PyAttributeOutsideInit
                 self.max_coverage = max(len(snv_alignments), self.max_coverage)
         
-        if self.verbose:
-            self.__print_counters()
-    
-    def __print_counters(self):
-        print("written alignments %d" % self.alignment_counter)
-        print("unmapped alignments %d" % self.unmapped_counter)
-        print("overlapping alignments %d" % self.overlapping_counter)
-        print("max coverage %d" % self.max_coverage)
-        print("read snvs %d" % self.variant_counter)
-        print("mutations %d" % self.mut_counter)
-        print("diffs (mutation mappings) %d" % self.diff_counter)
+        # noinspection PyAttributeOutsideInit
+        self.snv_counter = VacIterator.counter(vac_iter)
     
     def __mutate_overlap(self, out_diff_file, snv_alignments, vac):
         """
@@ -548,3 +543,131 @@ class Mutator:
             if snv_pos is not None:
                 # alignment is mapped at another new_snv position
                 snv_alignment.pos = snv_pos
+
+
+class MutatorCaller:
+    SAM_COMMENT_TAG = 'CO'
+    MUT_COMMENT_PREFIX = 'MUT:'
+    
+    STAT_ALIGNMENT_COUNT = 0,
+    STAT_UNMAPPED_COUNT = 1,
+    STAT_OVERLAPPING_COUNT = 2,
+    STAT_MAX_COVERAGE = 3,
+    STAT_SNV_COUNT = 4,
+    STAT_MUT_COUNT = 5,
+    STAT_DIFF_COUNT = 6
+    
+    def __init__(self, rnd=random.SystemRandom(), verbose=False):
+        self.rnd = rnd
+        self.verbose = verbose
+        self._stats = {}
+    
+    @classmethod
+    def is_mutated(cls, bam_filename):
+        with pysam.AlignmentFile(bam_filename, 'rb') as bam_file:
+            return cls.__is_mutated(bam_file.header)
+    
+    @classmethod
+    def __is_mutated(cls, header_map):
+        if cls.SAM_COMMENT_TAG in header_map:
+            for comment in header_map[cls.SAM_COMMENT_TAG]:
+                if comment[:len(cls.MUT_COMMENT_PREFIX)] == cls.MUT_COMMENT_PREFIX:
+                    return True
+        return False
+    
+    @classmethod
+    def __add_comment(cls, header_map, comment):
+        if cls.SAM_COMMENT_TAG in header_map:
+            header_map[cls.SAM_COMMENT_TAG].append(comment)
+        else:
+            header_map[cls.SAM_COMMENT_TAG] = [comment]
+    
+    @classmethod
+    def __mut_header(cls, header_map, checksum):
+        if cls.__is_mutated(header_map):
+            raise ValueError("File appears to be already mutated.")
+        else:
+            comment = cls.MUT_COMMENT_PREFIX + bin2hex(checksum)
+            cls.__add_comment(header_map, comment)
+            return header_map
+    
+    @classmethod
+    def __unmut_header(cls, header_map):
+        if cls.__is_mutated(header_map):
+            comment_list = []
+            for i in range(len(header_map[cls.SAM_COMMENT_TAG])):
+                comment = header_map[cls.SAM_COMMENT_TAG][i]
+                print(comment)
+                if comment[:len(cls.MUT_COMMENT_PREFIX)] != cls.MUT_COMMENT_PREFIX:
+                    comment_list.append(comment)
+            
+            header_map[cls.SAM_COMMENT_TAG] = comment_list
+            return header_map
+        else:
+            raise ValueError('File does not appear to be mutated.')
+    
+    def stat(self, stat_id):
+        if stat_id in self._stats:
+            return self._stats[stat_id]
+        else:
+            raise ValueError('Stat not found.')
+    
+    def mutate(
+            self,
+            bam_filename,
+            vac_filename,
+            out_bam_filename
+    ):
+        self._stats = {}
+        out_diff_file = io.BytesIO()
+        with pysam.AlignmentFile(bam_filename, 'rb') as sam_file:
+            mut = Mutator(sam_file, rnd=self.rnd, verbose=self.verbose)
+            mut_header = self.__mut_header(sam_file.header, mut.bam_checksum())
+            with pysam.AlignmentFile(out_bam_filename, 'wb', header=mut_header) as out_bam_file, \
+                    open(vac_filename, 'rb') as vac_file:
+                mut.mutate(
+                    in_vac_file=vac_file,
+                    out_bam_file=out_bam_file,
+                    out_diff_file=out_diff_file
+                )
+            
+            self._stats = {
+                self.STAT_ALIGNMENT_COUNT: mut.alignment_counter,
+                self.STAT_UNMAPPED_COUNT: mut.unmapped_counter,
+                self.STAT_OVERLAPPING_COUNT: mut.overlapping_counter,
+                self.STAT_MAX_COVERAGE: mut.max_coverage,
+                self.STAT_SNV_COUNT: mut.snv_counter,
+                self.STAT_MUT_COUNT: mut.mut_counter,
+                self.STAT_DIFF_COUNT: mut.diff_counter
+            }
+        
+        Diff.write_checksum(out_diff_file, calc_checksum(out_bam_file.filename))
+        out_diff_file.seek(0)
+        return out_diff_file
+    
+    def unmutate(
+            self,
+            bam_filename,
+            diff_file,
+            out_bam_filename):
+        self._stats = {}
+        
+        with pysam.AlignmentFile(bam_filename, 'rb') as sam_file, \
+                open(diff_file, 'rb') as diff_file:
+            unmut_header = self.__unmut_header(sam_file.header)
+            mut = Mutator(sam_file, rnd=self.rnd, verbose=self.verbose)
+            with pysam.AlignmentFile(out_bam_filename, 'wb', header=unmut_header) as out_sam_file:
+                mut.unmutate(
+                    diff_file=diff_file,
+                    out_bam_file=out_sam_file,
+                )
+            
+            self._stats = {
+                self.STAT_ALIGNMENT_COUNT: mut.alignment_counter,
+                self.STAT_UNMAPPED_COUNT: mut.unmapped_counter,
+                self.STAT_OVERLAPPING_COUNT: mut.overlapping_counter,
+                self.STAT_MAX_COVERAGE: mut.max_coverage,
+                self.STAT_SNV_COUNT: mut.snv_counter,
+                self.STAT_MUT_COUNT: mut.mut_counter,
+                self.STAT_DIFF_COUNT: mut.diff_counter
+            }

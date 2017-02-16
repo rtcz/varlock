@@ -6,6 +6,7 @@ class FastaIndex:
         fai_list = []
         start = 0
         counter = 0
+        
         for record in bam_file.header['SQ']:
             fai_list.append(FaiRecord(index=counter, name=record['SN'], start=start, length=record['LN']))
             start += record['LN']

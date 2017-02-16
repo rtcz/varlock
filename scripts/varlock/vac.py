@@ -127,7 +127,11 @@ class Vac:
             if base not in ac_map:
                 ac_map[base] = 0
         
-        return struct.pack(self.STRUCT_FORMAT, index, ac_map['A'], ac_map['T'], ac_map['G'], ac_map['C'])
+        self.write_record(index, (ac_map['A'], ac_map['T'], ac_map['G'], ac_map['C']))
+    
+    @classmethod
+    def write_record(cls, vac_file, index, ac_tuple):
+        vac_file.write(struct.pack(cls.STRUCT_FORMAT, index, *ac_tuple))
     
     def vcf2vac(self, vcf_file, vac_file):
         """
@@ -156,14 +160,13 @@ class Vac:
                 chrom = data[self.VCF_CHROM_ID]
                 pos = int(data[self.VCF_POS_ID]) - 1  # vcf has 1-based index, convert to 0-based index
                 info_list = data[self.VCF_INFO_ID].split(self.INFO_SEP)
-                byte_string = self.__snv2vac(
+                self.__snv2vac(
                     chrom=chrom,
                     pos=pos,
                     ref=ref,
                     alt_list=alt_list,
                     info_list=info_list
                 )
-                vac_file.write(byte_string)
             
             if self.verbose and variant_counter % 10000 == 0:
                 print("variant %d" % variant_counter)
@@ -181,21 +184,22 @@ class Vac:
         return index, (a_ac, t_ac, c_ac, g_ac)
     
     @classmethod
-    def text2vac(cls, text_filename, vac_filename):
-        with open(text_filename, "r") as text_file, \
-                open(vac_filename, "wb") as vac_file:
+    def text2vac(cls, text_filepath, vac_filepath):
+        with open(vac_filepath, 'wb') as vac_file, \
+                open(text_filepath, 'rt') as text_file:
             for line in text_file:
-                data = map(int, line.strip().split(cls.COL_SEP))
-                vac_file.write(struct.pack(cls.STRUCT_FORMAT, *data))
+                index, ac_string = line.rstrip().split(cls.COL_SEP)
+                ac_tuple = tuple(map(int, ac_string.split(',')))
+                cls.write_record(vac_file, int(index), ac_tuple)
     
     @classmethod
-    def vac2list(cls, vac_filename):
-        data = []
-        with open(vac_filename, "rb") as vac_file:
+    def vac2text(cls, vac_filepath, text_filepath):
+        with open(vac_filepath, 'rb') as vac_file, \
+                open(text_filepath, 'wt') as text_file:
             while True:
-                byte_string = vac_file.read(cls.STRUCT_LENGTH)
-                if len(byte_string) == 0:
+                try:
+                    index, ac_tuple = cls.read_record(vac_file)
+                    ac_string = ','.join(map(str, ac_tuple))
+                    text_file.write('%d\t%s\n' % (index, ac_string))
+                except EOFError:
                     break
-                data.append(struct.unpack(cls.STRUCT_FORMAT, byte_string))
-        
-        return data

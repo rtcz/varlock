@@ -1,4 +1,6 @@
+import binascii
 import hashlib
+import os
 
 import pysam
 
@@ -81,9 +83,42 @@ def bam2sam(bam_filename, sam_filename):
             sam_file.write(alignment)
 
 
-def calc_checksum(file_obj):
-    hasher = hashlib.md5()
-    for chunk in iter(lambda: file_obj.read(4096), b""):
-        hasher.update(chunk)
+def bin2hex(byte_str):
+    return binascii.hexlify(byte_str).decode()
+
+
+def hex2bin(hex_str):
+    return binascii.unhexlify(hex_str)
+
+
+def calc_checksum(filename):
+    hash_md5 = hashlib.md5()
+    with open(filename, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
     
-    return hasher.hexdigest()
+    return hash_md5.digest()
+
+
+# def is_sam_filename(filename):
+#     return os.path.splitext(filename)[1] == '.sam'
+#
+#
+# def pysam_open_read(sam_filename):
+#     # read binary sam (bam)
+#     mode = 'rb'
+#     if is_sam_filename(sam_filename):
+#         # read sam
+#         mode = 'r'
+#
+#     return pysam.AlignmentFile(sam_filename, mode)
+#
+#
+# def pysam_open_write(sam_filename, header):
+#     # write binary sam (bam)
+#     mode = 'wb'
+#     if is_sam_filename(sam_filename):
+#         # write sam with header
+#         mode = 'wh'
+#
+#     return pysam.AlignmentFile(sam_filename, mode, header=header)
