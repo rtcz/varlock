@@ -157,14 +157,14 @@ class Mutator:
         alignment.query_sequence = mut_seq
     
     def __init_counters(self):
-        self.alignment_counter = 0  # counts written alignments
-        self.diff_counter = 0
-        self.mut_counter = 0
-        self.snv_counter = 0  # counts read snvs
+        self.alignment_counter = 0  # written alignments
+        self.diff_counter = 0  # processed diff records
+        self.mut_counter = 0  # mutations pre alignment
+        self.snv_counter = 0  # read vac records (SNVs)
         
-        self.unmapped_counter = 0
-        self.overlapping_counter = 0
-        self.max_coverage = 0
+        self.unmapped_counter = 0  # unmapped alignments
+        self.overlapping_counter = 0  # overlapping alignments
+        self.max_coverage = 0  # maximum alignments overlapping single SNV
     
     def __resolve_range(
             self,
@@ -292,7 +292,7 @@ class Mutator:
                 for snv_alignment in snv_alignments:
                     self.__write_alignment(out_bam_file, snv_alignment.alignment)
                 
-                # write remaining alignments (in EOF VAC case only)
+                # write remaining alignments (in EOF DIFF case only)
                 while alignment is not None:
                     self.__write_alignment(out_bam_file, alignment)
                     alignment = next(bam_iter)
@@ -310,23 +310,25 @@ class Mutator:
             
             elif self.__is_after_index(alignment, diff.index):
                 self.__unmutate_overlap(snv_alignments, diff.mut_map)
-                # done with this vac, read next
+                # done with this diff, read next
                 diff = next(diff_iter)
                 if diff is not None:
                     # could be end of DIFF file
                     self.__write_before_index(out_bam_file, snv_alignments, diff.index)
                     self.__set_seq_positions(snv_alignments, diff.ref_pos)
             
-            else:  # alignment is overlapping vac
-                # alignment dont have to be mapped to the vac (indel)
-                self.overlapping_counter += 1
-                # noinspection PyAttributeOutsideInit
-                self.max_coverage = max(len(snv_alignments), self.max_coverage)
+            else:  # alignment is overlapping diff
                 # find sequence position of vac
                 seq_pos = self.ref_pos2seq_pos(alignment, diff.ref_pos)
                 snv_alignments.append(SnvAlignment(alignment, seq_pos))
-                
                 alignment = next(bam_iter)
+                
+                self.overlapping_counter += 1
+                # noinspection PyAttributeOutsideInit
+                self.max_coverage = max(len(snv_alignments), self.max_coverage)
+        
+        # noinspection PyAttributeOutsideInit
+        self.diff_counter = diff_iter.counter
     
     def __unmutate_overlap(self, snv_alignments, mut_map):
         for snv_alignment in snv_alignments:
@@ -406,12 +408,9 @@ class Mutator:
                     self.__set_seq_positions(snv_alignments, vac.ref_pos)
             
             else:  # alignment is overlapping vac
-                # alignment dont have to be mapped to the vac (indel)
                 # find sequence position of vac
                 seq_pos = self.ref_pos2seq_pos(alignment, vac.ref_pos)
-                
                 snv_alignments.append(SnvAlignment(alignment, seq_pos))
-                
                 alignment = next(bam_iter)
                 
                 self.overlapping_counter += 1
@@ -419,7 +418,7 @@ class Mutator:
                 self.max_coverage = max(len(snv_alignments), self.max_coverage)
         
         # noinspection PyAttributeOutsideInit
-        self.snv_counter = VacIterator.counter(vac_iter)
+        self.snv_counter = vac_iter.counter
     
     def __mutate_overlap(self, out_diff_file, snv_alignments, vac):
         """
@@ -597,7 +596,6 @@ class MutatorCaller:
             comment_list = []
             for i in range(len(header_map[cls.SAM_COMMENT_TAG])):
                 comment = header_map[cls.SAM_COMMENT_TAG][i]
-                print(comment)
                 if comment[:len(cls.MUT_COMMENT_PREFIX)] != cls.MUT_COMMENT_PREFIX:
                     comment_list.append(comment)
             
@@ -641,6 +639,17 @@ class MutatorCaller:
                 self.STAT_DIFF_COUNT: mut.diff_counter
             }
         
+        # TODO remove difference
+        # print('before bam ' + bin2hex(calc_checksum(out_bam_file.filename)))
+        # bam2sam(out_bam_file.filename, out_bam_file.filename + b'.sam')
+        # print('before sam ' + bin2hex(calc_checksum(out_bam_file.filename + b'.sam')))
+        # sam2bam(out_bam_file.filename + b'.sam', out_bam_file.filename)
+        #
+        # print('after bam ' + bin2hex(calc_checksum(out_bam_file.filename)))
+        # bam2sam(out_bam_file.filename, out_bam_file.filename + b'.sam')
+        # print('after sam ' + bin2hex(calc_checksum(out_bam_file.filename + b'.sam')))
+        # exit(0)
+        
         Diff.write_checksum(out_diff_file, calc_checksum(out_bam_file.filename))
         out_diff_file.seek(0)
         return out_diff_file
@@ -655,6 +664,10 @@ class MutatorCaller:
         with pysam.AlignmentFile(bam_filename, 'rb') as sam_file, \
                 open(diff_file, 'rb') as diff_file:
             unmut_header = self.__unmut_header(sam_file.header)
+            
+            # print(unmut_header)
+            # exit(0)
+            
             mut = Mutator(sam_file, rnd=self.rnd, verbose=self.verbose)
             with pysam.AlignmentFile(out_bam_filename, 'wb', header=unmut_header) as out_sam_file:
                 mut.unmutate(
@@ -667,7 +680,6 @@ class MutatorCaller:
                 self.STAT_UNMAPPED_COUNT: mut.unmapped_counter,
                 self.STAT_OVERLAPPING_COUNT: mut.overlapping_counter,
                 self.STAT_MAX_COVERAGE: mut.max_coverage,
-                self.STAT_SNV_COUNT: mut.snv_counter,
                 self.STAT_MUT_COUNT: mut.mut_counter,
                 self.STAT_DIFF_COUNT: mut.diff_counter
             }

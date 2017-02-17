@@ -26,6 +26,3 @@ class VacIterator:
             ref_pos=ref_pos,
             ac=ac_tuple
         )
-    
-    def counter(self):
-        return self.counter

@@ -161,7 +161,6 @@ class TestMutator(unittest.TestCase):
         dir_path = 'tests/resources/mutator/unmutate/'
         
         # case 1
-        sam2bam(dir_path + 'input_01.sam', dir_path + 'input_01.bam')
         pysam.index(dir_path + 'input_01.bam')
         Diff.text2diff(dir_path + 'input_01.diff.txt', dir_path + 'input_01.diff')
         mut = MutatorCaller(rnd=RandomMockup())
@@ -172,16 +171,33 @@ class TestMutator(unittest.TestCase):
         )
         self.assertEqual(15, mut.stat(MutatorCaller.STAT_ALIGNMENT_COUNT))
         self.assertEqual(0, mut.stat(MutatorCaller.STAT_UNMAPPED_COUNT))
-        self.assertEqual(12, mut.stat(MutatorCaller.STAT_OVERLAPPING_COUNT))
+        self.assertEqual(11, mut.stat(MutatorCaller.STAT_OVERLAPPING_COUNT))
         self.assertEqual(5, mut.stat(MutatorCaller.STAT_MAX_COVERAGE))
-        self.assertEqual(5, mut.stat(MutatorCaller.STAT_SNV_COUNT))
         self.assertEqual(12, mut.stat(MutatorCaller.STAT_MUT_COUNT))
         self.assertEqual(4, mut.stat(MutatorCaller.STAT_DIFF_COUNT))
         
         bam2sam(dir_path + 'output_01.bam', dir_path + 'output_01.sam')
-        self.assertEqual(True, filecmp.cmp(dir_path + 'desired_01.sam', dir_path + 'output_01.sam'))
+        self.assertEqual(True, filecmp.cmp(dir_path + 'desired.sam', dir_path + 'output_01.sam'))
         
         # case 2
+        pysam.index(dir_path + 'input_02.bam')
+        Diff.text2diff(dir_path + 'input_02.diff.txt', dir_path + 'input_02.diff')
+        mut = MutatorCaller(rnd=RandomMockup())
+        mut.unmutate(
+            bam_filename=dir_path + 'input_02.bam',
+            diff_file=dir_path + 'input_02.diff',
+            out_bam_filename=dir_path + 'output_02.bam'
+        )
+        self.assertEqual(15, mut.stat(MutatorCaller.STAT_ALIGNMENT_COUNT))
+        self.assertEqual(0, mut.stat(MutatorCaller.STAT_UNMAPPED_COUNT))
+        self.assertEqual(6, mut.stat(MutatorCaller.STAT_OVERLAPPING_COUNT))
+        self.assertEqual(3, mut.stat(MutatorCaller.STAT_MAX_COVERAGE))
+        self.assertEqual(7, mut.stat(MutatorCaller.STAT_MUT_COUNT))
+        self.assertEqual(3, mut.stat(MutatorCaller.STAT_DIFF_COUNT))
+
+        bam2sam(dir_path + 'output_02.bam', dir_path + 'output_02.sam')
+        self.assertEqual(True, filecmp.cmp(dir_path + 'desired.sam', dir_path + 'output_02.sam'))
+        
         # TODO more tests (ranges etc.)
         # TODO test case with more references (chromosomes)
 

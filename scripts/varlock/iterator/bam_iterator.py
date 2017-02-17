@@ -43,6 +43,35 @@ class BamIterator:
                 if self.curr_ref_id > self.end_ref_id:
                     raise ValueError("Start reference has position after end reference.")
     
+    def __next_iterator(self):
+        if self.curr_ref_id is None or self.curr_ref_id > self.end_ref_id:
+            # end iteration
+            iterator = None
+        else:
+            if self.curr_ref_id == self.start_ref_id:
+                # first iterator
+                iterator = self.bam_file.fetch(
+                    reference=self.start_ref_name,
+                    start=self.start_ref_pos,
+                    end=None
+                )
+            elif self.curr_ref_id == self.end_ref_id:
+                # last iterator
+                iterator = self.bam_file.fetch(
+                    reference=self.end_ref_name,
+                    start=None,
+                    end=self.end_ref_pos
+                )
+            else:
+                # intermediate iterator
+                iterator = self.bam_file.fetch(
+                    reference=self.fai.ref_name(self.curr_ref_id)
+                )
+            
+            self.curr_ref_id += 1
+        
+        return iterator
+    
     def __iter__(self):
         return self
     
@@ -50,27 +79,8 @@ class BamIterator:
         try:
             return next(self.iterator)
         except StopIteration:
-            if self.curr_ref_id is None or self.curr_ref_id > self.end_ref_id:
-                # end iteration
+            self.iterator = self.__next_iterator()
+            if self.iterator is None:
                 return None
-            elif self.curr_ref_id == self.start_ref_id:
-                # first iterator
-                self.iterator = self.bam_file.fetch(
-                    reference=self.start_ref_name,
-                    start=self.start_ref_pos,
-                    end=None
-                )
-            elif self.curr_ref_id == self.end_ref_id:
-                # last iterator
-                self.iterator = self.bam_file.fetch(
-                    refenrece=self.end_ref_name,
-                    start=None,
-                    end=self.end_ref_pos
-                )
             else:
-                # intermediate iterator
-                self.iterator = self.bam_file.fetch(
-                    reference=self.fai.ref_name(self.curr_ref_id)
-                )
-                self.curr_ref_id += 1
-        return next(self)
+                return next(self)

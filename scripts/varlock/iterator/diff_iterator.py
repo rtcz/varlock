@@ -32,6 +32,3 @@ class DiffIterator:
             ref_pos=ref_pos,
             mut_map=dict(zip(mut_tuple, BASES))
         )
-    
-    def counter(self):
-        return self.counter
