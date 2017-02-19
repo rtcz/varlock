@@ -1,13 +1,12 @@
-import io
 import random
 
 import numpy as np
 
-from .common import *
-from .diff import Diff
-from .fasta_index import FastaIndex
-from .iterator import BamIterator, DiffIterator, VacIterator
-from .po import SnvAlignment
+from varlock.common import *
+from varlock.diff import Diff
+from varlock.fasta_index import FastaIndex
+from varlock.iterator import BamIterator, DiffIterator, VacIterator
+from varlock.po import SnvAlignment
 
 
 class Mutator:
@@ -51,47 +50,6 @@ class Mutator:
         alignment_start = self.fai.pos2index(alignment.reference_name, alignment.reference_start)
         return alignment_start > index
     
-    @staticmethod
-    def create_mut_map(alt_ac, ref_ac, rnd):
-        """
-        Creates mutation mapping for base pileup column.
-        pileup base -> mutated base
-        :param alt_ac: list of DNA bases frequencies
-        :param ref_ac:
-        :param rnd: random number generator
-        :return: dict which is specific mutation mapping
-        """
-        ref_bases = list(BASES)
-        alt_bases = list(BASES)
-        ref_ac = list(ref_ac)
-        
-        # add random value to distinguish tied values
-        alt_ac = [ac + rnd.random() for ac in alt_ac]
-        
-        # init mutation mapping
-        mut_map = dict.fromkeys(BASES)
-        # unknown base is always mapped to itself
-        mut_map[UNKNOWN_BASE] = UNKNOWN_BASE
-        # map bases but skip last unmapped base
-        for i in range(len(BASES) - 1):
-            # draw ref base with multinomial probability
-            ref_base_id = multi_random(ref_ac, rnd)
-            # draw most abundant base from alt alleles
-            alt_base_id = np.argmax(alt_ac)
-            # add mapping
-            mut_map[alt_bases[alt_base_id]] = ref_bases[ref_base_id]
-            
-            # delete processed items
-            del ref_bases[ref_base_id]
-            del ref_ac[ref_base_id]
-            del alt_bases[alt_base_id]
-            del alt_ac[alt_base_id]
-        
-        # last base mapping is obvious
-        mut_map[alt_bases[0]] = ref_bases[0]
-        
-        return mut_map
-    
     def __write_alignment(self, bam_file, alignment):
         """
         :param alignment: pysam.AlignedSegment
@@ -102,59 +60,6 @@ class Mutator:
         
         if self.verbose and self.alignment_counter % 10000 == 0:
             print("%d alignments processed" % self.alignment_counter)
-    
-    @staticmethod
-    def ref_pos2seq_pos(alignment, ref_pos):
-        """
-        Retrieve base position in sequence string at refence position.
-        It is assumed that alignment and reference position are on the same reference.
-        :param alignment: pysam.AlignedSegment
-        :param ref_pos: reference position of base
-        :return: 0-based position of base with specified reference position in sequence string
-        None if alignment is not mapped at ref_pos (deletion)
-        """
-        seq_pos = None
-        for current_seq_pos, current_ref_pos in alignment.get_aligned_pairs(matches_only=False, with_seq=False):
-            # search for base in snv position
-            if current_ref_pos == ref_pos:
-                seq_pos = current_seq_pos
-                break
-        
-        return seq_pos
-    
-    @classmethod
-    def get_base_pileup(cls, snv_alignments):
-        pileup_col = []
-        for snv_alignment in snv_alignments:
-            if snv_alignment.pos is not None:
-                # alignment is mapped at snv position
-                snv_base = cls.get_base(snv_alignment.alignment, snv_alignment.pos)
-                pileup_col.append(snv_base)
-        
-        return pileup_col
-    
-    @staticmethod
-    def get_base(alignment, pos):
-        """
-        :param alignment: pysam.AlignedSegment
-        :param pos: position in sequence
-        :return: base at pos
-        """
-        return alignment.query_sequence[pos]
-    
-    @staticmethod
-    def set_base(alignment, pos, base):
-        """
-        Replace base at SNV position
-        :param alignment: pysam.AlignedSegment
-        :param pos: position in sequence
-        :param base: mutated base letter
-        :return: mutated sequence string
-        """
-        mut_seq = alignment.query_sequence[:pos]
-        mut_seq += base
-        mut_seq += alignment.query_sequence[pos + 1:]
-        alignment.query_sequence = mut_seq
     
     def __init_counters(self):
         self.alignment_counter = 0  # written alignments
@@ -319,7 +224,7 @@ class Mutator:
             
             else:  # alignment is overlapping diff
                 # find sequence position of vac
-                seq_pos = self.ref_pos2seq_pos(alignment, diff.ref_pos)
+                seq_pos = ref_pos2seq_pos(alignment, diff.ref_pos)
                 snv_alignments.append(SnvAlignment(alignment, seq_pos))
                 alignment = next(bam_iter)
                 
@@ -409,7 +314,7 @@ class Mutator:
             
             else:  # alignment is overlapping vac
                 # find sequence position of vac
-                seq_pos = self.ref_pos2seq_pos(alignment, vac.ref_pos)
+                seq_pos = ref_pos2seq_pos(alignment, vac.ref_pos)
                 snv_alignments.append(SnvAlignment(alignment, seq_pos))
                 alignment = next(bam_iter)
                 
@@ -429,8 +334,8 @@ class Mutator:
         """
         is_mutated = False
         # get pileup of bases from alignments at vac mapping position
-        base_pileup = self.get_base_pileup(snv_alignments)
-        alt_ac = count_bases(base_pileup)
+        base_pileup = get_base_pileup(snv_alignments)
+        alt_ac = self.count_bases(base_pileup)
         
         mut_map = self.create_mut_map(alt_ac=alt_ac, ref_ac=vac.ac, rnd=self.rnd)
         
@@ -459,14 +364,14 @@ class Mutator:
         """
         is_mutated = False
         # alignment is mapped at snv position
-        snv_base = self.get_base(alignment, seq_pos)
+        snv_base = get_base(alignment, seq_pos)
         mut_base = mut_map[snv_base]
         
         if snv_base != mut_base:
             # base has been mutated to another base
             self.mut_counter += 1
             is_mutated = True
-            self.set_base(alignment, seq_pos, mut_base)
+            set_base(alignment, seq_pos, mut_base)
             self.check_cigar_str(alignment, seq_pos)
         
         return is_mutated
@@ -530,7 +435,8 @@ class Mutator:
                 # remove written alignment
                 snv_alignments.remove(snv_alignment)
     
-    def __set_seq_positions(self, snv_alignments, ref_pos):
+    @staticmethod
+    def __set_seq_positions(snv_alignments, ref_pos):
         """
         Set SNV position derived from reference position for each alignment.
         :param snv_alignments:
@@ -538,148 +444,66 @@ class Mutator:
         :return:
         """
         for snv_alignment in snv_alignments:
-            snv_pos = self.ref_pos2seq_pos(snv_alignment.alignment, ref_pos)
+            snv_pos = ref_pos2seq_pos(snv_alignment.alignment, ref_pos)
             if snv_pos is not None:
                 # alignment is mapped at another new_snv position
                 snv_alignment.pos = snv_pos
-
-
-class MutatorCaller:
-    SAM_COMMENT_TAG = 'CO'
-    MUT_COMMENT_PREFIX = 'MUT:'
-    
-    STAT_ALIGNMENT_COUNT = 0,
-    STAT_UNMAPPED_COUNT = 1,
-    STAT_OVERLAPPING_COUNT = 2,
-    STAT_MAX_COVERAGE = 3,
-    STAT_SNV_COUNT = 4,
-    STAT_MUT_COUNT = 5,
-    STAT_DIFF_COUNT = 6
-    
-    def __init__(self, rnd=random.SystemRandom(), verbose=False):
-        self.rnd = rnd
-        self.verbose = verbose
-        self._stats = {}
     
     @classmethod
-    def is_mutated(cls, bam_filename):
-        with pysam.AlignmentFile(bam_filename, 'rb') as bam_file:
-            return cls.__is_mutated(bam_file.header)
-    
-    @classmethod
-    def __is_mutated(cls, header_map):
-        if cls.SAM_COMMENT_TAG in header_map:
-            for comment in header_map[cls.SAM_COMMENT_TAG]:
-                if comment[:len(cls.MUT_COMMENT_PREFIX)] == cls.MUT_COMMENT_PREFIX:
-                    return True
-        return False
-    
-    @classmethod
-    def __add_comment(cls, header_map, comment):
-        if cls.SAM_COMMENT_TAG in header_map:
-            header_map[cls.SAM_COMMENT_TAG].append(comment)
-        else:
-            header_map[cls.SAM_COMMENT_TAG] = [comment]
-    
-    @classmethod
-    def __mut_header(cls, header_map, checksum):
-        if cls.__is_mutated(header_map):
-            raise ValueError("File appears to be already mutated.")
-        else:
-            comment = cls.MUT_COMMENT_PREFIX + bin2hex(checksum)
-            cls.__add_comment(header_map, comment)
-            return header_map
-    
-    @classmethod
-    def __unmut_header(cls, header_map):
-        if cls.__is_mutated(header_map):
-            comment_list = []
-            for i in range(len(header_map[cls.SAM_COMMENT_TAG])):
-                comment = header_map[cls.SAM_COMMENT_TAG][i]
-                if comment[:len(cls.MUT_COMMENT_PREFIX)] != cls.MUT_COMMENT_PREFIX:
-                    comment_list.append(comment)
-            
-            header_map[cls.SAM_COMMENT_TAG] = comment_list
-            return header_map
-        else:
-            raise ValueError('File does not appear to be mutated.')
-    
-    def stat(self, stat_id):
-        if stat_id in self._stats:
-            return self._stats[stat_id]
-        else:
-            raise ValueError('Stat not found.')
-    
-    def mutate(
-            self,
-            bam_filename,
-            vac_filename,
-            out_bam_filename
-    ):
-        self._stats = {}
-        out_diff_file = io.BytesIO()
-        with pysam.AlignmentFile(bam_filename, 'rb') as sam_file:
-            mut = Mutator(sam_file, rnd=self.rnd, verbose=self.verbose)
-            mut_header = self.__mut_header(sam_file.header, mut.bam_checksum())
-            with pysam.AlignmentFile(out_bam_filename, 'wb', header=mut_header) as out_bam_file, \
-                    open(vac_filename, 'rb') as vac_file:
-                mut.mutate(
-                    in_vac_file=vac_file,
-                    out_bam_file=out_bam_file,
-                    out_diff_file=out_diff_file
-                )
-            
-            self._stats = {
-                self.STAT_ALIGNMENT_COUNT: mut.alignment_counter,
-                self.STAT_UNMAPPED_COUNT: mut.unmapped_counter,
-                self.STAT_OVERLAPPING_COUNT: mut.overlapping_counter,
-                self.STAT_MAX_COVERAGE: mut.max_coverage,
-                self.STAT_SNV_COUNT: mut.snv_counter,
-                self.STAT_MUT_COUNT: mut.mut_counter,
-                self.STAT_DIFF_COUNT: mut.diff_counter
-            }
+    def count_bases(cls, base_pileup):
+        """
+        Count allele count in base pileup column.
+        :param base_pileup: list of base occurences
+        :return: list of DNA base frequencies
+        """
+        alt_ac = [0] * 4
+        for base in base_pileup:
+            # skip unknown base
+            if base != UNKNOWN_BASE:
+                try:
+                    alt_ac[BASES.index(base)] += 1
+                except KeyError:
+                    raise ValueError("Illegal DNA base %s" % base)
         
-        # TODO remove difference
-        # print('before bam ' + bin2hex(calc_checksum(out_bam_file.filename)))
-        # bam2sam(out_bam_file.filename, out_bam_file.filename + b'.sam')
-        # print('before sam ' + bin2hex(calc_checksum(out_bam_file.filename + b'.sam')))
-        # sam2bam(out_bam_file.filename + b'.sam', out_bam_file.filename)
-        #
-        # print('after bam ' + bin2hex(calc_checksum(out_bam_file.filename)))
-        # bam2sam(out_bam_file.filename, out_bam_file.filename + b'.sam')
-        # print('after sam ' + bin2hex(calc_checksum(out_bam_file.filename + b'.sam')))
-        # exit(0)
-        
-        Diff.write_checksum(out_diff_file, calc_checksum(out_bam_file.filename))
-        out_diff_file.seek(0)
-        return out_diff_file
+        return alt_ac
     
-    def unmutate(
-            self,
-            bam_filename,
-            diff_file,
-            out_bam_filename):
-        self._stats = {}
+    @classmethod
+    def create_mut_map(cls, alt_ac, ref_ac, rnd):
+        """
+        Creates mutation mapping for base pileup column.
+        pileup base -> mutated base
+        :param alt_ac: list of DNA bases frequencies
+        :param ref_ac:
+        :param rnd: random number generator
+        :return: dict which is specific mutation mapping
+        """
+        ref_bases = list(BASES)
+        alt_bases = list(BASES)
+        ref_ac = list(ref_ac)
         
-        with pysam.AlignmentFile(bam_filename, 'rb') as sam_file, \
-                open(diff_file, 'rb') as diff_file:
-            unmut_header = self.__unmut_header(sam_file.header)
+        # add random value to distinguish tied values
+        alt_ac = [ac + rnd.random() for ac in alt_ac]
+        
+        # init mutation mapping
+        mut_map = dict.fromkeys(BASES)
+        # unknown base is always mapped to itself
+        mut_map[UNKNOWN_BASE] = UNKNOWN_BASE
+        # map bases but skip last unmapped base
+        for i in range(len(BASES) - 1):
+            # draw ref base with multinomial probability
+            ref_base_id = multi_random(ref_ac, rnd)
+            # draw most abundant base from alt alleles
+            alt_base_id = np.argmax(alt_ac)
+            # add mapping
+            mut_map[alt_bases[alt_base_id]] = ref_bases[ref_base_id]
             
-            # print(unmut_header)
-            # exit(0)
-            
-            mut = Mutator(sam_file, rnd=self.rnd, verbose=self.verbose)
-            with pysam.AlignmentFile(out_bam_filename, 'wb', header=unmut_header) as out_sam_file:
-                mut.unmutate(
-                    diff_file=diff_file,
-                    out_bam_file=out_sam_file,
-                )
-            
-            self._stats = {
-                self.STAT_ALIGNMENT_COUNT: mut.alignment_counter,
-                self.STAT_UNMAPPED_COUNT: mut.unmapped_counter,
-                self.STAT_OVERLAPPING_COUNT: mut.overlapping_counter,
-                self.STAT_MAX_COVERAGE: mut.max_coverage,
-                self.STAT_MUT_COUNT: mut.mut_counter,
-                self.STAT_DIFF_COUNT: mut.diff_counter
-            }
+            # delete processed items
+            del ref_bases[ref_base_id]
+            del ref_ac[ref_base_id]
+            del alt_bases[alt_base_id]
+            del alt_ac[alt_base_id]
+        
+        # last base mapping is obvious
+        mut_map[alt_bases[0]] = ref_bases[0]
+        
+        return mut_map

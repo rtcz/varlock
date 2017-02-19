@@ -30,7 +30,7 @@ class SnvAlignment:
 class FaiRecord:
     def __init__(self, index, name, start, length):
         """
-        :param id: reference id
+        :param index: reference id
         :param name: reference name
         :param start: 0-based first position
         :param length: reference length - number of bases

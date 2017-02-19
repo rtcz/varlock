@@ -24,7 +24,7 @@ OUT_DIFF_FILENAME = os.path.join(RESOURCES_DIR, "sample.diff")
 
 # time 8.613
 
-mutator = Mutator(rnd=random.Random(0), verbose=True)
+mutator = __Mutator(rnd=random.Random(0), verbose=True)
 with pysam.AlignmentFile(IN_BAM_FILENAME, "rb") as in_bam_file, \
         open(IN_VAC_FILENAME, "rb") as in_vac_file, \
         pysam.AlignmentFile(OUT_BAM_FILENAME, "wb", template=in_bam_file) as out_bam_file, \

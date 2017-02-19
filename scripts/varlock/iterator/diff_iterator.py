@@ -1,6 +1,6 @@
-from ..common import BASES
 from ..diff import Diff
 from ..po import DiffRecord
+from ..common import BASES
 
 
 class DiffIterator:

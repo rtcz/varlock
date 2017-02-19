@@ -46,7 +46,7 @@ class Varlock:
         aes_key = os.urandom(cls.AES_KEY_LENGTH)
         out_diff = io.BytesIO()
         
-        mut = varlock.Mutator(verbose=verbose)
+        mut = varlock._BamMutator(verbose=verbose)
         mut.mutate(
             in_vac_file=vac_file,
             in_bam_file=bam_file,
@@ -107,7 +107,7 @@ class Varlock:
         aes.decrypt(diff_enc_file, diff_file)
         
         # unmutate
-        mut = varlock.Mutator(verbose)
+        mut = varlock._BamMutator(verbose)
         mut.unmutate(
             mut_bam_file=mut_bam_file,
             diff_file=diff_file,

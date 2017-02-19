@@ -2,6 +2,7 @@ import struct
 
 import numpy as np
 
+from varlock.mutator import BASES
 from .common import *
 
 
@@ -100,7 +101,7 @@ class Vac:
         else:
             return ac_list
     
-    def __snv2vac(self, chrom, pos, ref, alt_list, info_list):
+    def __snv2vac(self, chrom, pos, ref, alt_list, info_list, vac_file):
         """
         :param chrom: reference sequence name
         :param pos: 0-based position
@@ -127,7 +128,7 @@ class Vac:
             if base not in ac_map:
                 ac_map[base] = 0
         
-        self.write_record(index, (ac_map['A'], ac_map['T'], ac_map['G'], ac_map['C']))
+        self.write_record(vac_file, index, (ac_map['A'], ac_map['T'], ac_map['G'], ac_map['C']))
     
     @classmethod
     def write_record(cls, vac_file, index, ac_tuple):
@@ -165,7 +166,8 @@ class Vac:
                     pos=pos,
                     ref=ref,
                     alt_list=alt_list,
-                    info_list=info_list
+                    info_list=info_list,
+                    vac_file=vac_file
                 )
             
             if self.verbose and variant_counter % 10000 == 0:

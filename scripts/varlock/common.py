@@ -1,6 +1,5 @@
 import binascii
 import hashlib
-import os
 
 import pysam
 
@@ -51,24 +50,6 @@ def strip_chr(value):
         return value
 
 
-def count_bases(base_pileup):
-    """
-    Count allele count in base pileup column.
-    :param base_pileup: list of base occurences
-    :return: list of DNA base frequencies
-    """
-    alt_ac = [0] * 4
-    for base in base_pileup:
-        # skip unknown base
-        if base != UNKNOWN_BASE:
-            try:
-                alt_ac[BASES.index(base)] += 1
-            except KeyError:
-                raise ValueError("Illegal DNA base %s" % base)
-    
-    return alt_ac
-
-
 def sam2bam(sam_filename, bam_filename):
     with pysam.AlignmentFile(sam_filename, "r") as sam_file, \
             pysam.AlignmentFile(bam_filename, "wb", template=sam_file) as bam_file:
@@ -100,25 +81,54 @@ def calc_checksum(filename):
     return hash_md5.digest()
 
 
-# def is_sam_filename(filename):
-#     return os.path.splitext(filename)[1] == '.sam'
-#
-#
-# def pysam_open_read(sam_filename):
-#     # read binary sam (bam)
-#     mode = 'rb'
-#     if is_sam_filename(sam_filename):
-#         # read sam
-#         mode = 'r'
-#
-#     return pysam.AlignmentFile(sam_filename, mode)
-#
-#
-# def pysam_open_write(sam_filename, header):
-#     # write binary sam (bam)
-#     mode = 'wb'
-#     if is_sam_filename(sam_filename):
-#         # write sam with header
-#         mode = 'wh'
-#
-#     return pysam.AlignmentFile(sam_filename, mode, header=header)
+def ref_pos2seq_pos(alignment, ref_pos):
+    """
+    Retrieve base position in sequence string at refence position.
+    It is assumed that alignment and reference position are on the same reference.
+    :param alignment: pysam.AlignedSegment
+    :param ref_pos: reference position of base
+    :return: 0-based position of base with specified reference position in sequence string
+    None if alignment is not mapped at ref_pos (deletion)
+    """
+    seq_pos = None
+    for current_seq_pos, current_ref_pos in alignment.get_aligned_pairs(matches_only=False, with_seq=False):
+        # search for base in snv position
+        if current_ref_pos == ref_pos:
+            seq_pos = current_seq_pos
+            break
+    
+    return seq_pos
+
+
+def get_base_pileup(snv_alignments):
+    pileup_col = []
+    for snv_alignment in snv_alignments:
+        if snv_alignment.pos is not None:
+            # alignment is mapped at snv position
+            snv_base = get_base(snv_alignment.alignment, snv_alignment.pos)
+            pileup_col.append(snv_base)
+    
+    return pileup_col
+
+
+def get_base(alignment, pos):
+    """
+    :param alignment: pysam.AlignedSegment
+    :param pos: position in sequence
+    :return: base at pos
+    """
+    return alignment.query_sequence[pos]
+
+
+def set_base(alignment, pos, base):
+    """
+    Replace base at SNV position
+    :param alignment: pysam.AlignedSegment
+    :param pos: position in sequence
+    :param base: mutated base letter
+    :return: mutated sequence string
+    """
+    mut_seq = alignment.query_sequence[:pos]
+    mut_seq += base
+    mut_seq += alignment.query_sequence[pos + 1:]
+    alignment.query_sequence = mut_seq

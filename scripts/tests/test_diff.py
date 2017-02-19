@@ -1,7 +1,7 @@
 import io
 import unittest
 
-from varlock import *
+from varlock.diff import Diff
 
 
 class TestDiff(unittest.TestCase):
