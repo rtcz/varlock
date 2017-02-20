@@ -105,6 +105,4 @@ class TestMutator(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    # python3 /usr/local/bin/nosetests -s /data/projects/varlock/scripts/mutator_test.py
-    # python3 -m cProfile -s tottime /data/projects/varlock/scripts/mutator.py
     unittest.main()

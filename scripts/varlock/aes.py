@@ -8,7 +8,7 @@ class FileAES:
     AES encryption for binary input
     """
     
-    def __init__(self, key):
+    def __init__(self, key: bytes):
         """
         :param key: byte string
         The secret key to use in the symmetric cipher.
@@ -24,7 +24,7 @@ class FileAES:
             chunk = in_file.read(1024 * AES.block_size)
             if len(chunk) == 0 or len(chunk) % AES.block_size != 0:
                 padding_length = AES.block_size - (len(chunk) % AES.block_size)
-                chunk += padding_length * chr(padding_length)
+                chunk += padding_length * bytes([padding_length])
                 out_file.write(cipher.encrypt(chunk))
                 break
             else:
@@ -44,7 +44,7 @@ class FileAES:
                     raise ValueError("bad decrypt pad (%d)" % padding_length)
                 
                 # all the pad-bytes must be the same
-                if chunk[-padding_length:] != (padding_length * chr(padding_length)):
+                if chunk[-padding_length:] != (padding_length * bytes([padding_length])):
                     # this is similar to the bad decrypt:evp_enc.c from openssl program
                     raise ValueError("bad decrypt")
                 

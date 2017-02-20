@@ -76,16 +76,16 @@ class BamMutator:
     
     def mutate(
             self,
-            bam_filename,
-            vac_filename,
-            out_bam_filename
+            bam_filename: str,
+            vac_filename: str,
+            mut_bam_filename: str
     ):
         self._stats = {}
         out_diff_file = io.BytesIO()
         with pysam.AlignmentFile(bam_filename, 'rb') as sam_file:
             mut = Mutator(sam_file, rnd=self.rnd, verbose=self.verbose)
             mut_header = self.__mut_header(sam_file.header, mut.bam_checksum())
-            with pysam.AlignmentFile(out_bam_filename, 'wb', header=mut_header) as out_bam_file, \
+            with pysam.AlignmentFile(mut_bam_filename, 'wb', header=mut_header) as out_bam_file, \
                     open(vac_filename, 'rb') as vac_file:
                 mut.mutate(
                     in_vac_file=vac_file,
@@ -120,23 +120,18 @@ class BamMutator:
     
     def unmutate(
             self,
-            bam_filename,
-            diff_file,
-            out_bam_filename,
-            start_ref_name=None,
-            start_ref_pos=None,
-            end_ref_name=None,
-            end_ref_pos=None,
+            bam_filename: str,
+            diff_file: str,
+            out_bam_filename: str,
+            start_ref_name: str = None,
+            start_ref_pos: int = None,
+            end_ref_name: str = None,
+            end_ref_pos: int = None,
     ):
         self._stats = {}
         
-        with pysam.AlignmentFile(bam_filename, 'rb') as sam_file, \
-                open(diff_file, 'rb') as diff_file:
+        with pysam.AlignmentFile(bam_filename, 'rb') as sam_file:
             unmut_header = self.__unmut_header(sam_file.header)
-            
-            # print(unmut_header)
-            # exit(0)
-            
             mut = Mutator(sam_file, rnd=self.rnd, verbose=self.verbose)
             with pysam.AlignmentFile(out_bam_filename, 'wb', header=unmut_header) as out_sam_file:
                 mut.unmutate(

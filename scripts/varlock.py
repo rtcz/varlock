@@ -1,251 +1,136 @@
-import io
+import argparse
 import os
+import sys
 
-import varlock
+from Crypto.PublicKey import RSA
+
+from varlocker import Varlocker
 
 
-class Varlock:
-    RSA_KEY_LENGTH = 4096
-    AES_KEY_LENGTH = 32
-    
-    @staticmethod
-    def create_vac(bam_file, vcf_file, out_vac_file):
-        """
-        :param bam_file:
-        :param vcf_file:
-        :param out_vac_file:
-        :return:
-        """
-        vac = varlock.Vac(bam_file)
-        vac.vcf2vac(vcf_file, out_vac_file)
-    
-    @classmethod
-    def encrypt(
-            cls,
-            bam_file,
-            vac_file,
-            public_key,
-            mut_bam_file,
-            diff_enc_file,
-            verbose=False
-    ):
-        """
-        Mutate BAM file and store it along with DIFF file encrypted by AES key which is encrypted by RSA public key.
-        Output formats:
-        .mut.bam
-        .diff.enc
-        .aes.enc
-        :param bam_file: pysam.AlignmentFile
-        :param vac_file: VAC file
-        :param public_key: An RSA key object (`RsaKey`) containing the public key
-        :param mut_bam_file: output pysam.AlignmentFile
-        :param diff_enc_file: output binary file
-        :param verbose:
-        :return: AES key (to diff file) encrypted with public key
-        """
-        aes_key = os.urandom(cls.AES_KEY_LENGTH)
-        out_diff = io.BytesIO()
+def main():
+    try:
+        locker = Varlocker()
+        command, args = parse_command()
+        if command == 'encrypt':
+            # python3 varlock.py encrypt --pub_key resources/jozko.pub --bam examples/resources/sample.bam --vac examples/resources/sample.vac --out_bam resources/out.mut.bam --out_diff resources/out.diff.enc
+            parsed_args = parse_encrypt_args(args)
+            with open(parsed_args.pub_key, 'rb') as pub_key_file:
+                rsa_key = RSA.importKey(pub_key_file.read())
+                locker.encrypt(
+                    bam_filename=parsed_args.bam,
+                    vac_filename=parsed_args.vac,
+                    rsa_key=rsa_key,
+                    out_bam_filename=parsed_args.out_bam,
+                    out_enc_diff_filename=parsed_args.out_diff,
+                    verbose=parsed_args.verbose
+                )
         
-        mut = varlock._BamMutator(verbose=verbose)
-        mut.mutate(
-            in_vac_file=vac_file,
-            in_bam_file=bam_file,
-            out_bam_file=mut_bam_file,
-            out_diff_file=out_diff
-        )
-        
-        # encrypt diff with new AES key
-        aes = varlock.FileAES(aes_key)
-        aes.encrypt(out_diff, diff_enc_file)
-        
-        # encrypt AES key with public key
-        return public_key.encrypt(aes_key)
-    
-    def decrypt(
-            self,
-            mut_bam_file,
-            private_key,
-            aes_enc_key,
-            diff_enc_file,
-            bam_file,
-            ref_name=None,
-            start_pos=None,
-            end_pos=None,
-            verbose=False
-    ):
-        """
-        Reverse operation for mutate. Restore original bam file.
-        Output formats:
-        .bam
-        :param mut_bam_file: input BAM
-        :param private_key: An RSA key object (`RsaKey`) containing the private key
-        :param aes_enc_key:
-        :param diff_enc_file:
-        :param bam_file: output BAM
-        # :param ref_name:
-        # :param start_pos:
-        # :param end_pos:
-        :param verbose:
-        """
-        if not self.has_privilege(
-                private_key,
-                aes_enc_key,
-                diff_enc_file,
-                mut_bam_file,
-                # ref_name,
-                # start_pos,
-                # end_pos
-        ):
-            raise PermissionError("SHIT")
-        
-        # decrypt aes key
-        aes_key = private_key.decrypt(aes_enc_key)
-        
-        # decrypt diff
-        diff_file = io.BytesIO()
-        aes = varlock.FileAES(aes_key)
-        aes.decrypt(diff_enc_file, diff_file)
-        
-        # unmutate
-        mut = varlock._BamMutator(verbose)
-        mut.unmutate(
-            mut_bam_file=mut_bam_file,
-            diff_file=diff_file,
-            out_bam_file=bam_file,
-            ref_name=ref_name,
-            start_ref_pos=start_pos,
-            end_ref_pos=end_pos,
-        )
-    
-    @classmethod
-    def add_privilege(
-            cls,
-            public_key,
-            private_key,
-            aes_enc_key,
-            mut_bam_file,
-            diff_enc_file,
-            out_diff_enc_file,
-            ref_name=None,
-            start_pos=None,
-            end_pos=None
-    ):
-        """
-        Output formats:
-        .diff.enc
-        .aes.enc
-        :param public_key:
-        :param private_key:
-        :param aes_enc_key:
-        :param diff_enc_file:
-        :param out_diff_enc_file:
-        :param mut_bam_file:
-        :param ref_name:
-        :param start_pos:
-        :param end_pos:
-        :return: AES key (to diff file) encrypted with public key
-        """
-        if not cls.has_privilege(
-                private_key,
-                aes_enc_key,
-                diff_enc_file,
-                mut_bam_file,
-                ref_name,
-                start_pos,
-                end_pos
-        ):
-            raise PermissionError("SHIT")
-        
-        # decrypt AES key
-        aes_key = private_key.decrypt(aes_enc_key)
-        aes = varlock.FileAES(aes_key)
-        
-        # decrypt diff
-        diff_file = io.BytesIO()
-        aes.decrypt(diff_enc_file, diff_file)
-        
-        fai_list = varlock.get_fai_list(mut_bam_file)
-        fai_dict = varlock.fai_list2dict(fai_list)
-        
-        # slice diff
-        out_diff_file = cls.__slice(diff_file, ref_name, start_pos, end_pos, fai_dict)
-        
-        # encrypt diff with aes key
-        out_aes_key = os.urandom(cls.AES_KEY_LENGTH)
-        out_aes = varlock.FileAES(out_aes_key)
-        out_aes.encrypt(out_diff_file, out_diff_enc_file)
-        
-        # encrypt aes key
-        return public_key.encrypt(out_aes_key)
-    
-    @classmethod
-    def __start_index(cls, ref_name, start_pos, fai_dict):
-        if start_pos is None:
-            # access is given from the start of the reference
-            start_index = fai_dict[ref_name].start
+        elif command == 'decrypt':
+            parsed_args = parse_decrypt_args(args)
+        elif command == 'reencrypt':
+            parsed_args = parse_reencrypt_args(args)
+        elif command == 'vac':
+            parsed_args = parse_vac_args(args)
         else:
-            start_index = varlock.pos2index(ref_name, start_pos, fai_dict)
-        
-        return start_index
+            print("unrecognized command '%s'" % command)
+    except InvalidCommandError:
+        print_usage()
+
+
+def parse_command():
+    if len(sys.argv) < 2:
+        raise InvalidCommandError("Command is missing.")
+    else:
+        command = sys.argv[1]
+        args = sys.argv[2:]
+        return command, args
+
+
+def print_usage():
+    print('Usage:\t\tvarlock <command> [options]')
+    print()
+    print('Command:\tencrypt\t\tcreate mutated BAM along with encrypted DIFF and it\'s key')
+    print('\t\tdecrypt\t\trevert mutated BAM to original')
+    print('\t\treencrypt\t\tcreate encrypted slice of DIFF')
+    print('\t\tvac\t\tconvert VCF to VAC')
+
+
+def parse_encrypt_args(args):
+    parser = argparse.ArgumentParser(prog='varlock encrypt')
     
-    @classmethod
-    def __end_index(cls, ref_name, end_pos, fai_dict):
-        if end_pos is None:
-            # access is given from the start of the reference
-            end_index = fai_dict[ref_name].start + fai_dict[ref_name].length - 1
-        else:
-            end_index = varlock.pos2index(ref_name, end_pos, fai_dict)
-        
-        return end_index
+    required = parser.add_argument_group("Required")
+    required.add_argument('-k', '--pub_key', type=is_file, help='public key', required=True)
+    required.add_argument('-b', '--bam', type=is_file, help='BAM file', required=True)
+    required.add_argument('-c', '--vac', type=is_file, help='VAC file', required=True)
+    required.add_argument('-m', '--out_bam', type=str, help='output mutated BAM file', required=True)
+    required.add_argument('-d', '--out_diff', type=str, help='output encrypted DIFF file', required=True)
     
-    @classmethod
-    def __slice(cls, diff_file, ref_name, start_pos, end_pos, fai_dict):
-        if ref_name is not None:
-            if ref_name not in fai_dict:
-                raise ValueError("Reference name %s not found." % ref_name)
-        
-            return varlock.Diff.slice(
-                diff_file=diff_file,
-                start_index=cls.__start_index(ref_name, start_pos, fai_dict),
-                end_index=cls.__end_index(ref_name, end_pos, fai_dict)
-            )
+    optional = parser.add_argument_group("Optional")
+    optional.add_argument('-v', '--verbose', action='store_true', help="explain what is being done")
+    return parser.parse_args(args)
+
+
+def parse_decrypt_args(args):
+    parser = argparse.ArgumentParser(prog='varlock decrypt')
     
-    @classmethod
-    def has_privilege(
-            cls,
-            private_key,
-            aes_enc_key,
-            diff_enc_file,
-            mut_bam_file,
-            ref_name=None,
-            start_pos=None,
-            end_pos=None
-    ):
-        """
-        :param private_key:
-        :param aes_enc_key:
-        :param diff_enc_file:
-        :param mut_bam_file:
-        :param ref_name:
-        :param start_pos:
-        :param end_pos:
-        :return:
-        """
-        if ref_name is not None and start_pos is not None and end_pos is not None:
-            # range is specified
-            if start_pos >= end_pos:
-                # wrong range
-                raise ValueError("End position must be greater than start position.")
-        
-        # TODO 1 try to decrypt aes
-        aes_key = private_key.decrypt(aes_enc_key)
-        
-        # TODO 2 try to decrypt diff, only header part
-        
-        # TODO 3 check the range specified in diff's header
-        
-        # TODO 4 compare checksum of BAM to checksum from diff's header
-        
-        # TODO 5 check if range is present in BAM
-        
-        return True
+    required = parser.add_argument_group("Required")
+    required.add_argument('-k', '--key', type=is_file, help='private key', required=True)
+    required.add_argument('-m', '--bam', type=is_file, help='mutated BAM file', required=True)
+    required.add_argument('-d', '--diff', type=is_file, help='encrypted DIFF file', required=True)
+    required.add_argument('-b', '--out_bam', type=str, help='output restored BAM file', required=True)
+    
+    optional = parser.add_argument_group("Optional")
+    range_help = "range in one of following formats: 'chr1', 'chr1:chr2', 'chr1:10000:20000', 'chr1:10000:chr2:20000'"
+    optional.add_argument('-r', '--range', type=is_sam_range, help=range_help)
+    optional.add_argument('-v', '--verbose', action='store_true', help="explain what is being done")
+    return parser.parse_args(args)
+
+
+def parse_reencrypt_args(args):
+    parser = argparse.ArgumentParser(prog='varlock reencrypt')
+    return parser.parse_args(args)
+
+
+def parse_vac_args(args):
+    parser = argparse.ArgumentParser(prog='varlock vac')
+    return parser.parse_args(args)
+
+
+def is_sam_range(value):
+    """
+    A genomic region, stated relative to a reference sequence.
+    A region consists of reference name (‘chr1’), start (10000), and end (20000).
+    Start and end can be omitted for regions spanning a whole chromosome.
+    If end is missing, the region will span from start to the end of the chromosome.
+    Within pysam, coordinates are 0-based, half-open intervals, i.e.,
+    the position 10,000 is part of the interval, but 20,000 is not.
+    An exception are samtools compatible region strings such as ‘chr1:10000:20000’,
+    which are closed, i.e., both positions 10,000 and 20,000 are part of the interval.
+    """
+    range_args = value.split(':')
+    # TODO
+    if len(range_args) == 1:
+        pass
+    elif len(range_args) == 2:
+        pass
+    elif len(range_args) == 3:
+        pass
+    elif len(range_args) == 4:
+        pass
+    else:
+        raise argparse.ArgumentTypeError("Value %s is not a sam range." % value)
+
+
+def is_file(value):
+    if os.path.isfile(value):
+        return os.path.realpath(value)
+    else:
+        raise argparse.ArgumentTypeError("Value %s is not a file." % value)
+
+
+class InvalidCommandError(Exception):
+    pass
+
+
+if __name__ == "__main__":
+    main()

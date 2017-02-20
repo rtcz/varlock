@@ -71,7 +71,7 @@ class Mutator:
         self.overlapping_counter = 0  # overlapping alignments
         self.max_coverage = 0  # maximum alignments overlapping single SNV
     
-    def __resolve_range(
+    def resolve_diff_range(
             self,
             diff_file,
             start_ref_name,
@@ -165,7 +165,7 @@ class Mutator:
         self.__init_counters()
         
         Diff.validate(diff_file)
-        start_index, end_index = self.__resolve_range(
+        start_index, end_index = self.resolve_diff_range(
             diff_file,
             start_ref_name,
             start_ref_pos,

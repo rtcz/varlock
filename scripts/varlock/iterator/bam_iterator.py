@@ -11,6 +11,9 @@ class BamIterator:
         if start_index is end_index is not None:
             assert start_index <= end_index
         
+        if not bam_file.has_index():
+            raise IndexError('can not iterate on BAM without index')
+        
         self.bam_file = bam_file
         self.fai = FastaIndex(bam_file)
         # empty iterator
@@ -32,7 +35,7 @@ class BamIterator:
                 self.iterator = bam_file.fetch(
                     reference=self.start_ref_name,
                     start=self.start_ref_pos,
-                    end=self.end_ref_pos
+                    end=self.end_ref_pos + 1  # half open interval
                 )
             else:
                 # multiple iterators
@@ -60,7 +63,7 @@ class BamIterator:
                 iterator = self.bam_file.fetch(
                     reference=self.end_ref_name,
                     start=None,
-                    end=self.end_ref_pos
+                    end=self.end_ref_pos + 1  # half open interval
                 )
             else:
                 # intermediate iterator
