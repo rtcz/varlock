@@ -33,13 +33,13 @@ class FileAES:
     def decrypt(self, in_file, out_file):
         iv = in_file.read(AES.block_size)
         cipher = AES.new(self.key, AES.MODE_CBC, iv)
-        next_chunk = ''
+        next_chunk = b''
         while True:
             chunk = next_chunk
             next_chunk = cipher.decrypt(in_file.read(1024 * AES.block_size))
             
             if len(next_chunk) == 0:
-                padding_length = ord(chunk[-1])
+                padding_length = chunk[-1]
                 if padding_length < 1 or padding_length > AES.block_size:
                     raise ValueError("bad decrypt pad (%d)" % padding_length)
                 

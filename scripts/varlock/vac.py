@@ -2,7 +2,6 @@ import struct
 
 import numpy as np
 
-from varlock.mutator import BASES
 from .common import *
 
 
@@ -101,9 +100,9 @@ class Vac:
         else:
             return ac_list
     
-    def __snv2vac(self, chrom, pos, ref, alt_list, info_list, vac_file):
+    def __snv2vac(self, ref_name, pos, ref, alt_list, info_list, vac_file):
         """
-        :param chrom: reference sequence name
+        :param ref_name: reference sequence name
         :param pos: 0-based position
         :param ref: reference base
         :param alt_list: list of alternative alleles
@@ -120,8 +119,9 @@ class Vac:
         base_list = [ref] + alt_list
         count_list = self.compact_base_count([ref_ac] + info_ac)
         
-        index = self.fai.pos2index(strip_chr(chrom), pos)
+        ref_name = ref_name if self.fai.keep_chr else strip_chr(ref_name)
         
+        index = self.fai.pos2index(ref_name, pos)
         ac_map = dict(zip(base_list, count_list))
         
         for base in BASES:
@@ -162,7 +162,7 @@ class Vac:
                 pos = int(data[self.VCF_POS_ID]) - 1  # vcf has 1-based index, convert to 0-based index
                 info_list = data[self.VCF_INFO_ID].split(self.INFO_SEP)
                 self.__snv2vac(
-                    chrom=chrom,
+                    ref_name=chrom,
                     pos=pos,
                     ref=ref,
                     alt_list=alt_list,

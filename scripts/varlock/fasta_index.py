@@ -1,14 +1,17 @@
+from .common import strip_chr
 from .po import FaiRecord
 
 
 class FastaIndex:
-    def __init__(self, bam_file):
+    def __init__(self, bam_file, keep_chr=True):
         fai_list = []
         start = 0
         counter = 0
+        self._keep_chr = keep_chr
         
         for record in bam_file.header['SQ']:
-            fai_list.append(FaiRecord(index=counter, name=record['SN'], start=start, length=record['LN']))
+            ref_name = record['SN'] if keep_chr else strip_chr(record['SN'])
+            fai_list.append(FaiRecord(index=counter, name=ref_name, start=start, length=record['LN']))
             start += record['LN']
             counter += 1
         
@@ -17,6 +20,10 @@ class FastaIndex:
         
         self.list = fai_list
         self.dict = dict((reference.name, reference) for reference in self.list)
+    
+    @property
+    def keep_chr(self):
+        return self._keep_chr
     
     def resolve_start_index(self, start_ref_name, start_ref_pos):
         if start_ref_name is None and start_ref_pos is not None:

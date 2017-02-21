@@ -1,3 +1,4 @@
+import gzip
 import io
 import os
 import struct
@@ -16,18 +17,28 @@ class Varlocker:
     AES_KEY_LENGTH = 32
     
     @staticmethod
-    def create_vac(bam_filename: str, vcf_filename: str, out_vac_filename: str):
+    def create_vac(bam_filename: str, vcf_filename: str, out_vac_filename: str, verbose=False):
         """
         :param bam_filename:
         :param vcf_filename:
         :param out_vac_filename:
         :return:
         """
+        if vcf_filename[-3:] == '.gz':
+            if verbose:
+                print('VCF in gzip mode')
+            vcf_file = gzip.open(vcf_filename, 'rt')
+        else:
+            if verbose:
+                print('VCF in text mode')
+            vcf_file = open(vcf_filename, 'rt')
+        
         with pysam.AlignmentFile(bam_filename, 'rb') as sam_file, \
-                open(vcf_filename, 'rb') as vcf_file, \
                 open(out_vac_filename, 'wb') as out_vac_file:
-            vac = vrl.Vac(vrl.FastaIndex(sam_file))
+            vac = vrl.Vac(vrl.FastaIndex(sam_file, keep_chr=False))
             vac.vcf2vac(vcf_file, out_vac_file)
+        
+        vcf_file.close()
     
     @classmethod
     def encrypt(
@@ -183,7 +194,7 @@ class Varlocker:
             with Diff.slice(diff_file, start_index, end_index) as sliced_diff, \
                     open(out_enc_diff_filename, 'rb') as out_enc_diff_file:
                 # store encrypted AES key in encrypted DIFF
-                enc_aes_key = PKCS1_OAEP.new(rsa_dec_key.publickey()).encrypt(aes_key)
+                enc_aes_key = PKCS1_OAEP.new(rsa_enc_key.publickey()).encrypt(aes_key)
                 enc_diff_file.write(struct.pack('<I', len(enc_aes_key)))
                 enc_diff_file.write(enc_aes_key)
                 

@@ -31,6 +31,8 @@ class Mutator:
         self.fai = FastaIndex(bam_file)
         self.bam_file = bam_file
         self._bam_checksum = None
+
+        self.prev_alignment = None
     
     def __is_before_index(self, alignment, index):
         """
@@ -55,6 +57,25 @@ class Mutator:
         :param alignment: pysam.AlignedSegment
         :return:
         """
+        
+        # if alignment.query_name == 'NB501186:8:HM23NBGXX:3:22412:8993:9825':
+        #     print(alignment.query_name)
+        #     exit(0)
+        #
+        # if alignment.query_name == 'NB501186:8:HM23NBGXX:3:23503:6575:7803':
+        #     print(alignment.query_name)
+        #     exit(0)
+
+        if self.prev_alignment is not None and alignment.reference_start < self.prev_alignment.reference_start:
+            print(self.prev_alignment)
+            print(alignment)
+            raise Exception
+            exit(0)
+            # bam 16055862-16055891
+            # sam 16055863-16055892
+            
+        self.prev_alignment = alignment
+        
         bam_file.write(alignment)
         self.alignment_counter += 1
         
@@ -272,26 +293,27 @@ class Mutator:
         )
         while True:
             if vac is None or alignment is None:
+                return
                 # finish
                 if self.verbose:
                     if vac is None:
                         print("EOF VAC")
                     else:
                         print("EOF BAM")
-                
+
                 # last mutation
                 if vac is not None:
                     # noinspection PyTypeChecker
                     self.__mutate_overlap(out_diff_file, snv_alignments, vac)
-                
+
                 for snv_alignment in snv_alignments:
                     self.__write_alignment(out_bam_file, snv_alignment.alignment)
-                
+
                 # write remaining alignments (in EOF VAC case only)
                 while alignment is not None:
                     self.__write_alignment(out_bam_file, alignment)
                     alignment = next(bam_iter)
-                
+
                 break
             
             elif alignment.is_unmapped:
@@ -429,8 +451,21 @@ class Mutator:
         """
         tmp_snv_alignments = snv_alignments[:]
         for snv_alignment in tmp_snv_alignments:
+    
+            if snv_alignment.alignment.reference_start >= 16055862:
+                print([(alignment.alignment.query_name, alignment.alignment.reference_start,
+                        self.__is_before_index(snv_alignment.alignment, index)) for alignment in tmp_snv_alignments])
+                print(self.fai.index2pos(index))
+            
             # new_snv alignment is either before or overlapping next new_snv
             if self.__is_before_index(snv_alignment.alignment, index):
+                
+                if snv_alignment.alignment.query_name == 'NB501186:8:HM23NBGXX:3:22412:8993:9825':
+                    # print(self.prev_alignment)
+                    # print([(alignment.alignment.query_name, alignment.alignment.reference_start, self.__is_before_index(snv_alignment.alignment, index)) for alignment in tmp_snv_alignments])
+                    #
+                    exit(0)
+                
                 self.__write_alignment(out_bam_file, snv_alignment.alignment)
                 # remove written alignment
                 snv_alignments.remove(snv_alignment)
