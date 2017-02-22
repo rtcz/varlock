@@ -126,7 +126,7 @@ class Varlocker:
                 print('Unmutating BAM')
             
             # unmutate
-            mut = vrl.BamMutator(verbose)
+            mut = vrl.BamMutator(verbose=verbose)
             mut.unmutate(
                 bam_filename,
                 diff_file,

@@ -13,12 +13,11 @@ class BamMutator:
     MUT_COMMENT_PREFIX = 'MUT:'
     
     STAT_ALIGNMENT_COUNT = 0,
-    STAT_UNMAPPED_COUNT = 1,
-    STAT_OVERLAPPING_COUNT = 2,
-    STAT_MAX_COVERAGE = 3,
-    STAT_SNV_COUNT = 4,
-    STAT_MUT_COUNT = 5,
-    STAT_DIFF_COUNT = 6
+    STAT_OVERLAPPING_COUNT = 1,
+    STAT_MAX_COVERAGE = 2,
+    STAT_SNV_COUNT = 3,
+    STAT_MUT_COUNT = 4,
+    STAT_DIFF_COUNT = 5
     
     def __init__(self, rnd=random.SystemRandom(), verbose=False):
         self.rnd = rnd
@@ -85,6 +84,7 @@ class BamMutator:
         with pysam.AlignmentFile(bam_filename, 'rb') as sam_file:
             mut = Mutator(sam_file, rnd=self.rnd, verbose=self.verbose)
             mut_header = self.__mut_header(sam_file.header, mut.bam_checksum())
+            
             with pysam.AlignmentFile(mut_bam_filename, 'wb', header=mut_header) as out_bam_file, \
                     open(vac_filename, 'rb') as vac_file:
                 mut.mutate(
@@ -95,7 +95,6 @@ class BamMutator:
             
             self._stats = {
                 self.STAT_ALIGNMENT_COUNT: mut.alignment_counter,
-                self.STAT_UNMAPPED_COUNT: mut.unmapped_counter,
                 self.STAT_OVERLAPPING_COUNT: mut.overlapping_counter,
                 self.STAT_MAX_COVERAGE: mut.max_coverage,
                 self.STAT_SNV_COUNT: mut.snv_counter,
@@ -121,18 +120,18 @@ class BamMutator:
     def unmutate(
             self,
             bam_filename: str,
-            diff_file: str,
+            diff_file: object,
             out_bam_filename: str,
             start_ref_name: str = None,
             start_ref_pos: int = None,
             end_ref_name: str = None,
-            end_ref_pos: int = None,
+            end_ref_pos: int = None
     ):
         self._stats = {}
-        
         with pysam.AlignmentFile(bam_filename, 'rb') as sam_file:
             unmut_header = self.__unmut_header(sam_file.header)
             mut = Mutator(sam_file, rnd=self.rnd, verbose=self.verbose)
+            
             with pysam.AlignmentFile(out_bam_filename, 'wb', header=unmut_header) as out_sam_file:
                 mut.unmutate(
                     diff_file=diff_file,
@@ -140,12 +139,11 @@ class BamMutator:
                     start_ref_name=start_ref_name,
                     start_ref_pos=start_ref_pos,
                     end_ref_name=end_ref_name,
-                    end_ref_pos=end_ref_pos,
+                    end_ref_pos=end_ref_pos
                 )
             
             self._stats = {
                 self.STAT_ALIGNMENT_COUNT: mut.alignment_counter,
-                self.STAT_UNMAPPED_COUNT: mut.unmapped_counter,
                 self.STAT_OVERLAPPING_COUNT: mut.overlapping_counter,
                 self.STAT_MAX_COVERAGE: mut.max_coverage,
                 self.STAT_MUT_COUNT: mut.mut_counter,

@@ -90,6 +90,8 @@ def ref_pos2seq_pos(alignment, ref_pos):
     :return: 0-based position of base with specified reference position in sequence string
     None if alignment is not mapped at ref_pos (deletion)
     """
+    # TODO check reference name, dont assume that reference position and alignment are on same reference
+    # TODO optimalize
     seq_pos = None
     for current_seq_pos, current_ref_pos in alignment.get_aligned_pairs(matches_only=False, with_seq=False):
         # search for base in snv position

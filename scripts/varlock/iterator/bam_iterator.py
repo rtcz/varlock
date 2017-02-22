@@ -22,6 +22,7 @@ class BamIterator:
         self.start_ref_id = None
         self.curr_ref_id = None
         self.end_ref_id = None
+        self.counter = 0
         
         if start_index is end_index is None:
             # fetch all
@@ -80,7 +81,9 @@ class BamIterator:
     
     def __next__(self):
         try:
-            return next(self.iterator)
+            alignment = next(self.iterator)
+            self.counter += 1
+            return alignment
         except StopIteration:
             self.iterator = self.__next_iterator()
             if self.iterator is None:

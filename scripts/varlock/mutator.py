@@ -1,5 +1,5 @@
 import random
-
+import io
 import numpy as np
 
 from varlock.common import *
@@ -31,7 +31,7 @@ class Mutator:
         self.fai = FastaIndex(bam_file)
         self.bam_file = bam_file
         self._bam_checksum = None
-
+        
         self.prev_alignment = None
     
     def __is_before_index(self, alignment, index):
@@ -57,27 +57,13 @@ class Mutator:
         :param alignment: pysam.AlignedSegment
         :return:
         """
-        
-        # if alignment.query_name == 'NB501186:8:HM23NBGXX:3:22412:8993:9825':
-        #     print(alignment.query_name)
-        #     exit(0)
-        #
-        # if alignment.query_name == 'NB501186:8:HM23NBGXX:3:23503:6575:7803':
-        #     print(alignment.query_name)
-        #     exit(0)
-
         if self.prev_alignment is not None and alignment.reference_start < self.prev_alignment.reference_start:
-            print(self.prev_alignment)
-            print(alignment)
-            raise Exception
-            exit(0)
-            # bam 16055862-16055891
-            # sam 16055863-16055892
-            
-        self.prev_alignment = alignment
+            # safety check
+            raise IndexError('Unordered write: %s after %s' % (alignment, self.prev_alignment))
         
         bam_file.write(alignment)
         self.alignment_counter += 1
+        self.prev_alignment = alignment
         
         if self.verbose and self.alignment_counter % 10000 == 0:
             print("%d alignments processed" % self.alignment_counter)
@@ -88,7 +74,6 @@ class Mutator:
         self.mut_counter = 0  # mutations pre alignment
         self.snv_counter = 0  # read vac records (SNVs)
         
-        self.unmapped_counter = 0  # unmapped alignments
         self.overlapping_counter = 0  # overlapping alignments
         self.max_coverage = 0  # maximum alignments overlapping single SNV
     
@@ -163,15 +148,15 @@ class Mutator:
             print(bin2hex(self.bam_checksum()))
             print(bin2hex(check_sum))
             raise ValueError("Invalid checksum.")
-    
+
     def unmutate(
             self,
             diff_file,
             out_bam_file,
-            start_ref_name=None,
-            start_ref_pos=None,
-            end_ref_name=None,
-            end_ref_pos=None,
+            start_ref_name: str = None,
+            start_ref_pos: int = None,
+            end_ref_name: str = None,
+            end_ref_pos: int = None
     ):
         """
         Unmutate BAM file in range specified by DIFF file or by parameters.
@@ -194,7 +179,7 @@ class Mutator:
             end_ref_pos
         )
         
-        snv_alignments = []
+        alignment_queue = []
         bam_iter = BamIterator(self.bam_file, start_index, end_index)
         alignment = next(bam_iter)
         
@@ -213,9 +198,9 @@ class Mutator:
                 # last mutation
                 if diff is not None:
                     # noinspection PyTypeChecker
-                    self.__unmutate_overlap(snv_alignments, diff.mut_map)
+                    self.__unmutate_overlap(alignment_queue, diff.mut_map)
                 
-                for snv_alignment in snv_alignments:
+                for snv_alignment in alignment_queue:
                     self.__write_alignment(out_bam_file, snv_alignment.alignment)
                 
                 # write remaining alignments (in EOF DIFF case only)
@@ -223,41 +208,45 @@ class Mutator:
                     self.__write_alignment(out_bam_file, alignment)
                     alignment = next(bam_iter)
                 
+                if self.verbose:
+                    print("total of %d alignments processed" % self.alignment_counter)
+                
                 break
             
-            elif alignment.is_unmapped:
-                self.unmapped_counter += 1
-                self.__write_alignment(out_bam_file, alignment)
-                alignment = next(bam_iter)
-            
-            elif self.__is_before_index(alignment, diff.index):
-                self.__write_alignment(out_bam_file, alignment)
+            elif alignment.is_unmapped or self.__is_before_index(alignment, diff.index):
+                if len(alignment_queue) == 0:
+                    # good to go, all preceeding alignments are written
+                    self.__write_alignment(out_bam_file, alignment)
+                else:
+                    # append to queue
+                    alignment_queue.append(SnvAlignment(alignment, None))
+                
                 alignment = next(bam_iter)
             
             elif self.__is_after_index(alignment, diff.index):
-                self.__unmutate_overlap(snv_alignments, diff.mut_map)
+                self.__unmutate_overlap(alignment_queue, diff.mut_map)
                 # done with this diff, read next
                 diff = next(diff_iter)
                 if diff is not None:
                     # could be end of DIFF file
-                    self.__write_before_index(out_bam_file, snv_alignments, diff.index)
-                    self.__set_seq_positions(snv_alignments, diff.ref_pos)
+                    self.__write_done(out_bam_file, alignment_queue, diff.index)
+                    self.__set_seq_positions(alignment_queue, diff.ref_pos)
             
             else:  # alignment is overlapping diff
                 # find sequence position of vac
                 seq_pos = ref_pos2seq_pos(alignment, diff.ref_pos)
-                snv_alignments.append(SnvAlignment(alignment, seq_pos))
+                alignment_queue.append(SnvAlignment(alignment, seq_pos))
                 alignment = next(bam_iter)
                 
                 self.overlapping_counter += 1
                 # noinspection PyAttributeOutsideInit
-                self.max_coverage = max(len(snv_alignments), self.max_coverage)
+                self.max_coverage = max(len(alignment_queue), self.max_coverage)
         
         # noinspection PyAttributeOutsideInit
         self.diff_counter = diff_iter.counter
     
-    def __unmutate_overlap(self, snv_alignments, mut_map):
-        for snv_alignment in snv_alignments:
+    def __unmutate_overlap(self, alignment_queue, mut_map):
+        for snv_alignment in alignment_queue:
             if snv_alignment.pos is not None:
                 # alignment has vac to mutate
                 self.__mutate_alignment(snv_alignment.alignment, snv_alignment.pos, mut_map)
@@ -277,7 +266,7 @@ class Mutator:
         """
         self.__init_counters()
         
-        snv_alignments = []
+        alignment_queue = []
         
         bam_iter = BamIterator(self.bam_file)
         alignment = next(bam_iter)
@@ -293,75 +282,75 @@ class Mutator:
         )
         while True:
             if vac is None or alignment is None:
-                return
                 # finish
                 if self.verbose:
                     if vac is None:
                         print("EOF VAC")
                     else:
                         print("EOF BAM")
-
+                
                 # last mutation
                 if vac is not None:
                     # noinspection PyTypeChecker
-                    self.__mutate_overlap(out_diff_file, snv_alignments, vac)
-
-                for snv_alignment in snv_alignments:
+                    self.__mutate_overlap(out_diff_file, alignment_queue, vac)
+                
+                for snv_alignment in alignment_queue:
                     self.__write_alignment(out_bam_file, snv_alignment.alignment)
-
+                
                 # write remaining alignments (in EOF VAC case only)
                 while alignment is not None:
                     self.__write_alignment(out_bam_file, alignment)
                     alignment = next(bam_iter)
-
+                
                 break
             
-            elif alignment.is_unmapped:
-                self.unmapped_counter += 1
-                self.__write_alignment(out_bam_file, alignment)
-                alignment = next(bam_iter)
-            
-            elif self.__is_before_index(alignment, vac.index):
-                self.__write_alignment(out_bam_file, alignment)
+            elif alignment.is_unmapped or self.__is_before_index(alignment, vac.index):
+                if len(alignment_queue) == 0:
+                    # good to go, all preceeding alignments are written
+                    self.__write_alignment(out_bam_file, alignment)
+                else:
+                    # append to queue
+                    alignment_queue.append(SnvAlignment(alignment, None))
+                
                 alignment = next(bam_iter)
             
             elif self.__is_after_index(alignment, vac.index):
-                self.__mutate_overlap(out_diff_file, snv_alignments, vac)
+                self.__mutate_overlap(out_diff_file, alignment_queue, vac)
                 # done with this vac, read next
                 vac = next(vac_iter)
                 if vac is not None:
                     # could be end of VAC file
-                    self.__write_before_index(out_bam_file, snv_alignments, vac.index)
-                    self.__set_seq_positions(snv_alignments, vac.ref_pos)
+                    self.__write_done(out_bam_file, alignment_queue, vac.index)
+                    self.__set_seq_positions(alignment_queue, vac.ref_pos)
             
             else:  # alignment is overlapping vac
                 # find sequence position of vac
                 seq_pos = ref_pos2seq_pos(alignment, vac.ref_pos)
-                snv_alignments.append(SnvAlignment(alignment, seq_pos))
+                alignment_queue.append(SnvAlignment(alignment, seq_pos))
                 alignment = next(bam_iter)
                 
                 self.overlapping_counter += 1
                 # noinspection PyAttributeOutsideInit
-                self.max_coverage = max(len(snv_alignments), self.max_coverage)
+                self.max_coverage = max(len(alignment_queue), self.max_coverage)
         
         # noinspection PyAttributeOutsideInit
         self.snv_counter = vac_iter.counter
     
-    def __mutate_overlap(self, out_diff_file, snv_alignments, vac):
+    def __mutate_overlap(self, out_diff_file, alignment_queue, vac):
         """
         Mutate alignments at current SNV position by allele frequencies of the SNV
-        :param snv_alignments: alignments together with vac positions
+        :param alignment_queue: alignments together with vac positions
         :param vac: SNV
         :return: True if NS mutation has occured
         """
         is_mutated = False
         # get pileup of bases from alignments at vac mapping position
-        base_pileup = get_base_pileup(snv_alignments)
+        base_pileup = get_base_pileup(alignment_queue)
         alt_ac = self.count_bases(base_pileup)
         
         mut_map = self.create_mut_map(alt_ac=alt_ac, ref_ac=vac.ac, rnd=self.rnd)
         
-        for snv_alignment in snv_alignments:
+        for snv_alignment in alignment_queue:
             if snv_alignment.pos is not None:
                 # alignment has vac to mutate
                 is_mutated |= self.__mutate_alignment(snv_alignment.alignment, snv_alignment.pos, mut_map)
@@ -441,44 +430,35 @@ class Mutator:
                     raise ValueError("Unsupported CIGAR operation %d" % cig_op_id)
                 break
     
-    def __write_before_index(self, out_bam_file, snv_alignments, index):
+    def __write_done(self, out_bam_file, alignment_queue, index):
         """
-        Write snv alignments before index to file.
+        Write snv alignments while their end reference position is before index.
         :param out_bam_file:
-        :param snv_alignments:
+        :param alignment_queue:
         :param index:
         :return:
         """
-        tmp_snv_alignments = snv_alignments[:]
-        for snv_alignment in tmp_snv_alignments:
-    
-            if snv_alignment.alignment.reference_start >= 16055862:
-                print([(alignment.alignment.query_name, alignment.alignment.reference_start,
-                        self.__is_before_index(snv_alignment.alignment, index)) for alignment in tmp_snv_alignments])
-                print(self.fai.index2pos(index))
+        tmp_alignment_queue = alignment_queue[:]
+        for snv_alignment in tmp_alignment_queue:
+            if not self.__is_before_index(snv_alignment.alignment, index):
+                # break to keep alignments in order
+                # otherwise shorter alignment could be written before longer alignment
+                break
             
-            # new_snv alignment is either before or overlapping next new_snv
-            if self.__is_before_index(snv_alignment.alignment, index):
-                
-                if snv_alignment.alignment.query_name == 'NB501186:8:HM23NBGXX:3:22412:8993:9825':
-                    # print(self.prev_alignment)
-                    # print([(alignment.alignment.query_name, alignment.alignment.reference_start, self.__is_before_index(snv_alignment.alignment, index)) for alignment in tmp_snv_alignments])
-                    #
-                    exit(0)
-                
-                self.__write_alignment(out_bam_file, snv_alignment.alignment)
-                # remove written alignment
-                snv_alignments.remove(snv_alignment)
+            self.__write_alignment(out_bam_file, snv_alignment.alignment)
+            # remove written alignment
+            alignment_queue.remove(snv_alignment)
     
     @staticmethod
-    def __set_seq_positions(snv_alignments, ref_pos):
+    def __set_seq_positions(alignment_queue, ref_pos):
         """
         Set SNV position derived from reference position for each alignment.
-        :param snv_alignments:
+        :param alignment_queue:
         :param ref_pos:
         :return:
         """
-        for snv_alignment in snv_alignments:
+        for snv_alignment in alignment_queue:
+            # TODO optimalize, skip when ref_pos is greater than alignment reference end
             snv_pos = ref_pos2seq_pos(snv_alignment.alignment, ref_pos)
             if snv_pos is not None:
                 # alignment is mapped at another new_snv position
