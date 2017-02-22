@@ -1,5 +1,5 @@
 import random
-import io
+
 import numpy as np
 
 from varlock.common import *
@@ -148,7 +148,7 @@ class Mutator:
             print(bin2hex(self.bam_checksum()))
             print(bin2hex(check_sum))
             raise ValueError("Invalid checksum.")
-
+    
     def unmutate(
             self,
             diff_file,
@@ -186,6 +186,10 @@ class Mutator:
         diff_iter = DiffIterator(diff_file, self.fai, start_index, end_index)
         diff = next(diff_iter)
         
+        if self.verbose:
+            print('first diff: %s' % diff)
+            print('first alignment: %s' % self.alignment2str(alignment))
+        
         while True:
             if diff is None or alignment is None:
                 # finish
@@ -209,6 +213,7 @@ class Mutator:
                     alignment = next(bam_iter)
                 
                 if self.verbose:
+                    print('last alignment: %s' % self.alignment2str(self.prev_alignment))
                     print("total of %d alignments processed" % self.alignment_counter)
                 
                 break
@@ -226,11 +231,14 @@ class Mutator:
             elif self.__is_after_index(alignment, diff.index):
                 self.__unmutate_overlap(alignment_queue, diff.mut_map)
                 # done with this diff, read next
+                prev_diff = diff
                 diff = next(diff_iter)
                 if diff is not None:
                     # could be end of DIFF file
                     self.__write_done(out_bam_file, alignment_queue, diff.index)
                     self.__set_seq_positions(alignment_queue, diff.ref_pos)
+                elif self.verbose:
+                    print('last diff: %s' % prev_diff)
             
             else:  # alignment is overlapping diff
                 # find sequence position of vac
@@ -240,6 +248,7 @@ class Mutator:
                 
                 self.overlapping_counter += 1
                 # noinspection PyAttributeOutsideInit
+                # TODO this is not the real coverage
                 self.max_coverage = max(len(alignment_queue), self.max_coverage)
         
         # noinspection PyAttributeOutsideInit
@@ -252,6 +261,11 @@ class Mutator:
                 self.__mutate_alignment(snv_alignment.alignment, snv_alignment.pos, mut_map)
                 # done with current vac
                 snv_alignment.pos = None
+    
+    def alignment2str(self, alignment):
+        ref_name = alignment.reference_name
+        ref_start = alignment.reference_start
+        return '#%d %s:%d' % (self.fai.pos2index(ref_name, ref_start), ref_name, ref_start)
     
     def mutate(self, in_vac_file, out_bam_file, out_diff_file):
         """
@@ -273,6 +287,10 @@ class Mutator:
         
         vac_iter = VacIterator(in_vac_file, self.fai)
         vac = next(vac_iter)
+        
+        if self.verbose:
+            print('first vac: %s' % vac)
+            print('first alignment: %s' % self.alignment2str(alignment))
         
         Diff.write_header(
             diff_file=out_diff_file,
@@ -302,6 +320,10 @@ class Mutator:
                     self.__write_alignment(out_bam_file, alignment)
                     alignment = next(bam_iter)
                 
+                if self.verbose:
+                    print('last alignment: %s' % self.alignment2str(self.prev_alignment))
+                    print("total of %d alignments processed" % self.alignment_counter)
+                
                 break
             
             elif alignment.is_unmapped or self.__is_before_index(alignment, vac.index):
@@ -317,11 +339,14 @@ class Mutator:
             elif self.__is_after_index(alignment, vac.index):
                 self.__mutate_overlap(out_diff_file, alignment_queue, vac)
                 # done with this vac, read next
+                prev_vac = vac
                 vac = next(vac_iter)
                 if vac is not None:
                     # could be end of VAC file
                     self.__write_done(out_bam_file, alignment_queue, vac.index)
                     self.__set_seq_positions(alignment_queue, vac.ref_pos)
+                elif self.verbose:
+                    print('last vac: %s' % prev_vac)
             
             else:  # alignment is overlapping vac
                 # find sequence position of vac
@@ -331,6 +356,7 @@ class Mutator:
                 
                 self.overlapping_counter += 1
                 # noinspection PyAttributeOutsideInit
+                # TODO this is not the real coverage
                 self.max_coverage = max(len(alignment_queue), self.max_coverage)
         
         # noinspection PyAttributeOutsideInit

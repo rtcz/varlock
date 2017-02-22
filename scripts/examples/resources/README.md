@@ -1,5 +1,5 @@
 ### sample.bam
-first 10000 alignments from chr22
+first 10000 alignments from chr22 file "1020b_S23_chr22.bam"
 
 ### sample.vcf.gz
 first 10000 variants from chr22

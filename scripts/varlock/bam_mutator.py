@@ -1,4 +1,3 @@
-import io
 import random
 
 import pysam
@@ -12,12 +11,12 @@ class BamMutator:
     SAM_COMMENT_TAG = 'CO'
     MUT_COMMENT_PREFIX = 'MUT:'
     
-    STAT_ALIGNMENT_COUNT = 0,
-    STAT_OVERLAPPING_COUNT = 1,
-    STAT_MAX_COVERAGE = 2,
-    STAT_SNV_COUNT = 3,
-    STAT_MUT_COUNT = 4,
-    STAT_DIFF_COUNT = 5
+    STAT_ALIGNMENT_COUNT = 'alignment_count'
+    STAT_OVERLAPPING_COUNT = 'overlapping_count'
+    STAT_MAX_COVERAGE = 'max_coverage'
+    STAT_SNV_COUNT = 'snv_count'
+    STAT_MUT_COUNT = 'mut_count'
+    STAT_DIFF_COUNT = 'diff_count'
     
     def __init__(self, rnd=random.SystemRandom(), verbose=False):
         self.rnd = rnd
@@ -73,14 +72,17 @@ class BamMutator:
         else:
             raise ValueError('Stat not found.')
     
+    def all_stats(self):
+        return self._stats
+    
     def mutate(
             self,
             bam_filename: str,
             vac_filename: str,
-            mut_bam_filename: str
+            mut_bam_filename: str,
+            diff_file
     ):
         self._stats = {}
-        out_diff_file = io.BytesIO()
         with pysam.AlignmentFile(bam_filename, 'rb') as sam_file:
             mut = Mutator(sam_file, rnd=self.rnd, verbose=self.verbose)
             mut_header = self.__mut_header(sam_file.header, mut.bam_checksum())
@@ -90,7 +92,7 @@ class BamMutator:
                 mut.mutate(
                     in_vac_file=vac_file,
                     out_bam_file=out_bam_file,
-                    out_diff_file=out_diff_file
+                    out_diff_file=diff_file
                 )
             
             self._stats = {
@@ -113,9 +115,8 @@ class BamMutator:
         # print('after sam ' + bin2hex(calc_checksum(out_bam_file.filename + b'.sam')))
         # exit(0)
         
-        Diff.write_checksum(out_diff_file, calc_checksum(out_bam_file.filename))
-        out_diff_file.seek(0)
-        return out_diff_file
+        Diff.write_checksum(diff_file, calc_checksum(out_bam_file.filename))
+        diff_file.seek(0)
     
     def unmutate(
             self,

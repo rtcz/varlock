@@ -3,6 +3,9 @@ class SnvPosition(object):
         self.index = index
         self.ref_name = ref_name
         self.ref_pos = ref_pos
+    
+    def __str__(self):
+        return '#%d %s:%d' % (self.index, self.ref_name, self.ref_pos)
 
 
 class DiffRecord(SnvPosition):
@@ -39,3 +42,6 @@ class FaiRecord:
         self.name = name
         self.start = start
         self.length = length
+    
+    def __str__(self):
+        return '#%d %s %d %d' % (self.id, self.name, self.start, self.length)

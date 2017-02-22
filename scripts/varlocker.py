@@ -68,8 +68,9 @@ class Varlocker:
         if verbose:
             print('Mutating BAM')
         
-        with mut.mutate(bam_filename, vac_filename, out_bam_filename) as diff_file, \
-                open(out_enc_diff_filename, 'wb') as enc_diff_file:
+        with io.BytesIO() as diff_file, open(out_enc_diff_filename, 'wb') as enc_diff_file:
+            
+            mut.mutate(bam_filename, vac_filename, out_bam_filename, diff_file)
             # store encrypted AES key in encrypted DIFF
             enc_aes_key = PKCS1_OAEP.new(rsa_key.publickey()).encrypt(aes_key)
             enc_diff_file.write(struct.pack('<I', len(enc_aes_key)))
