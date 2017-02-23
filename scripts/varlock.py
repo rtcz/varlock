@@ -12,7 +12,7 @@ def main():
         locker = Varlocker()
         command, args = parse_command()
         if command == 'encrypt':
-            # python3 varlock.py encrypt --pub_key resources/jozko.pub --bam examples/resources/sample.bam --vac examples/resources/sample.vac --out_bam resources/out.mut.bam --out_diff resources/out.diff.enc
+            # python3 varlock.py encrypt --pub_key resources/jozko.pub --bam resources/input.bam --vac resources/input.vac --out_bam resources/out.mut.bam --out_diff resources/out.diff.enc
             parsed_args = parse_encrypt_args(args)
             with open(parsed_args.pub_key, 'r') as pub_key_file:
                 rsa_key = RSA.importKey(pub_key_file.read())
@@ -42,13 +42,13 @@ def main():
                     verbose=parsed_args.verbose
                 )
         elif command == 'reencrypt':
+            # python3 varlock.py reencrypt -d resources/jozko -e resources/jozko.pub -b resources/out.mut.bam -s resources/input.diff -o resources/output.diff -v -p password
             parsed_args = parse_reencrypt_args(args)
-            
             with open(parsed_args.key, 'r') as key_file, \
                     open(parsed_args.pub_key, 'r') as pub_key_file:
                 rsa_dec_key = RSA.importKey(key_file.read(), passphrase=parsed_args.password)
                 rsa_enc_key = RSA.importKey(pub_key_file.read())
-                
+ 
                 locker.reencrypt(
                     rsa_dec_key=rsa_dec_key,
                     rsa_enc_key=rsa_enc_key,

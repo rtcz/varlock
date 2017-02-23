@@ -1,4 +1,5 @@
 import binascii
+import gzip
 import hashlib
 
 import pysam
@@ -134,3 +135,10 @@ def set_base(alignment, pos, base):
     mut_seq += base
     mut_seq += alignment.query_sequence[pos + 1:]
     alignment.query_sequence = mut_seq
+
+
+def open_vcf(filename, mode):
+    if filename[-3:] == '.gz':
+        return gzip.open(filename, mode)
+    else:
+        return open(filename, mode)

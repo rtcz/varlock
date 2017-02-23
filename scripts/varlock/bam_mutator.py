@@ -1,18 +1,12 @@
 import random
 
-import pysam
-from pysam.calignmentfile import VALID_HEADER_TYPES, KNOWN_HEADER_FIELDS
-
+from .bam import open_bam, mut_header, unmut_header
 from .common import calc_checksum, bin2hex
 from .diff import Diff
 from .mutator import Mutator
 
 
 class BamMutator:
-    MUT_TAG = 'mt'
-    BAM_TAG = 'bm'
-    VAC_TAG = 'vc'
-    
     STAT_ALIGNMENT_COUNT = 'alignment_count'
     STAT_OVERLAPPING_COUNT = 'overlapping_count'
     STAT_MAX_COVERAGE = 'max_coverage'
@@ -24,22 +18,6 @@ class BamMutator:
         self.rnd = rnd
         self.verbose = verbose
         self._stats = {}
-    
-    @classmethod
-    def __mut_header(cls, header_map, bam_checksum, vac_checksum):
-        if cls.MUT_TAG in header_map:
-            raise ValueError("File appears to be already mutated.")
-        else:
-            header_map[cls.MUT_TAG] = {cls.BAM_TAG: bam_checksum, cls.VAC_TAG: vac_checksum}
-            return header_map
-    
-    @classmethod
-    def __unmut_header(cls, header_map):
-        if cls.MUT_TAG in header_map:
-            del header_map[cls.MUT_TAG]
-            return header_map
-        else:
-            raise ValueError('File does not appear to be mutated.')
     
     def stat(self, stat_id):
         if stat_id in self._stats:
@@ -58,7 +36,7 @@ class BamMutator:
             diff_file
     ):
         self._stats = {}
-        with pysam.AlignmentFile(bam_filename, 'rb') as sam_file:
+        with open_bam(bam_filename, 'rb') as sam_file:
             mut = Mutator(sam_file, rnd=self.rnd, verbose=self.verbose)
             
             if self.verbose:
@@ -66,9 +44,9 @@ class BamMutator:
             
             vac_checksum = bin2hex(calc_checksum(vac_filename))
             bam_checksum = bin2hex(mut.bam_checksum())
-            mut_header = self.__mut_header(sam_file.header, bam_checksum, vac_checksum)
+            header = mut_header(sam_file.header, bam_checksum, vac_checksum)
             
-            with pysam.AlignmentFile(mut_bam_filename, 'wb', header=mut_header) as out_bam_file, \
+            with open_bam(mut_bam_filename, 'wb', header=header) as out_bam_file, \
                     open(vac_filename, 'rb') as vac_file:
                 mut.mutate(
                     in_vac_file=vac_file,
@@ -111,15 +89,11 @@ class BamMutator:
     ):
         self._stats = {}
         
-        # modify pysam's header format
-        VALID_HEADER_TYPES[self.MUT_TAG] = dict
-        KNOWN_HEADER_FIELDS[self.MUT_TAG] = {self.BAM_TAG: str, self.VAC_TAG: str}
-        
-        with pysam.AlignmentFile(bam_filename, 'rb') as sam_file:
-            unmut_header = self.__unmut_header(sam_file.header)
+        with open_bam(bam_filename, 'rb') as sam_file:
+            header = unmut_header(sam_file.header)
             mut = Mutator(sam_file, rnd=self.rnd, verbose=self.verbose)
             
-            with pysam.AlignmentFile(out_bam_filename, 'wb', header=unmut_header) as out_sam_file:
+            with open_bam(out_bam_filename, 'wb', header=header) as out_sam_file:
                 mut.unmutate(
                     diff_file=diff_file,
                     out_bam_file=out_sam_file,

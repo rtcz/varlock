@@ -1,14 +1,16 @@
-import gzip
 import io
 import os
 import struct
 
-import pysam
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.PublicKey import RSA
 
 import varlock as vrl
 from varlock import Diff
+from varlock import FastaIndex
+from varlock import Vac
+from varlock.bam import open_bam
+from varlock.common import open_vcf
 
 
 class Varlocker:
@@ -22,23 +24,14 @@ class Varlocker:
         :param bam_filename:
         :param vcf_filename:
         :param out_vac_filename:
+        :param verbose:
         :return:
         """
-        if vcf_filename[-3:] == '.gz':
-            if verbose:
-                print('VCF in gzip mode')
-            vcf_file = gzip.open(vcf_filename, 'rt')
-        else:
-            if verbose:
-                print('VCF in text mode')
-            vcf_file = open(vcf_filename, 'rt')
-        
-        with pysam.AlignmentFile(bam_filename, 'rb') as sam_file, \
+        with open_vcf(vcf_filename, 'rt') as vcf_file, \
+                open_bam(bam_filename, 'rb') as sam_file, \
                 open(out_vac_filename, 'wb') as out_vac_file:
-            vac = vrl.Vac(vrl.FastaIndex(sam_file, keep_chr=False))
+            vac = Vac(FastaIndex(sam_file, keep_chr=False))
             vac.vcf2vac(vcf_file, out_vac_file)
-        
-        vcf_file.close()
     
     @classmethod
     def encrypt(
@@ -80,6 +73,7 @@ class Varlocker:
                 print('Encrypting DIFF')
             
             # encrypt diff with new AES key
+            # noinspection PyTypeChecker
             aes = vrl.FileAES(aes_key)
             aes.encrypt(diff_file, enc_diff_file)
     
@@ -167,7 +161,7 @@ class Varlocker:
         :param end_ref_pos: 0-based, inclusive
         :param verbose:
         """
-        with pysam.AlignmentFile(bam_filename, 'rb') as sam_file, \
+        with open_bam(bam_filename, 'rb') as sam_file, \
                 open(enc_diff_filename, 'rb') as enc_diff_file, \
                 io.BytesIO() as diff_file:
             # retrieve encrypted AES key stored in encrypted DIFF
@@ -193,18 +187,18 @@ class Varlocker:
             )
             # slice diff
             with Diff.slice(diff_file, start_index, end_index) as sliced_diff, \
-                    open(out_enc_diff_filename, 'rb') as out_enc_diff_file:
+                    open(out_enc_diff_filename, 'wb') as out_enc_diff_file:
+                # generate new AES key
+                aes_key = os.urandom(cls.AES_KEY_LENGTH)
                 # store encrypted AES key in encrypted DIFF
                 enc_aes_key = PKCS1_OAEP.new(rsa_enc_key.publickey()).encrypt(aes_key)
-                enc_diff_file.write(struct.pack('<I', len(enc_aes_key)))
-                enc_diff_file.write(enc_aes_key)
-                
+                out_enc_diff_file.write(struct.pack('<I', len(enc_aes_key)))
+                out_enc_diff_file.write(enc_aes_key)
                 if verbose:
                     print('Encrypting DIFF')
                 
-                # encrypt diff with AES key
-                out_aes_key = os.urandom(cls.AES_KEY_LENGTH)
-                out_aes = vrl.FileAES(out_aes_key)
+                # noinspection PyTypeChecker
+                out_aes = vrl.FileAES(aes_key)
                 out_aes.encrypt(sliced_diff, out_enc_diff_file)
     
     @classmethod

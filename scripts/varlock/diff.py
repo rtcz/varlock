@@ -255,6 +255,7 @@ class Diff:
         # body
         diff_file.seek(start_offset)
         sliced_diff.write(diff_file.read(end_offset - start_offset))
+        sliced_diff.seek(0)
         return sliced_diff
     
     @classmethod
