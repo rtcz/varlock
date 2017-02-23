@@ -1,15 +1,17 @@
 import random
 
 import pysam
+from pysam.calignmentfile import VALID_HEADER_TYPES, KNOWN_HEADER_FIELDS
 
-from .common import bin2hex, calc_checksum
+from .common import calc_checksum, bin2hex
 from .diff import Diff
 from .mutator import Mutator
 
 
 class BamMutator:
-    SAM_COMMENT_TAG = 'CO'
-    MUT_COMMENT_PREFIX = 'MUT:'
+    MUT_TAG = 'mt'
+    BAM_TAG = 'bm'
+    VAC_TAG = 'vc'
     
     STAT_ALIGNMENT_COUNT = 'alignment_count'
     STAT_OVERLAPPING_COUNT = 'overlapping_count'
@@ -24,44 +26,17 @@ class BamMutator:
         self._stats = {}
     
     @classmethod
-    def is_mutated(cls, bam_filename):
-        with pysam.AlignmentFile(bam_filename, 'rb') as bam_file:
-            return cls.__is_mutated(bam_file.header)
-    
-    @classmethod
-    def __is_mutated(cls, header_map):
-        if cls.SAM_COMMENT_TAG in header_map:
-            for comment in header_map[cls.SAM_COMMENT_TAG]:
-                if comment[:len(cls.MUT_COMMENT_PREFIX)] == cls.MUT_COMMENT_PREFIX:
-                    return True
-        return False
-    
-    @classmethod
-    def __add_comment(cls, header_map, comment):
-        if cls.SAM_COMMENT_TAG in header_map:
-            header_map[cls.SAM_COMMENT_TAG].append(comment)
-        else:
-            header_map[cls.SAM_COMMENT_TAG] = [comment]
-    
-    @classmethod
-    def __mut_header(cls, header_map, checksum):
-        if cls.__is_mutated(header_map):
+    def __mut_header(cls, header_map, bam_checksum, vac_checksum):
+        if cls.MUT_TAG in header_map:
             raise ValueError("File appears to be already mutated.")
         else:
-            comment = cls.MUT_COMMENT_PREFIX + bin2hex(checksum)
-            cls.__add_comment(header_map, comment)
+            header_map[cls.MUT_TAG] = {cls.BAM_TAG: bam_checksum, cls.VAC_TAG: vac_checksum}
             return header_map
     
     @classmethod
     def __unmut_header(cls, header_map):
-        if cls.__is_mutated(header_map):
-            comment_list = []
-            for i in range(len(header_map[cls.SAM_COMMENT_TAG])):
-                comment = header_map[cls.SAM_COMMENT_TAG][i]
-                if comment[:len(cls.MUT_COMMENT_PREFIX)] != cls.MUT_COMMENT_PREFIX:
-                    comment_list.append(comment)
-            
-            header_map[cls.SAM_COMMENT_TAG] = comment_list
+        if cls.MUT_TAG in header_map:
+            del header_map[cls.MUT_TAG]
             return header_map
         else:
             raise ValueError('File does not appear to be mutated.')
@@ -85,7 +60,13 @@ class BamMutator:
         self._stats = {}
         with pysam.AlignmentFile(bam_filename, 'rb') as sam_file:
             mut = Mutator(sam_file, rnd=self.rnd, verbose=self.verbose)
-            mut_header = self.__mut_header(sam_file.header, mut.bam_checksum())
+            
+            if self.verbose:
+                print("Calculating VAC's checksum")
+            
+            vac_checksum = bin2hex(calc_checksum(vac_filename))
+            bam_checksum = bin2hex(mut.bam_checksum())
+            mut_header = self.__mut_header(sam_file.header, bam_checksum, vac_checksum)
             
             with pysam.AlignmentFile(mut_bam_filename, 'wb', header=mut_header) as out_bam_file, \
                     open(vac_filename, 'rb') as vac_file:
@@ -129,6 +110,11 @@ class BamMutator:
             end_ref_pos: int = None
     ):
         self._stats = {}
+        
+        # modify pysam's header format
+        VALID_HEADER_TYPES[self.MUT_TAG] = dict
+        KNOWN_HEADER_FIELDS[self.MUT_TAG] = {self.BAM_TAG: str, self.VAC_TAG: str}
+        
         with pysam.AlignmentFile(bam_filename, 'rb') as sam_file:
             unmut_header = self.__unmut_header(sam_file.header)
             mut = Mutator(sam_file, rnd=self.rnd, verbose=self.verbose)
