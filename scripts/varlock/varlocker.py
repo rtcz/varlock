@@ -6,11 +6,11 @@ from Crypto.Cipher import PKCS1_OAEP
 from Crypto.PublicKey import RSA
 
 import varlock as vrl
-from varlock import Diff
-from varlock import FastaIndex
-from varlock import Vac
-from varlock.bam import open_bam
-from varlock.common import open_vcf
+from .bam import open_bam
+from .common import open_vcf
+from .diff import Diff
+from .fasta_index import FastaIndex
+from .vac import Vac
 
 
 class Varlocker:
@@ -200,45 +200,3 @@ class Varlocker:
                 # noinspection PyTypeChecker
                 out_aes = vrl.FileAES(aes_key)
                 out_aes.encrypt(sliced_diff, out_enc_diff_file)
-    
-    @classmethod
-    def has_privilege(
-            cls,
-            private_key,
-            enc_aes_key,
-            enc_diff_file,
-            mut_bam_file,
-            ref_name=None,
-            start_pos=None,
-            end_pos=None
-    ):
-        """
-        :param private_key:
-        :param enc_aes_key:
-        :param enc_diff_file:
-        :param mut_bam_file:
-        :param ref_name:
-        :param start_pos:
-        :param end_pos:
-        :return:
-        """
-        pass
-        # TODO is this method needed ???
-        # if ref_name is not None and start_pos is not None and end_pos is not None:
-        #     # range is specified
-        #     if start_pos >= end_pos:
-        #         # wrong range
-        #         raise ValueError("End position must be greater than start position.")
-        #
-        # # TODO 1 try to decrypt aes
-        # aes_key = private_key.decrypt(enc_aes_key)
-        #
-        # # TODO 2 try to decrypt diff, only header part
-        #
-        # # TODO 3 check the range specified in diff's header
-        #
-        # # TODO 4 compare checksum of BAM to checksum from diff's header
-        #
-        # # TODO 5 check if range is present in BAM
-        #
-        # return True

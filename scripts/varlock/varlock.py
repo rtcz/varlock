@@ -4,7 +4,7 @@ import sys
 
 from Crypto.PublicKey import RSA
 
-from varlocker import Varlocker
+from .varlocker import Varlocker
 
 
 def main():
@@ -12,6 +12,7 @@ def main():
         locker = Varlocker()
         command, args = parse_command()
         if command == 'encrypt':
+            # TODO add option for ommiting optional fields
             # python3 varlock.py encrypt --pub_key resources/jozko.pub --bam resources/input.bam --vac resources/input.vac --out_bam resources/out.mut.bam --out_diff resources/out.diff.enc
             parsed_args = parse_encrypt_args(args)
             with open(parsed_args.pub_key, 'r') as pub_key_file:
