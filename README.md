@@ -20,7 +20,7 @@ Varlock is a command line interface utility for depersonalization of BAM files b
 VAC is a compact binary file format for storing SNV allele counts. VAC file does not contain header. Each record represents one SNV from a VCF file and contains its absolute position in the genome and four numbers representing counts of different alleles (A, C, T, G) for that position. 
 
 ### BAM Difference (BDIFF) file format 
-SNV differences between original and depersonalized BAM file are stored in a binary BDIFF file format. The format specifies a header consisting of the checksum of original BAM and an effective range that BDIFF covers as two absolute positions in the genome. A single BDIFF record represents a difference at one position in the genome. Since BAM can contain multiple alleles for one position, the difference is a map from depersonalized alleles to original ones. A record consists of an absolute position on the genome and a permutation of DNA bases at that position.  
+SNV differences between original and depersonalized BAM file are stored in a binary BDIFF file format. The format specifies a header consisting of the checksum of depersonalized BAM and an effective range that BDIFF covers as two absolute positions in the genome. A single BDIFF record represents a difference at one position in the genome. Since BAM can contain multiple alleles for one position, the difference is a map from depersonalized alleles to original ones. A record consists of an absolute position on the genome and a permutation of DNA bases at that position.  
 
 ### Encrypt
 Process involving BAM depersonalization is simply called _encryption_. User must supply the original BAM file, VAC (or VCF) file, and his public key for encryption. Both VAC and BAM files are iterated at the same time to produce a new depersonalized BAM. Every time a genomic position of VAC record overlaps with  one or more alignments from BAM file, a permutation for this alignment column is created. 
@@ -29,7 +29,7 @@ The permutation depersonalizes original bases and it is created in an iterative 
 
 Bases in alignment column at position of SNV are permuted with the corresponding permutation. When the generated permutation is not identity, a new record is written to BDIFF file with the position of SNV and generated permutation. After all alignments or VAC records are processed, depersonalization algorithm has ended and remaining alignments are written. Checksum of original BAM file and VAC file is added to the header of the depersonalized BAM for validation and file management purposes. At the same time, a checksum of depersonalized BAM is added to the header of BDIFF file. BDIFF file format requires also a genomic range, the full range is used for BAM files encrypted for the first time to allow access to all data.
 
-Last step of encryption is the actual encryption of BDIFF file. Public key can not be used for the encryption directly because the RSA encryption has a limited input size. Instead, the AES encryption with a randomly generated key is udes to encrypt the whole file. The AES key is encrypted with the private key and stored as a part of encrypted BDIFF file. 
+Last step of encryption is the actual encryption of BDIFF file. Public key can not be used for the encryption directly because the RSA encryption has a limited input size. Instead, the AES encryption with a randomly generated key is used to encrypt the whole file. The AES key is encrypted with the private key and stored as a part of encrypted BDIFF file. 
  
  After the encryption, the original BAM file can be deleted and the access to data is then restricted to the owner of the private key paired with the public key used for encryption. 
 
@@ -44,3 +44,29 @@ A secure pseudo-random number generator or a true random number generator must b
 
 ## Conclusion
 Varlock is a tool suitable for storing BAM files in a depersonalized form with the option to restore their original content. The authority managing BAM files can distribute access to specific genomic regions of original BAM file among users, while other parts of the original BAM file stay inaccessible. Now, only the sequence is depersonalized, however, we intend to extend this concept in the future to other BAM file format fields such as CIGAR string, base quality, and optional fields.
+
+# Development
+## Testing
+
+
+run all tests
+python3 -m unittest discover
+
+run single test
+python3 -m unittest tests.<FILE_NAME>.<CLASS_NAME>.<METHOD_NAME>
+
+## Examples
+run example
+python3 -m examples.bam_mutator
+
+profile example
+python3 -m cProfile -s tottime examples/bam_mutator.py | head -n 140
+
+
+## Samtools
+samtools view -H examples/resources/sample.mut.bam
+samtools view -h resources/out.mut.bam >> out.mut.sam
+
+
+
+

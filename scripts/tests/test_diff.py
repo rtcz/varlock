@@ -8,7 +8,7 @@ class TestDiff(unittest.TestCase):
     @staticmethod
     def __build_diff_file():
         diff_file = io.BytesIO()
-        Diff.write_header(diff_file, b'0123456789ABCDEF', 2000000000, 3000000000)
+        Diff.write_header(diff_file, 2000000000, 3000000000, b'0123456789ABCDEF')
         Diff.write_record(diff_file, 2830728741, ('C', 'A', 'T', 'G'))
         Diff.write_record(diff_file, 2830728781, ('G', 'A', 'T', 'C'))
         Diff.write_record(diff_file, 2830728786, ('T', 'G', 'A', 'C'))
@@ -102,27 +102,27 @@ class TestDiff(unittest.TestCase):
     
     def test_header_range(self):
         diff_file = io.BytesIO()
-        self.assertRaises(AssertionError, lambda: Diff.write_header(diff_file, b'0123456789ABCDEF', 20, 10))
+        self.assertRaises(AssertionError, lambda: Diff.write_header(diff_file, 20, 10, b'0123456789ABCDEF'))
         
         diff_file = io.BytesIO()
-        Diff.write_header(diff_file, b'0123456789ABCDEF', 10, 20)
+        Diff.write_header(diff_file, 10, 20, b'0123456789ABCDEF')
         Diff.write_record(diff_file, 10, ('C', 'A', 'T', 'G'))
         Diff.write_record(diff_file, 20, ('G', 'A', 'T', 'C'))
         Diff.validate_header_range(diff_file)
         
         diff_file = io.BytesIO()
-        Diff.write_header(diff_file, b'0123456789ABCDEF', 10, 10)
+        Diff.write_header(diff_file, 10, 10, b'0123456789ABCDEF')
         Diff.write_record(diff_file, 10, ('C', 'A', 'T', 'G'))
         Diff.validate_header_range(diff_file)
         
         diff_file = io.BytesIO()
-        Diff.write_header(diff_file, b'0123456789ABCDEF', 11, 20)
+        Diff.write_header(diff_file, 11, 20, b'0123456789ABCDEF')
         Diff.write_record(diff_file, 10, ('C', 'A', 'T', 'G'))
         Diff.write_record(diff_file, 20, ('G', 'A', 'T', 'C'))
         self.assertRaises(ValueError, lambda: Diff.validate_header_range(diff_file))
         
         diff_file = io.BytesIO()
-        Diff.write_header(diff_file, b'0123456789ABCDEF', 10, 19)
+        Diff.write_header(diff_file, 10, 19, b'0123456789ABCDEF')
         Diff.write_record(diff_file, 10, ('C', 'A', 'T', 'G'))
         Diff.write_record(diff_file, 20, ('G', 'A', 'T', 'C'))
         self.assertRaises(ValueError, lambda: Diff.validate_header_range(diff_file))

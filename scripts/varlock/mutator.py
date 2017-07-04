@@ -297,7 +297,6 @@ class Mutator:
         
         Diff.write_header(
             diff_file=out_diff_file,
-            bam_checksum=bytes(Diff.MD5_LENGTH),
             start_index=self.fai.first_index(),
             end_index=self.fai.last_index()
         )
@@ -537,7 +536,7 @@ class Mutator:
             # draw ref base with multinomial probability
             ref_base_id = multi_random(ref_ac, rnd)
             # draw most abundant base from alt alleles
-            alt_base_id = np.argmax(alt_ac)
+            alt_base_id = np.argmax(alt_ac)  # type: int
             # add mapping
             mut_map[alt_bases[alt_base_id]] = ref_bases[ref_base_id]
             

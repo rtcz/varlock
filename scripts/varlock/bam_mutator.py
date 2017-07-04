@@ -74,6 +74,7 @@ class BamMutator:
         # print('after sam ' + bin2hex(calc_checksum(out_bam_file.filename + b'.sam')))
         # exit(0)
         
+        # rewrite checksum placeholder with real checksum
         Diff.write_checksum(diff_file, calc_checksum(out_bam_file.filename))
         diff_file.seek(0)
     

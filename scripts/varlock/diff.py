@@ -99,7 +99,7 @@ class Diff:
             raise ValueError("Invalid header end index")
     
     @classmethod
-    def write_header(cls, diff_file, bam_checksum, start_index, end_index):
+    def write_header(cls, diff_file, start_index: int, end_index: int, bam_checksum: bytes = bytes(MD5_LENGTH)):
         assert start_index <= end_index
         cls.write_checksum(diff_file, bam_checksum)
         diff_file.write(struct.pack('<II', start_index, end_index))
@@ -113,12 +113,12 @@ class Diff:
         return index, cls.INDEX_2_MUT[mut_index]
     
     @classmethod
-    def write_record(cls, diff_file, index, mut_tuple):
+    def write_record(cls, diff_file, index: int, mut_tuple: tuple):
         byte_string = struct.pack(cls.RECORD_FORMAT, index, cls.MUT_2_INDEX[mut_tuple])
         diff_file.write(byte_string)
     
     @classmethod
-    def write_checksum(cls, diff_file, bam_checksum):
+    def write_checksum(cls, diff_file, bam_checksum: bytes):
         diff_file.seek(0)
         if len(bam_checksum) != cls.MD5_LENGTH:
             raise ValueError('Invalid checksum length')
@@ -136,7 +136,7 @@ class Diff:
         return diff_file.tell()
     
     @classmethod
-    def seek_subrange(cls, diff_file, start_index, end_index):
+    def seek_subrange(cls, diff_file, start_index: int, end_index: int):
         assert start_index <= end_index
         
         start_offset = cls.seek_closest_index(diff_file, start_index, True)
@@ -171,12 +171,12 @@ class Diff:
         cls.validate_header_range(diff_file)
     
     @classmethod
-    def seek_closest_index(cls, diff_file, index, up=True):
+    def seek_closest_index(cls, diff_file, index: int, up=True):
         """
-        :param diff_file:
-        :param index:
-        :param up:
-        :return:
+        :param diff_file: file to seek
+        :param index: initial index
+        :param up: direction of seeking
+        :return: file position of closest index
         """
         cls.validate(diff_file)
         
@@ -238,7 +238,7 @@ class Diff:
         return offset
     
     @classmethod
-    def slice(cls, diff_file, start_index, end_index):
+    def slice(cls, diff_file, start_index: int, end_index: int):
         """
         :param diff_file: diff to slice from
         :param start_index: start genome pos
@@ -251,7 +251,7 @@ class Diff:
         sliced_diff = io.BytesIO()
         # header
         checksum = cls.read_header(diff_file)[0]
-        cls.write_header(sliced_diff, checksum, start_index, end_index)
+        cls.write_header(sliced_diff, start_index, end_index, checksum)
         # body
         diff_file.seek(start_offset)
         sliced_diff.write(diff_file.read(end_offset - start_offset))
@@ -276,7 +276,7 @@ class Diff:
         with open(diff_filepath, 'wb') as diff_file, \
                 open(text_filepath, 'rt') as text_file:
             checksum_hex, start_index, end_index = text_file.readline().rstrip().split('\t')
-            cls.write_header(diff_file, hex2bin(checksum_hex), int(start_index), int(end_index))
+            cls.write_header(diff_file, int(start_index), int(end_index), hex2bin(checksum_hex))
             for line in text_file:
                 index, mut = line.rstrip().split('\t')
                 Diff.write_record(diff_file, int(index), tuple(mut.split(',')))
