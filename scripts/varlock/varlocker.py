@@ -87,6 +87,8 @@ class Varlocker:
             start_ref_pos: int = None,
             end_ref_name: str = None,
             end_ref_pos: int = None,
+            include_unmapped: bool = False,
+            unmapped_only: bool = False,
             verbose: bool = False
     ):
         """
@@ -101,6 +103,9 @@ class Varlocker:
         :param start_ref_pos: 0-based, inclusive
         :param end_ref_name: inclusive
         :param end_ref_pos: 0-based, inclusive
+        :param include_unmapped: Include all unplaced unmapped reads.
+        :param unmapped_only: Only unmapped reads - both placed and unplaced.
+         Overrides other parameters.
         :param verbose:
         """
         with io.BytesIO() as diff_file, \
@@ -129,7 +134,9 @@ class Varlocker:
                 start_ref_name,
                 start_ref_pos,
                 end_ref_name,
-                end_ref_pos
+                end_ref_pos,
+                include_unmapped,
+                unmapped_only
             )
     
     @classmethod

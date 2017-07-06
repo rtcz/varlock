@@ -86,7 +86,9 @@ class BamMutator:
             start_ref_name: str = None,
             start_ref_pos: int = None,
             end_ref_name: str = None,
-            end_ref_pos: int = None
+            end_ref_pos: int = None,
+            include_unmapped: bool = False,
+            unmapped_only: bool = False
     ):
         self._stats = {}
         
@@ -101,7 +103,9 @@ class BamMutator:
                     start_ref_name=start_ref_name,
                     start_ref_pos=start_ref_pos,
                     end_ref_name=end_ref_name,
-                    end_ref_pos=end_ref_pos
+                    end_ref_pos=end_ref_pos,
+                    include_unmapped=include_unmapped,
+                    unmapped_only=unmapped_only
                 )
             
             self._stats = {

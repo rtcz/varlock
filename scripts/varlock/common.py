@@ -123,6 +123,15 @@ def get_base(alignment, pos):
     return alignment.query_sequence[pos]
 
 
+def is_placed_alignment(alignment):
+    """
+    :param alignment: pysam.AlignedSegment
+    :return: True if alignment is placed, it still can be unmapped.
+    Unplaced alignment has no reference_name and reference_start.
+    """
+    return alignment.reference_id != -1
+
+
 def set_base(alignment, pos, base):
     """
     Replace base at SNV position

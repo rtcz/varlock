@@ -40,6 +40,8 @@ def main():
                     start_ref_pos=parsed_args.range[1],
                     end_ref_name=parsed_args.range[2],
                     end_ref_pos=parsed_args.range[3],
+                    include_unmapped=parsed_args.include_unmapped,
+                    unmapped_only=parsed_args.unmapped_only,
                     verbose=parsed_args.verbose
                 )
         elif command == 'reencrypt':
@@ -124,6 +126,8 @@ def parse_decrypt_args(args):
     optional.add_argument('-p', '--password', type=str, help='private key password')
     range_help = "range in one of following formats: 'chr1', 'chr1:chr2', 'chr1:10000:20000', 'chr1:10000:chr2:20000'"
     optional.add_argument('-r', '--range', type=is_sam_range, help=range_help, default=(None, None, None, None))
+    optional.add_argument('-i', '--include_unmapped', action='store_false', help="include all unplaced unmapped reads")
+    optional.add_argument('-u', '--unmapped_only', action='store_false', help="only unmapped reads")
     optional.add_argument('-v', '--verbose', action='store_true', help="explain what is being done")
     return parser.parse_args(args)
 

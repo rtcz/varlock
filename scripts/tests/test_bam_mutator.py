@@ -30,7 +30,7 @@ class TestBamMutator(unittest.TestCase):
                 mut_bam_filename=self.MUT_DIR_PATH + 'output_01.bam',
                 diff_file=out_diff_file
             )
-            self.assertEqual(15, mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
+            self.assertEqual(19, mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
             self.assertEqual(12, mut.stat(BamMutator.STAT_OVERLAPPING_COUNT))
             self.assertEqual(5, mut.stat(BamMutator.STAT_MAX_COVERAGE))
             self.assertEqual(5, mut.stat(BamMutator.STAT_SNV_COUNT))
@@ -56,7 +56,7 @@ class TestBamMutator(unittest.TestCase):
                 diff_file=out_diff_file
             )
             
-            self.assertEqual(15, mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
+            self.assertEqual(19, mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
             self.assertEqual(7, mut.stat(BamMutator.STAT_OVERLAPPING_COUNT))
             self.assertEqual(3, mut.stat(BamMutator.STAT_MAX_COVERAGE))
             self.assertEqual(4, mut.stat(BamMutator.STAT_SNV_COUNT))
@@ -81,14 +81,14 @@ class TestBamMutator(unittest.TestCase):
                 diff_file=diff_file,
                 out_bam_filename=self.UNMUT_DIR_PATH + 'output_01.bam'
             )
-            self.assertEqual(15, mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
+            self.assertEqual(16, mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
             self.assertEqual(11, mut.stat(BamMutator.STAT_OVERLAPPING_COUNT))
             self.assertEqual(5, mut.stat(BamMutator.STAT_MAX_COVERAGE))
             self.assertEqual(12, mut.stat(BamMutator.STAT_MUT_COUNT))
             self.assertEqual(4, mut.stat(BamMutator.STAT_DIFF_COUNT))
             
             bam2sam(self.UNMUT_DIR_PATH + 'output_01.bam', self.UNMUT_DIR_PATH + 'output_01.sam')
-            is_equal = filecmp.cmp(self.UNMUT_DIR_PATH + 'desired.sam', self.UNMUT_DIR_PATH + 'output_01.sam')
+            is_equal = filecmp.cmp(self.UNMUT_DIR_PATH + 'desired_01_02.sam', self.UNMUT_DIR_PATH + 'output_01.sam')
             self.assertEqual(True, is_equal)
     
     def test_unmutate_02(self):
@@ -102,14 +102,14 @@ class TestBamMutator(unittest.TestCase):
                 diff_file=diff_file,
                 out_bam_filename=self.UNMUT_DIR_PATH + 'output_02.bam'
             )
-            self.assertEqual(15, mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
+            self.assertEqual(16, mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
             self.assertEqual(6, mut.stat(BamMutator.STAT_OVERLAPPING_COUNT))
             self.assertEqual(3, mut.stat(BamMutator.STAT_MAX_COVERAGE))
             self.assertEqual(7, mut.stat(BamMutator.STAT_MUT_COUNT))
             self.assertEqual(3, mut.stat(BamMutator.STAT_DIFF_COUNT))
             
             bam2sam(self.UNMUT_DIR_PATH + 'output_02.bam', self.UNMUT_DIR_PATH + 'output_02.sam')
-            is_equal = filecmp.cmp(self.UNMUT_DIR_PATH + 'desired.sam', self.UNMUT_DIR_PATH + 'output_02.sam')
+            is_equal = filecmp.cmp(self.UNMUT_DIR_PATH + 'desired_01_02.sam', self.UNMUT_DIR_PATH + 'output_02.sam')
             self.assertEqual(True, is_equal)
     
     def test_unmutate_03(self):
@@ -139,6 +139,7 @@ class TestBamMutator(unittest.TestCase):
 
 
 if __name__ == '__main__':
+    # TODO unmutate cases with unmapped_only and include_unmapped options
     # TODO more unmutate slice tests
     # TODO test cases with alignments of different length
     # TODO test cases with more references (chromosomes)

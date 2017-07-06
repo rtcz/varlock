@@ -5,7 +5,8 @@ import numpy as np
 from varlock.common import *
 from varlock.diff import Diff
 from varlock.fasta_index import FastaIndex
-from varlock.iterator import BamIterator, DiffIterator, VacIterator
+from varlock.iterator import DiffIterator, VacIterator, UnmappedOnlyBamIterator, UnmappedBamIterator, BaiBamIterator
+from varlock.iterator import FullBamIterator
 from varlock.po import SnvAlignment
 
 
@@ -57,9 +58,15 @@ class Mutator:
         :param alignment: pysam.AlignedSegment
         :return:
         """
-        if self.prev_alignment is not None and alignment.reference_start < self.prev_alignment.reference_start:
+        are_placed = self.prev_alignment is not None and is_placed_alignment(
+            alignment) and is_placed_alignment(self.prev_alignment)
+        # FIXME is case of placed after unplaced alignment valid ?
+        if are_placed and alignment.reference_start < self.prev_alignment.reference_start:
             # safety check
-            raise IndexError('Unordered write: %s after %s' % (alignment, self.prev_alignment))
+            raise IndexError('Unordered write: %s after %s' % (
+                self.alignment2str(alignment),
+                self.alignment2str(self.prev_alignment)
+            ))
         
         bam_file.write(alignment)
         self.alignment_counter += 1
@@ -121,14 +128,14 @@ class Mutator:
             start_index = self.fai.resolve_start_index(start_ref_name, start_ref_pos)
             end_index = self.fai.resolve_end_index(end_ref_name, end_ref_pos)
             
-            diff_range = self.fai.index2pos(diff_start_index) + self.fai.index2pos(diff_end_index)
+            diff_range = self.fai.index2pos(diff_start_index) + self.fai.index2pos(diff_end_index)  # type: tuple
             
             if start_index < diff_start_index:
-                args = self.fai.index2pos(start_index) + diff_range
+                args = self.fai.index2pos(start_index) + diff_range  # type: tuple
                 # noinspection PyStringFormat
                 raise ValueError("Start position [%s, %d] must be within DIFF range [%s, %d]:[%s, %d]." % args)
             if end_index > diff_end_index:
-                args = self.fai.index2pos(end_index) + diff_range
+                args = self.fai.index2pos(end_index) + diff_range  # type: tuple
                 # noinspection PyStringFormat
                 raise ValueError("End position [%s, %d] must be within DIFF range [%s, %d]:[%s, %d]." % args)
             return start_index, end_index
@@ -159,17 +166,21 @@ class Mutator:
             start_ref_name: str = None,
             start_ref_pos: int = None,
             end_ref_name: str = None,
-            end_ref_pos: int = None
+            end_ref_pos: int = None,
+            include_unmapped: bool = False,
+            unmapped_only: bool = False
     ):
         """
         Unmutate BAM file in range specified by DIFF file or by parameters.
         :param diff_file: binary file
         :param out_bam_file: pysam.AlignmentFile
-        :param start_ref_name:
-        :param start_ref_pos:
-        :param end_ref_name:
-        :param end_ref_pos:
-        :return:
+        :param start_ref_name: inclusive
+        :param start_ref_pos: 0-based, inclusive
+        :param end_ref_name: inclusive
+        :param end_ref_pos: 0-based, inclusive
+        :param include_unmapped: Include all unplaced unmapped reads.
+        :param unmapped_only: Only unmapped reads - both placed and unplaced.
+         Overrides other parameters.
         """
         self.__init_counters()
         
@@ -183,9 +194,15 @@ class Mutator:
         )
         
         alignment_queue = []
-        bam_iter = BamIterator(self.bam_file, start_index, end_index)
-        alignment = next(bam_iter)
         
+        if unmapped_only:
+            bam_iter = UnmappedOnlyBamIterator(self.bam_file)
+        elif include_unmapped:
+            bam_iter = UnmappedBamIterator(self.bam_file, start_index, end_index)
+        else:
+            bam_iter = BaiBamIterator(self.bam_file, start_index, end_index)
+        
+        alignment = next(bam_iter)
         diff_iter = DiffIterator(diff_file, self.fai, start_index, end_index)
         diff = next(diff_iter)
         
@@ -266,16 +283,19 @@ class Mutator:
                 snv_alignment.pos = None
     
     def alignment2str(self, alignment):
-        ref_name = alignment.reference_name
-        ref_start = alignment.reference_start
-        return '#%d %s:%d' % (self.fai.pos2index(ref_name, ref_start), ref_name, ref_start)
+        if is_placed_alignment(alignment):
+            ref_name = alignment.reference_name
+            ref_start = alignment.reference_start
+            # unplaced alignment
+            return '#%d %s:%d' % (self.fai.pos2index(ref_name, ref_start), ref_name, ref_start)
+        else:
+            return alignment.query_sequence
     
     def mutate(self, in_vac_file, out_bam_file, out_diff_file):
         """
         Mutate BAM file SNVs.
         :param in_vac_file: binary file
         input variant allele count file
-        input bam file
         :param out_bam_file: pysam.AlignmentFile
         output bam file
         :param out_diff_file: binary file
@@ -285,7 +305,7 @@ class Mutator:
         
         alignment_queue = []
         
-        bam_iter = BamIterator(self.bam_file)
+        bam_iter = FullBamIterator(self.bam_file)
         alignment = next(bam_iter)
         
         vac_iter = VacIterator(in_vac_file, self.fai)
@@ -468,7 +488,8 @@ class Mutator:
         """
         tmp_alignment_queue = alignment_queue[:]
         for snv_alignment in tmp_alignment_queue:
-            if not self.__is_before_index(snv_alignment.alignment, index):
+            is_mapped = not snv_alignment.alignment.is_unmapped
+            if is_mapped and not self.__is_before_index(snv_alignment.alignment, index):
                 # break to keep alignments in order
                 # otherwise shorter alignment could be written before longer alignment
                 break
