@@ -51,7 +51,8 @@ def main():
                     open(parsed_args.pub_key, 'r') as pub_key_file:
                 rsa_dec_key = RSA.importKey(key_file.read(), passphrase=parsed_args.password)
                 rsa_enc_key = RSA.importKey(pub_key_file.read())
- 
+                
+                # TODO options: unmapped_only, include_unmapped
                 locker.reencrypt(
                     rsa_dec_key=rsa_dec_key,
                     rsa_enc_key=rsa_enc_key,
@@ -124,7 +125,8 @@ def parse_decrypt_args(args):
     
     optional = parser.add_argument_group("Optional")
     optional.add_argument('-p', '--password', type=str, help='private key password')
-    range_help = "range in one of following formats: 'chr1', 'chr1:chr2', 'chr1:10000:20000', 'chr1:10000:chr2:20000'"
+    region_formats = "'chr1', 'chr1:chr2', 'chr1:10000:20000', 'chr1:10000:chr2:20000'"
+    range_help = "range in one of following formats: " + region_formats + "; positions are 1-based"
     optional.add_argument('-r', '--range', type=is_sam_range, help=range_help, default=(None, None, None, None))
     optional.add_argument('-i', '--include_unmapped', action='store_false', help="include all unplaced unmapped reads")
     optional.add_argument('-u', '--unmapped_only', action='store_false', help="only unmapped reads")
@@ -143,7 +145,8 @@ def parse_reencrypt_args(args):
     
     optional = parser.add_argument_group("Optional")
     optional.add_argument('-p', '--password', type=str, help='private key password')
-    range_help = "range in one of following formats: 'chr1', 'chr1:chr2', 'chr1:10000:20000', 'chr1:10000:chr2:20000'"
+    region_formats = "'chr1', 'chr1:chr2', 'chr1:10000:20000', 'chr1:10000:chr2:20000'"
+    range_help = "range in one of following formats: " + region_formats + "; positions are 1-based"
     optional.add_argument('-r', '--range', type=is_sam_range, help=range_help, default=(None, None, None, None))
     optional.add_argument('-v', '--verbose', action='store_true', help="explain what is being done")
     
@@ -164,7 +167,12 @@ def parse_vac_args(args):
     return parser.parse_args(args)
 
 
-def parse_sam_range(value):
+def parse_sam_range(value: str):
+    """
+    1-based positions are converted to 0-based
+    :param value: range string
+    :return: range tuple
+    """
     start_ref_pos = None
     end_ref_pos = None
     
@@ -180,15 +188,15 @@ def parse_sam_range(value):
     elif len(range_args) == 3:
         # chr1:10000:20000
         start_ref_name = range_args[0]
-        start_ref_pos = int(range_args[1])
+        start_ref_pos = int(range_args[1]) - 1
         end_ref_name = range_args[0]
-        end_ref_pos = int(range_args[2])
+        end_ref_pos = int(range_args[2]) - 1
     elif len(range_args) == 4:
         # chr1:10000:chr2:20000
         start_ref_name = range_args[0]
-        start_ref_pos = int(range_args[1])
+        start_ref_pos = int(range_args[1]) - 1
         end_ref_name = range_args[2]
-        end_ref_pos = int(range_args[3])
+        end_ref_pos = int(range_args[3]) - 1
     else:
         raise ValueError("Invalid range format")
     

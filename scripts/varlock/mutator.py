@@ -78,10 +78,10 @@ class Mutator:
     def __init_counters(self):
         self.alignment_counter = 0  # written alignments
         self.diff_counter = 0  # processed diff records
-        self.mut_counter = 0  # mutations pre alignment
+        self.mut_counter = 0  # all mutations
         self.snv_counter = 0  # read vac records (SNVs)
         
-        self.overlapping_counter = 0  # overlapping alignments
+        self.mut_alignment_counter = 0  # mutated alignments
         self.max_coverage = 0  # maximum alignments overlapping single SNV
     
     def resolve_diff_range(
@@ -181,6 +181,9 @@ class Mutator:
         :param include_unmapped: Include all unplaced unmapped reads.
         :param unmapped_only: Only unmapped reads - both placed and unplaced.
          Overrides other parameters.
+         
+         When range is supplied partialy covered reads are also included,
+         but only snv's within range are unmutated.
         """
         self.__init_counters()
         
@@ -260,13 +263,13 @@ class Mutator:
                 elif self.verbose:
                     print('last diff: %s' % prev_diff)
             
-            else:  # alignment is overlapping diff
+            else:  # alignment is covering diff position
                 # find sequence position of vac
                 seq_pos = ref_pos2seq_pos(alignment, diff.ref_pos)
                 alignment_queue.append(SnvAlignment(alignment, seq_pos))
                 alignment = next(bam_iter)
                 
-                self.overlapping_counter += 1
+                self.mut_alignment_counter += 1
                 # noinspection PyAttributeOutsideInit
                 # TODO this is not the real coverage
                 self.max_coverage = max(len(alignment_queue), self.max_coverage)
@@ -370,13 +373,13 @@ class Mutator:
                 elif self.verbose:
                     print('last vac: %s' % prev_vac)
             
-            else:  # alignment is overlapping vac
+            else:  # alignment is covering vac position
                 # find sequence position of vac
                 seq_pos = ref_pos2seq_pos(alignment, vac.ref_pos)
                 alignment_queue.append(SnvAlignment(alignment, seq_pos))
                 alignment = next(bam_iter)
                 
-                self.overlapping_counter += 1
+                self.mut_alignment_counter += 1
                 # noinspection PyAttributeOutsideInit
                 # TODO this is not the real coverage
                 self.max_coverage = max(len(alignment_queue), self.max_coverage)

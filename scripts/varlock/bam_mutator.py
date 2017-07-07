@@ -7,11 +7,23 @@ from .mutator import Mutator
 
 
 class BamMutator:
+    # written alignments
     STAT_ALIGNMENT_COUNT = 'alignment_count'
-    STAT_OVERLAPPING_COUNT = 'overlapping_count'
+    
+    # mutated alignments
+    # number of alignments covering vac / diff position
+    STAT_MUT_ALIGNMENT_COUNT = 'mut_alignment_count'
+    
+    # maximum alignments overlapping single SNV
     STAT_MAX_COVERAGE = 'max_coverage'
+    
+    # number of diff records read (SNVs)
     STAT_SNV_COUNT = 'snv_count'
+    
+    # sum of bases mutated per alignment
     STAT_MUT_COUNT = 'mut_count'
+    
+    # number of diff records written / read
     STAT_DIFF_COUNT = 'diff_count'
     
     def __init__(self, rnd=random.SystemRandom(), verbose=False):
@@ -35,6 +47,12 @@ class BamMutator:
             mut_bam_filename: str,
             diff_file
     ):
+        """
+        :param bam_filename:
+        :param vac_filename:
+        :param mut_bam_filename:
+        :param diff_file:
+        """
         self._stats = {}
         with open_bam(bam_filename, 'rb') as sam_file:
             mut = Mutator(sam_file, rnd=self.rnd, verbose=self.verbose)
@@ -56,7 +74,7 @@ class BamMutator:
             
             self._stats = {
                 self.STAT_ALIGNMENT_COUNT: mut.alignment_counter,
-                self.STAT_OVERLAPPING_COUNT: mut.overlapping_counter,
+                self.STAT_MUT_ALIGNMENT_COUNT: mut.mut_alignment_counter,
                 self.STAT_MAX_COVERAGE: mut.max_coverage,
                 self.STAT_SNV_COUNT: mut.snv_counter,
                 self.STAT_MUT_COUNT: mut.mut_counter,
@@ -90,6 +108,17 @@ class BamMutator:
             include_unmapped: bool = False,
             unmapped_only: bool = False
     ):
+        """
+        :param bam_filename:
+        :param diff_file:
+        :param out_bam_filename:
+        :param start_ref_name: inclusive
+        :param start_ref_pos: 0-based, inclusive
+        :param end_ref_name: inclusive
+        :param end_ref_pos: 0-based, inclusive
+        :param include_unmapped:
+        :param unmapped_only:
+        """
         self._stats = {}
         
         with open_bam(bam_filename, 'rb') as sam_file:
@@ -110,7 +139,7 @@ class BamMutator:
             
             self._stats = {
                 self.STAT_ALIGNMENT_COUNT: mut.alignment_counter,
-                self.STAT_OVERLAPPING_COUNT: mut.overlapping_counter,
+                self.STAT_MUT_ALIGNMENT_COUNT: mut.mut_alignment_counter,
                 self.STAT_MAX_COVERAGE: mut.max_coverage,
                 self.STAT_MUT_COUNT: mut.mut_counter,
                 self.STAT_DIFF_COUNT: mut.diff_counter

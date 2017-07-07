@@ -145,6 +145,7 @@ class UnmappedBamIterator:
         
         Iterator includes all unplaced unmapped reads. BAM index ensures that BAM is sorted
         and is needed to resolve range.
+        Iterator assumes that unplaced alignment can be anywhere in BAM file.
         """
         assert start_index <= end_index
         
@@ -167,17 +168,17 @@ class UnmappedBamIterator:
         try:
             while True:
                 alignment = next(self.iterator)
-                if not is_placed_alignment(alignment):
-                    # unplaced unmapped read
+                if alignment.is_unmapped:
                     return alignment
                 
                 curr_ref_id = self.fai.ref_id(alignment.reference_name)
-                curr_ref_pos = alignment.reference_start
-                if curr_ref_id < self.start_ref_id and curr_ref_pos < self.start_ref_pos:
+                if curr_ref_id < self.start_ref_id or (
+                                curr_ref_id == self.start_ref_id and alignment.reference_end <= self.start_ref_pos):
                     # before range
                     continue
                 
-                if curr_ref_id > self.end_ref_id and self.end_ref_pos > curr_ref_pos:
+                if curr_ref_id > self.end_ref_id or (
+                                curr_ref_id == self.end_ref_id and alignment.reference_start > self.end_ref_pos):
                     # after range
                     continue
                 
