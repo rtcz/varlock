@@ -1,3 +1,5 @@
+import numpy as np
+
 import binascii
 import gzip
 import hashlib
@@ -6,6 +8,47 @@ import pysam
 
 BASES = ("A", "T", "G", "C")
 UNKNOWN_BASE = "N"
+
+
+def create_mut_map(alt_ac, ref_ac, rnd):
+    """
+    Creates mutation mapping for base pileup column.
+    pileup base -> mutated base
+    :param alt_ac: list of DNA bases frequencies
+    :param ref_ac:
+    :param rnd: random number generator
+    :return: dict which is specific mutation mapping
+    """
+    ref_bases = list(BASES)
+    alt_bases = list(BASES)
+    ref_ac = list(ref_ac)
+    
+    # add random value to distinguish tied values
+    alt_ac = [ac + rnd.random() for ac in alt_ac]
+    
+    # init mutation mapping
+    mut_map = dict.fromkeys(BASES)
+    # unknown base is always mapped to itself
+    mut_map[UNKNOWN_BASE] = UNKNOWN_BASE
+    # map bases but skip last unmapped base
+    for i in range(len(BASES) - 1):
+        # draw ref base with multinomial probability
+        ref_base_id = multi_random(ref_ac, rnd)
+        # draw most abundant base from alt alleles
+        alt_base_id = np.argmax(alt_ac)  # type: int
+        # add mapping
+        mut_map[alt_bases[alt_base_id]] = ref_bases[ref_base_id]
+        
+        # delete processed items
+        del ref_bases[ref_base_id]
+        del ref_ac[ref_base_id]
+        del alt_bases[alt_base_id]
+        del alt_ac[alt_base_id]
+    
+    # last base mapping is obvious
+    mut_map[alt_bases[0]] = ref_bases[0]
+    
+    return mut_map
 
 
 def multi_random(p_dist, rnd):
@@ -37,6 +80,24 @@ def multi_random(p_dist, rnd):
     
     raise ValueError(
         "sum of probability distribution %d must be greater then the probability value %d" % (sum(p_dist), p_value))
+
+
+def count_bases(base_pileup: list):
+    """
+    Count allele count in base pileup column.
+    :param base_pileup: list of bases
+    :return: list of DNA base frequencies
+    """
+    alt_ac = [0] * 4
+    for base in base_pileup:
+        # skip unknown base
+        if base != UNKNOWN_BASE:
+            try:
+                alt_ac[BASES.index(base)] += 1
+            except KeyError:
+                raise ValueError("Illegal DNA base %s" % base)
+    
+    return alt_ac
 
 
 def strip_chr(value):

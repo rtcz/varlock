@@ -1,8 +1,7 @@
 import random
-
-import numpy as np
 import os
 
+from varlock.cigar import Cigar
 from varlock.common import *
 from varlock.diff import Diff
 from varlock.fasta_index import FastaIndex
@@ -12,17 +11,6 @@ from varlock.po import SnvAlignment
 
 
 class Mutator:
-    CIGAR_MATCH = 0  # M
-    CIGAR_INS = 1  # I
-    CIGAR_DEL = 2  # D
-    CIGAR_REF_SKIP = 3  # N
-    CIGAR_SOFT_CLIP = 4  # S
-    CIGAR_HARD_CLIP = 5  # H
-    CIGAR_PAD = 6  # P
-    CIGAR_EQUAL = 7  # E
-    CIGAR_DIFF = 8  # X
-    NM_TAG = 9
-    
     def __init__(
             self,
             bam_file,
@@ -407,9 +395,9 @@ class Mutator:
         is_mutated = False
         # get pileup of bases from alignments at vac mapping position
         base_pileup = get_base_pileup(alignment_queue)
-        alt_ac = self.count_bases(base_pileup)
+        alt_ac = count_bases(base_pileup)
         
-        mut_map = self.create_mut_map(alt_ac=alt_ac, ref_ac=vac.ac, rnd=self.rnd)
+        mut_map = create_mut_map(alt_ac=alt_ac, ref_ac=vac.ac, rnd=self.rnd)
         
         for snv_alignment in alignment_queue:
             if snv_alignment.pos is not None:
@@ -446,7 +434,7 @@ class Mutator:
             self.mut_counter += 1
             is_mutated = True
             set_base(alignment, seq_pos, mut_base)
-            self.check_cigar_str(alignment, seq_pos)
+            Cigar.validate(alignment, seq_pos)
         
         return is_mutated
     
@@ -454,44 +442,6 @@ class Mutator:
         self.diff_counter += 1
         mut_tuple = (mut_map['A'], mut_map['T'], mut_map['G'], mut_map['C'])
         Diff.write_record(out_diff_file, index, mut_tuple)
-    
-    @classmethod
-    def check_cigar_str(cls, alignment, snv_pos):
-        """
-        Validate cigar operation at SNV position.
-        TODO: Update cigar and quality strings.
-        :param alignment: pysam.AlignedSegment
-        :param snv_pos: position of SNV in alignment sequence
-        """
-        # start at -1 to work with 0-based position
-        seq_pos = -1
-        for cig_op_id, cig_op_len in alignment.cigartuples:
-            if cig_op_id == cls.CIGAR_MATCH or cig_op_id == cls.CIGAR_INS:
-                # match and insert are present in aligned sequence
-                tmp_seq_pos = seq_pos + cig_op_len
-            elif cig_op_id == cls.CIGAR_DEL:
-                # deletion is not present in aligned sequence
-                continue
-            else:
-                raise ValueError("Unsupported CIGAR operation %d" % cig_op_id)
-            
-            if tmp_seq_pos < snv_pos:
-                # curr_seq_pos has not reached snv_seq_pos
-                seq_pos = tmp_seq_pos
-            else:
-                # cigar segment covers snv position, it must be a match
-                if cig_op_id != cls.CIGAR_MATCH:
-                    # snv is not matched
-                    # TODO update mapping quality
-                    # TODO update cigar string
-                    
-                    print("snv_pos %d" % snv_pos)
-                    print("seq_pos %d" % seq_pos)
-                    print(alignment.cigarstring)
-                    print(alignment.get_aligned_pairs(matches_only=False, with_seq=False))
-                    
-                    raise ValueError("Unsupported CIGAR operation %d" % cig_op_id)
-                break
     
     def __write_done(self, out_bam_file, alignment_queue, index):
         """
@@ -522,67 +472,8 @@ class Mutator:
         :return:
         """
         for snv_alignment in alignment_queue:
-            # TODO optimalize, skip when ref_pos is greater than alignment reference end
+            # TODO optimize, skip when ref_pos is greater than alignment reference end
             snv_pos = ref_pos2seq_pos(snv_alignment.alignment, ref_pos)
             if snv_pos is not None:
                 # alignment is mapped at another new_snv position
                 snv_alignment.pos = snv_pos
-    
-    @classmethod
-    def count_bases(cls, base_pileup):
-        """
-        Count allele count in base pileup column.
-        :param base_pileup: list of base occurences
-        :return: list of DNA base frequencies
-        """
-        alt_ac = [0] * 4
-        for base in base_pileup:
-            # skip unknown base
-            if base != UNKNOWN_BASE:
-                try:
-                    alt_ac[BASES.index(base)] += 1
-                except KeyError:
-                    raise ValueError("Illegal DNA base %s" % base)
-        
-        return alt_ac
-    
-    @classmethod
-    def create_mut_map(cls, alt_ac, ref_ac, rnd):
-        """
-        Creates mutation mapping for base pileup column.
-        pileup base -> mutated base
-        :param alt_ac: list of DNA bases frequencies
-        :param ref_ac:
-        :param rnd: random number generator
-        :return: dict which is specific mutation mapping
-        """
-        ref_bases = list(BASES)
-        alt_bases = list(BASES)
-        ref_ac = list(ref_ac)
-        
-        # add random value to distinguish tied values
-        alt_ac = [ac + rnd.random() for ac in alt_ac]
-        
-        # init mutation mapping
-        mut_map = dict.fromkeys(BASES)
-        # unknown base is always mapped to itself
-        mut_map[UNKNOWN_BASE] = UNKNOWN_BASE
-        # map bases but skip last unmapped base
-        for i in range(len(BASES) - 1):
-            # draw ref base with multinomial probability
-            ref_base_id = multi_random(ref_ac, rnd)
-            # draw most abundant base from alt alleles
-            alt_base_id = np.argmax(alt_ac)  # type: int
-            # add mapping
-            mut_map[alt_bases[alt_base_id]] = ref_bases[ref_base_id]
-            
-            # delete processed items
-            del ref_bases[ref_base_id]
-            del ref_ac[ref_base_id]
-            del alt_bases[alt_base_id]
-            del alt_ac[alt_base_id]
-        
-        # last base mapping is obvious
-        mut_map[alt_bases[0]] = ref_bases[0]
-        
-        return mut_map
