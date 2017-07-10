@@ -19,12 +19,11 @@ class Varlocker:
     AES_KEY_LENGTH = 32
     
     @staticmethod
-    def create_vac(bam_filename: str, vcf_filename: str, out_vac_filename: str, verbose=False):
+    def create_vac(bam_filename: str, vcf_filename: str, out_vac_filename: str):
         """
         :param bam_filename:
         :param vcf_filename:
         :param out_vac_filename:
-        :param verbose:
         :return:
         """
         with open_vcf(vcf_filename, 'rt') as vcf_file, \
@@ -151,6 +150,8 @@ class Varlocker:
             start_ref_pos: int = None,
             end_ref_name: str = None,
             end_ref_pos: int = None,
+            include_unmapped: bool = False,
+            unmapped_only: bool = False,
             verbose: bool = True
     ):
         """
@@ -166,6 +167,9 @@ class Varlocker:
         :param start_ref_pos: 0-based, inclusive
         :param end_ref_name: inclusive
         :param end_ref_pos: 0-based, inclusive
+        :param include_unmapped: Include all unplaced unmapped reads.
+        :param unmapped_only: Only unmapped reads - both placed and unplaced.
+         Overrides other parameters.
         :param verbose:
         """
         with open_bam(bam_filename, 'rb') as sam_file, \
@@ -192,9 +196,16 @@ class Varlocker:
                 end_ref_name,
                 end_ref_pos
             )
-            # slice diff
-            with Diff.slice(diff_file, start_index, end_index) as sliced_diff, \
-                    open(out_enc_diff_filename, 'wb') as out_enc_diff_file:
+            
+            if unmapped_only:
+                new_diff = Diff.truncate(diff_file)
+            elif include_unmapped:
+                new_diff = Diff.slice(diff_file, start_index, end_index)
+            else:
+                # mapped only
+                new_diff = Diff.slice(diff_file, start_index, end_index, False)
+            
+            with new_diff, open(out_enc_diff_filename, 'wb') as out_enc_diff_file:
                 # generate new AES key
                 aes_key = os.urandom(cls.AES_KEY_LENGTH)
                 # store encrypted AES key in encrypted DIFF
@@ -206,4 +217,4 @@ class Varlocker:
                 
                 # noinspection PyTypeChecker
                 out_aes = vrl.FileAES(aes_key)
-                out_aes.encrypt(sliced_diff, out_enc_diff_file)
+                out_aes.encrypt(new_diff, out_enc_diff_file)

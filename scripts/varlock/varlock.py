@@ -52,7 +52,6 @@ def main():
                 rsa_dec_key = RSA.importKey(key_file.read(), passphrase=parsed_args.password)
                 rsa_enc_key = RSA.importKey(pub_key_file.read())
                 
-                # TODO options: unmapped_only, include_unmapped
                 locker.reencrypt(
                     rsa_dec_key=rsa_dec_key,
                     rsa_enc_key=rsa_enc_key,
@@ -63,6 +62,8 @@ def main():
                     start_ref_pos=parsed_args.range[1],
                     end_ref_name=parsed_args.range[2],
                     end_ref_pos=parsed_args.range[3],
+                    include_unmapped=parsed_args.include_unmapped,
+                    unmapped_only=parsed_args.unmapped_only,
                     verbose=True
                 )
         

@@ -1,11 +1,12 @@
 import random
 
 import numpy as np
+import os
 
 from varlock.common import *
 from varlock.diff import Diff
 from varlock.fasta_index import FastaIndex
-from varlock.iterator import DiffIterator, VacIterator, UnmappedOnlyBamIterator, UnmappedBamIterator, BaiBamIterator
+from varlock.iterator import DiffIterator, VacIterator, UnmappedBamIterator, RangedBamIterator, MappedBamIterator
 from varlock.iterator import FullBamIterator
 from varlock.po import SnvAlignment
 
@@ -22,12 +23,19 @@ class Mutator:
     CIGAR_DIFF = 8  # X
     NM_TAG = 9
     
-    def __init__(self, bam_file, rnd=random.SystemRandom(), verbose=False):
+    def __init__(
+            self,
+            bam_file,
+            rnd=random.SystemRandom(),
+            urandom: callable = lambda size: os.urandom(size),
+            verbose: bool = False
+    ):
         """
         :param rnd: (secure) random generator
         :param verbose:
         """
         self.rnd = rnd
+        self.urandom = urandom
         self.verbose = verbose
         self.fai = FastaIndex(bam_file)
         self.bam_file = bam_file
@@ -92,7 +100,7 @@ class Mutator:
             end_ref_name,
             end_ref_pos
     ):
-        checksum, diff_start_index, diff_end_index = Diff.read_header(diff_file)
+        checksum, diff_start_index, diff_end_index, secret = Diff.read_header(diff_file)
         self.validate_checksum(checksum)
         
         return self.resolve_range(
@@ -199,11 +207,12 @@ class Mutator:
         alignment_queue = []
         
         if unmapped_only:
-            bam_iter = UnmappedOnlyBamIterator(self.bam_file)
+            bam_iter = UnmappedBamIterator(self.bam_file)
         elif include_unmapped:
-            bam_iter = UnmappedBamIterator(self.bam_file, start_index, end_index)
+            bam_iter = RangedBamIterator(self.bam_file, start_index, end_index)
         else:
-            bam_iter = BaiBamIterator(self.bam_file, start_index, end_index)
+            # mapped only
+            bam_iter = MappedBamIterator(self.bam_file, start_index, end_index)
         
         alignment = next(bam_iter)
         diff_iter = DiffIterator(diff_file, self.fai, start_index, end_index)
@@ -321,7 +330,8 @@ class Mutator:
         Diff.write_header(
             diff_file=out_diff_file,
             start_index=self.fai.first_index(),
-            end_index=self.fai.last_index()
+            end_index=self.fai.last_index(),
+            secret=self.urandom(Diff.SECRET_SIZE)
         )
         while True:
             if vac is None or alignment is None:
@@ -415,6 +425,8 @@ class Mutator:
                 index=vac.index,
                 mut_map=mut_map
             )
+        
+        return is_mutated
     
     def __mutate_alignment(self, alignment, seq_pos, mut_map):
         """

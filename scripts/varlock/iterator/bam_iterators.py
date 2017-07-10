@@ -2,14 +2,14 @@ from ..common import is_placed_alignment
 from ..fasta_index import FastaIndex
 
 
-class BaiBamIterator:
+class MappedBamIterator:
     def __init__(self, bam_file, start_index=None, end_index=None):
         """
         :param bam_file: pysam.AlignmentFile
         :param start_index: iterate from 0-based index inclusive
         :param end_index: iterate to 0-based index inclusive
         
-        Iterates over indexed reads only. Placed unmapped reads are included.
+        Iterates over mapped reads only.
         """
         if start_index is end_index is not None:
             assert start_index <= end_index
@@ -85,6 +85,8 @@ class BaiBamIterator:
     def __next__(self):
         try:
             alignment = next(self.iterator)
+            while alignment.is_unmapped:
+                alignment = next(self.iterator)
             self.counter += 1
             return alignment
         except StopIteration:
@@ -95,7 +97,7 @@ class BaiBamIterator:
                 return next(self)
 
 
-class UnmappedOnlyBamIterator:
+class UnmappedBamIterator:
     def __init__(self, bam_file):
         """
         :param bam_file: pysam.AlignmentFile
@@ -122,7 +124,7 @@ class UnmappedOnlyBamIterator:
 class FullBamIterator:
     def __init__(self, bam_file):
         """
-        Iterates over all reads in BAM file.
+        Iterates over all reads within BAM file.
         """
         self.iterator = bam_file.fetch(until_eof=True)
     
@@ -136,15 +138,15 @@ class FullBamIterator:
             return None
 
 
-class UnmappedBamIterator:
+class RangedBamIterator:
     def __init__(self, bam_file, start_index, end_index):
         """
         :param bam_file: pysam.AlignmentFile
         :param start_index: iterate from 0-based index inclusive
         :param end_index: iterate to 0-based index inclusive
         
-        Iterator includes all unplaced unmapped reads. BAM index ensures that BAM is sorted
-        and is needed to resolve range.
+        Iterator includes mapped reads within the range and all unmapped reads.
+        BAM index ensures that BAM is sorted and is needed to resolve range.
         Iterator assumes that unplaced alignment can be anywhere in BAM file.
         """
         assert start_index <= end_index

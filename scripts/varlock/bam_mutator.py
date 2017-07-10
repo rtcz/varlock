@@ -1,4 +1,5 @@
 import random
+import os
 
 from .bam import open_bam, mut_header, unmut_header
 from .common import calc_checksum, bin2hex
@@ -26,8 +27,14 @@ class BamMutator:
     # number of diff records written / read
     STAT_DIFF_COUNT = 'diff_count'
     
-    def __init__(self, rnd=random.SystemRandom(), verbose=False):
+    def __init__(
+            self,
+            rnd=random.SystemRandom(),
+            urandom: callable = lambda size: os.urandom(size),
+            verbose: bool = False
+    ):
         self.rnd = rnd
+        self.urandom = urandom
         self.verbose = verbose
         self._stats = {}
     
@@ -55,7 +62,7 @@ class BamMutator:
         """
         self._stats = {}
         with open_bam(bam_filename, 'rb') as sam_file:
-            mut = Mutator(sam_file, rnd=self.rnd, verbose=self.verbose)
+            mut = Mutator(sam_file, rnd=self.rnd, urandom=self.urandom, verbose=self.verbose)
             
             if self.verbose:
                 print("Calculating VAC's checksum")
@@ -92,9 +99,9 @@ class BamMutator:
         # print('after sam ' + bin2hex(calc_checksum(out_bam_file.filename + b'.sam')))
         # exit(0)
         
-        # rewrite checksum placeholder with real checksum
-        Diff.write_checksum(diff_file, calc_checksum(out_bam_file.filename))
+        # rewrite checksum placeholder with mutated BAM checksum
         diff_file.seek(0)
+        Diff.write_checksum(diff_file, calc_checksum(out_bam_file.filename))
     
     def unmutate(
             self,
@@ -123,7 +130,7 @@ class BamMutator:
         
         with open_bam(bam_filename, 'rb') as sam_file:
             header = unmut_header(sam_file.header)
-            mut = Mutator(sam_file, rnd=self.rnd, verbose=self.verbose)
+            mut = Mutator(sam_file, rnd=self.rnd, urandom=self.urandom, verbose=self.verbose)
             
             with open_bam(out_bam_filename, 'wb', header=header) as out_sam_file:
                 mut.unmutate(

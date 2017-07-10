@@ -8,7 +8,7 @@ class DiffIterator:
         assert start_index < end_index
         
         self.diff_file = Diff.slice(diff_file, start_index, end_index)
-        self.diff_file.seek(Diff.HEADER_LENGTH)
+        self.diff_file.seek(Diff.HEADER_SIZE)
         self.fai = fai
         self.start_index = start_index
         self.end_index = end_index

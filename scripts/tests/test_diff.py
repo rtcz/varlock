@@ -17,7 +17,10 @@ class TestDiff(unittest.TestCase):
     
     def test_io(self):
         diff_file = self.__build_diff_file()
-        self.assertTupleEqual((b'0123456789ABCDEF', 2000000000, 3000000000), Diff.read_header(diff_file))
+        self.assertTupleEqual(
+            (b'0123456789ABCDEF', 2000000000, 3000000000, bytes(Diff.SECRET_SIZE)),
+            Diff.read_header(diff_file)
+        )
         self.assertTupleEqual((2830728741, ('C', 'A', 'T', 'G')), Diff.read_record(diff_file))
         self.assertTupleEqual((2830728781, ('G', 'A', 'T', 'C')), Diff.read_record(diff_file))
         self.assertTupleEqual((2830728786, ('T', 'G', 'A', 'C')), Diff.read_record(diff_file))
@@ -48,7 +51,7 @@ class TestDiff(unittest.TestCase):
     
     @staticmethod
     def rec_offset(record_id):
-        return record_id * Diff.RECORD_LENGTH + Diff.HEADER_LENGTH
+        return record_id * Diff.RECORD_SIZE + Diff.HEADER_SIZE
     
     def test_seek_range(self):
         # build diff
@@ -139,7 +142,10 @@ class TestDiff(unittest.TestCase):
         
         # exact range
         sliced_file = Diff.slice(diff_file, 2830728741, 2830728806)
-        self.assertTupleEqual((b'0123456789ABCDEF', 2830728741, 2830728806), Diff.read_header(sliced_file))
+        self.assertTupleEqual(
+            (b'0123456789ABCDEF', 2830728741, 2830728806, bytes(Diff.SECRET_SIZE)),
+            Diff.read_header(sliced_file)
+        )
         self.assertTupleEqual((2830728741, ('C', 'A', 'T', 'G')), Diff.read_record(sliced_file))
         self.assertTupleEqual((2830728781, ('G', 'A', 'T', 'C')), Diff.read_record(sliced_file))
         self.assertTupleEqual((2830728786, ('T', 'G', 'A', 'C')), Diff.read_record(sliced_file))
@@ -148,7 +154,10 @@ class TestDiff(unittest.TestCase):
         
         # outer range
         sliced_file = Diff.slice(diff_file, 2000000000, 3000000000)
-        self.assertTupleEqual((b'0123456789ABCDEF', 2000000000, 3000000000), Diff.read_header(sliced_file))
+        self.assertTupleEqual(
+            (b'0123456789ABCDEF', 2000000000, 3000000000, bytes(Diff.SECRET_SIZE)),
+            Diff.read_header(sliced_file)
+        )
         self.assertTupleEqual((2830728741, ('C', 'A', 'T', 'G')), Diff.read_record(sliced_file))
         self.assertTupleEqual((2830728781, ('G', 'A', 'T', 'C')), Diff.read_record(sliced_file))
         self.assertTupleEqual((2830728786, ('T', 'G', 'A', 'C')), Diff.read_record(sliced_file))
@@ -157,36 +166,54 @@ class TestDiff(unittest.TestCase):
         
         # inner range
         sliced_file = Diff.slice(diff_file, 2830728781, 2830728786)
-        self.assertTupleEqual((b'0123456789ABCDEF', 2830728781, 2830728786), Diff.read_header(sliced_file))
+        self.assertTupleEqual(
+            (b'0123456789ABCDEF', 2830728781, 2830728786, bytes(Diff.SECRET_SIZE)),
+            Diff.read_header(sliced_file)
+        )
         self.assertTupleEqual((2830728781, ('G', 'A', 'T', 'C')), Diff.read_record(sliced_file))
         self.assertTupleEqual((2830728786, ('T', 'G', 'A', 'C')), Diff.read_record(sliced_file))
         self.assertRaises(EOFError, lambda: Diff.read_record(sliced_file))
         
         sliced_file = Diff.slice(diff_file, 2830728780, 2830728790)
-        self.assertTupleEqual((b'0123456789ABCDEF', 2830728780, 2830728790), Diff.read_header(sliced_file))
+        self.assertTupleEqual(
+            (b'0123456789ABCDEF', 2830728780, 2830728790, bytes(Diff.SECRET_SIZE)),
+            Diff.read_header(sliced_file)
+        )
         self.assertTupleEqual((2830728781, ('G', 'A', 'T', 'C')), Diff.read_record(sliced_file))
         self.assertTupleEqual((2830728786, ('T', 'G', 'A', 'C')), Diff.read_record(sliced_file))
         self.assertRaises(EOFError, lambda: Diff.read_record(sliced_file))
         
         # right intersect range
         sliced_file = Diff.slice(diff_file, 2830728806, 3000000000)
-        self.assertTupleEqual((b'0123456789ABCDEF', 2830728806, 3000000000), Diff.read_header(sliced_file))
+        self.assertTupleEqual(
+            (b'0123456789ABCDEF', 2830728806, 3000000000, bytes(Diff.SECRET_SIZE)),
+            Diff.read_header(sliced_file)
+        )
         self.assertTupleEqual((2830728806, ('G', 'C', 'A', 'T')), Diff.read_record(sliced_file))
         self.assertRaises(EOFError, lambda: Diff.read_record(sliced_file))
         
         sliced_file = Diff.slice(diff_file, 2830728790, 3000000000)
-        self.assertTupleEqual((b'0123456789ABCDEF', 2830728790, 3000000000), Diff.read_header(sliced_file))
+        self.assertTupleEqual(
+            (b'0123456789ABCDEF', 2830728790, 3000000000, bytes(Diff.SECRET_SIZE)),
+            Diff.read_header(sliced_file)
+        )
         self.assertTupleEqual((2830728806, ('G', 'C', 'A', 'T')), Diff.read_record(sliced_file))
         self.assertRaises(EOFError, lambda: Diff.read_record(sliced_file))
         
         # left intersect range
         sliced_file = Diff.slice(diff_file, 2000000000, 2830728741)
-        self.assertTupleEqual((b'0123456789ABCDEF', 2000000000, 2830728741), Diff.read_header(sliced_file))
+        self.assertTupleEqual(
+            (b'0123456789ABCDEF', 2000000000, 2830728741, bytes(Diff.SECRET_SIZE)),
+            Diff.read_header(sliced_file)
+        )
         self.assertTupleEqual((2830728741, ('C', 'A', 'T', 'G')), Diff.read_record(sliced_file))
         self.assertRaises(EOFError, lambda: Diff.read_record(sliced_file))
         
         sliced_file = Diff.slice(diff_file, 2000000000, 2830728750)
-        self.assertTupleEqual((b'0123456789ABCDEF', 2000000000, 2830728750), Diff.read_header(sliced_file))
+        self.assertTupleEqual(
+            (b'0123456789ABCDEF', 2000000000, 2830728750, bytes(Diff.SECRET_SIZE)),
+            Diff.read_header(sliced_file)
+        )
         self.assertTupleEqual((2830728741, ('C', 'A', 'T', 'G')), Diff.read_record(sliced_file))
         self.assertRaises(EOFError, lambda: Diff.read_record(sliced_file))
 
