@@ -1,5 +1,6 @@
 import unittest
 import pysam
+from bitarray import bitarray
 
 from varlock import SnvAlignment
 from varlock.cigar import Cigar
@@ -122,6 +123,37 @@ class TestCommon(unittest.TestCase):
     def test_mut_map(self):
         mut_map = create_mut_map(alt_ac=[1, 1, 1, 1], ref_ac=[1, 1, 1, 1], rnd=Random(0))
         self.assertDictEqual({'A': 'G', 'T': 'T', 'G': 'C', 'C': 'A', 'N': 'N'}, mut_map)
+    
+    @staticmethod
+    def bits2bytes(bit_str):
+        return bitarray(bit_str).tobytes()
+        
+    def test_stream_cipher(self):
+        # ATGC is 00011011
+        # homogenic key
+        self.assertEqual('ATGC', stream_cipher('ATGC', self.bits2bytes('00000000')))
+        self.assertEqual('CGTA', stream_cipher('ATGC', self.bits2bytes('11111111')))
+        self.assertEqual('ATGC', stream_cipher('CGTA', self.bits2bytes('11111111')))
+        
+        # heterogenic key
+        self.assertEqual('CAAC', stream_cipher('ATGC', self.bits2bytes('11011000')))
+        self.assertEqual('ATGC', stream_cipher('CAAC', self.bits2bytes('11011000')))
+
+        # unknown base
+        self.assertEqual('CANC', stream_cipher('ATNC', self.bits2bytes('11011000')))
+        self.assertEqual('ATNC', stream_cipher('CANC', self.bits2bytes('11011000')))
+        
+        # longer input
+        self.assertEqual('CAACCANC', stream_cipher('ATGCATNC', self.bits2bytes('1101100011011000')))
+        self.assertEqual('ATGCATNC', stream_cipher('CAACCANC', self.bits2bytes('1101100011011000')))
+        self.assertEqual('CAACCA', stream_cipher('ATGCAT', self.bits2bytes('1101100011011000')))
+        self.assertEqual('ATGCAT', stream_cipher('CAACCA', self.bits2bytes('1101100011011000')))
+        
+        # repeated key
+        self.assertEqual('CAACCANC', stream_cipher('ATGCATNC', self.bits2bytes('11011000')))
+        self.assertEqual('ATGCATNC', stream_cipher('CAACCANC', self.bits2bytes('11011000')))
+        self.assertEqual('CAACCA', stream_cipher('ATGCAT', self.bits2bytes('11011000')))
+        self.assertEqual('ATGCAT', stream_cipher('CAACCA', self.bits2bytes('11011000')))
 
 
 if __name__ == '__main__':

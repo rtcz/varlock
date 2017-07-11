@@ -1,6 +1,8 @@
 import random
 import os
 
+from bitstring import BitArray
+
 from varlock.cigar import Cigar
 from varlock.common import *
 from varlock.diff import Diff
@@ -477,3 +479,4 @@ class Mutator:
             if snv_pos is not None:
                 # alignment is mapped at another new_snv position
                 snv_alignment.pos = snv_pos
+

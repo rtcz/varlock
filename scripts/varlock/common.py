@@ -9,6 +9,38 @@ import pysam
 BASES = ("A", "T", "G", "C")
 UNKNOWN_BASE = "N"
 
+BASE_BITMASKS = [0b11000000, 0b00110000, 0b00001100, 0b00000011]
+BASE2BITS = {'A': 0b00, 'T': 0b01, 'G': 0b10, 'C': 0b11}
+BITS2BASE = {0b00: 'A', 0b01: 'T', 0b10: 'G', 0b11: 'C'}
+
+
+def stream_cipher(seq: str, key: bytes):
+    """
+    :param seq: sequence of DNA bases
+    :param key: key stream
+    :return: cipher stream in form of DNA bases
+    DNA base encryption using stream cipher.
+    Input sequence of DNA bases is encrypted as another sequence of same length.
+    Each 2 bits of the key stream are used to encrypt one base from the sequence.
+    If there is not enough bits of the key stream to encrypt whole sequence, new bits are repeated from start.
+    """
+    mut_seq = ''
+    for i in range(len(seq)):
+        secret_byte = key[int(i / 4) % len(key)]
+        rshift = 6 - (i % 4) * 2
+        
+        if seq[i] == UNKNOWN_BASE:
+            mut_seq += UNKNOWN_BASE
+        else:
+            try:
+                key_bits = (secret_byte & BASE_BITMASKS[i % 4]) >> rshift
+                bits = BASE2BITS[seq[i]] ^ key_bits
+            except KeyError:
+                raise ValueError("Illegal DNA base %s" % seq[i])
+            mut_seq += BITS2BASE[bits]
+    
+    return mut_seq
+
 
 def create_mut_map(alt_ac, ref_ac, rnd):
     """
@@ -85,7 +117,7 @@ def multi_random(p_dist, rnd):
 def count_bases(base_pileup: list):
     """
     Count allele count in base pileup column.
-    :param base_pileup: list of bases
+    :param base_pileup: list of DNA bases
     :return: list of DNA base frequencies
     """
     alt_ac = [0] * 4
