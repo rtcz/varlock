@@ -16,6 +16,7 @@ class TestDiff(unittest.TestCase):
         Diff.write_record(diff_file, 2830728781, ('G', 'A', 'T', 'C'))
         Diff.write_record(diff_file, 2830728786, ('T', 'G', 'A', 'C'))
         Diff.write_record(diff_file, 2830728806, ('G', 'C', 'A', 'T'))
+        diff_file.seek(0)
         return diff_file
     
     def test_io(self):

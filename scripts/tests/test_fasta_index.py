@@ -5,6 +5,8 @@ from varlock import FastaIndex
 
 
 class TestFastaIndex(unittest.TestCase):
+    # TODO test more methods
+    
     @staticmethod
     def create_fai():
         with pysam.AlignmentFile('tests/resources/common/input.sam', "r") as sam_file:

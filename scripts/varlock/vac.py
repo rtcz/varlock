@@ -6,6 +6,7 @@ from .common import *
 
 
 class Vac:
+    # TODO add header with VAC's checksum ?
     """
     Class for handling VAC file. VAC stands for Variant Allele Count.
     VAC is binary file, where each record represent one SNV from VCF.
@@ -46,16 +47,16 @@ class Vac:
         self.verbose = verbose
     
     @staticmethod
-    def is_snp(ref, alt):
+    def is_snp(ref: str, alt: list):
         """
         :param ref: reference string
         :param alt: array of alleles
         :return: True if variant is SNP
         """
-        return len(ref) == 1 and all(len(value) == 1 for value in alt)
+        return len(ref) == 1 and (all((len(value) == 1 and value != '.') for value in alt))
     
     @classmethod
-    def parse_ac(cls, info_list):
+    def parse_ac(cls, info_list: list):
         """
         Parse allele count from VCF INFO column.
         :param info_list: list of VCF INFO key=value strings
@@ -70,7 +71,7 @@ class Vac:
         raise ValueError("VCF record is missing INFO AC attribute")
     
     @staticmethod
-    def parse_an(info_list):
+    def parse_an(info_list: list):
         """
         Parse allele number from VCF INFO column
         :param info_list: list of VCF INFO key=value strings
@@ -84,7 +85,7 @@ class Vac:
         
         raise ValueError("VCF record is missing INFO AN attribute")
     
-    def compact_base_count(self, ac_list):
+    def compact_base_count(self, ac_list: list):
         """
         Compact base counts so each of them is lower than MAX_BASE_COUNT
         :param ac_list:
@@ -92,46 +93,38 @@ class Vac:
         """
         max_count = max(ac_list)
         if max_count > self.MAX_BASE_COUNT:
-            ratio = float(max_count) / self.MAX_BASE_COUNT
-            new_ac_list = np.round(np.array(ac_list) * ratio).astype(int)
+            ratio = self.MAX_BASE_COUNT / float(max_count)
+            new_ac_list = np.round(np.array(ac_list) * ratio).astype(int).tolist()
             if self.verbose:
                 print("compacting base counts from %s to %s" % (ac_list, new_ac_list))
             return new_ac_list
         else:
             return ac_list
     
-    def __snv2vac(self, ref_name, pos, ref, alt_list, info_list, vac_file):
+    def ac_map(self, ref: str, alt_list: list, info_ac: list, info_an: int):
         """
-        :param ref_name: reference sequence name
-        :param pos: 0-based position
+        :param info_an: total allele number
+        :param info_ac: allele count list
         :param ref: reference base
         :param alt_list: list of alternative alleles
-        :param info_list: list of VCF INFO key=value strings
-        :return: byte string
+        :return: allele count map
         """
-        # alternative allele count list
-        info_ac = self.parse_ac(info_list)
-        # total allele count
-        info_an = self.parse_an(info_list)
-        # reference allele count
+        assert len(info_ac) == len(alt_list)
         ref_ac = info_an - sum(info_ac)
+        assert ref_ac > 0
         
         base_list = [ref] + alt_list
         count_list = self.compact_base_count([ref_ac] + info_ac)
-        
-        ref_name = ref_name if self.fai.keep_chr else strip_chr(ref_name)
-        
-        index = self.fai.pos2index(ref_name, pos)
         ac_map = dict(zip(base_list, count_list))
         
         for base in BASES:
             if base not in ac_map:
                 ac_map[base] = 0
         
-        self.write_record(vac_file, index, (ac_map['A'], ac_map['T'], ac_map['G'], ac_map['C']))
+        return ac_map
     
     @classmethod
-    def write_record(cls, vac_file, index, ac_tuple):
+    def write_record(cls, vac_file, index: int, ac_tuple: tuple):
         vac_file.write(struct.pack(cls.STRUCT_FORMAT, index, *ac_tuple))
     
     def vcf2vac(self, vcf_file, vac_file):
@@ -161,14 +154,16 @@ class Vac:
                 chrom = data[self.VCF_CHROM_ID]
                 pos = int(data[self.VCF_POS_ID]) - 1  # vcf has 1-based index, convert to 0-based index
                 info_list = data[self.VCF_INFO_ID].split(self.INFO_SEP)
-                self.__snv2vac(
-                    ref_name=chrom,
-                    pos=pos,
-                    ref=ref,
-                    alt_list=alt_list,
-                    info_list=info_list,
-                    vac_file=vac_file
-                )
+                
+                # alternative allele count list
+                info_ac = self.parse_ac(info_list)
+                # total allele number
+                info_an = self.parse_an(info_list)
+                # allele count map
+                ac_map = self.ac_map(ref, alt_list, info_ac, info_an)
+                # genomic index
+                index = self.fai.pos2index(chrom, pos)
+                self.write_record(vac_file, index, (ac_map['A'], ac_map['T'], ac_map['G'], ac_map['C']))
             
             if self.verbose and variant_counter % 10000 == 0:
                 print("variant %d" % variant_counter)

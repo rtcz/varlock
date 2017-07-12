@@ -21,6 +21,8 @@ class Varlocker:
     @staticmethod
     def create_vac(bam_filename: str, vcf_filename: str, out_vac_filename: str, verbose=False):
         """
+        BAM and VCF should use same reference genome.
+        VCF must contain INFO column with sub-fields AC and AN.
         :param bam_filename:
         :param vcf_filename:
         :param out_vac_filename:
@@ -45,6 +47,7 @@ class Varlocker:
     ):
         """
         Mutate BAM file and store it along with encrypted DIFF file.
+        BAM and VAC (vcf derivate file) should use same reference genome.
         Output formats:
         .mut.bam
         .diff.enc
