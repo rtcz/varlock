@@ -30,11 +30,9 @@ class BamMutator:
     def __init__(
             self,
             rnd=random.SystemRandom(),
-            urandom: callable = lambda size: os.urandom(size),
             verbose: bool = False
     ):
         self.rnd = rnd
-        self.urandom = urandom
         self.verbose = verbose
         self._stats = {}
     
@@ -52,17 +50,20 @@ class BamMutator:
             bam_filename: str,
             vac_filename: str,
             mut_bam_filename: str,
-            diff_file
+            diff_file,
+            secret: bytes = None
     ):
         """
         :param bam_filename:
         :param vac_filename:
         :param mut_bam_filename:
         :param diff_file:
+        :param secret: Secret key written into DIFF used for unmapped alignment encryption.
+        Secret must be of size specified by DIFF format.
         """
         self._stats = {}
         with open_bam(bam_filename, 'rb') as sam_file:
-            mut = Mutator(sam_file, rnd=self.rnd, urandom=self.urandom, verbose=self.verbose)
+            mut = Mutator(sam_file, rnd=self.rnd, verbose=self.verbose)
             
             if self.verbose:
                 print("Calculating VAC's checksum")
@@ -71,12 +72,16 @@ class BamMutator:
             bam_checksum = bin2hex(mut.bam_checksum())
             header = mut_header(sam_file.header, bam_checksum, vac_checksum)
             
+            if secret is None:
+                secret = os.urandom(Diff.SECRET_SIZE)
+            
             with open_bam(mut_bam_filename, 'wb', header=header) as out_bam_file, \
                     open(vac_filename, 'rb') as vac_file:
                 mut.mutate(
                     in_vac_file=vac_file,
                     out_bam_file=out_bam_file,
-                    out_diff_file=diff_file
+                    out_diff_file=diff_file,
+                    secret=secret
                 )
             
             self._stats = {
@@ -130,7 +135,7 @@ class BamMutator:
         
         with open_bam(bam_filename, 'rb') as sam_file:
             header = unmut_header(sam_file.header)
-            mut = Mutator(sam_file, rnd=self.rnd, urandom=self.urandom, verbose=self.verbose)
+            mut = Mutator(sam_file, rnd=self.rnd, verbose=self.verbose)
             
             with open_bam(out_bam_filename, 'wb', header=header) as out_sam_file:
                 mut.unmutate(

@@ -16,7 +16,7 @@ class TestBamMutator(unittest.TestCase):
     
     @classmethod
     def setUpClass(cls):
-        cls.mut = BamMutator(rnd=RandomMockup(), urandom=cls.urandom)
+        cls.mut = BamMutator(rnd=RandomMockup())
         sam2bam(cls.MUT_DIR_PATH + 'input.sam', cls.MUT_DIR_PATH + 'input.bam')
         pysam.index(cls.MUT_DIR_PATH + 'input.bam')
     
@@ -33,7 +33,8 @@ class TestBamMutator(unittest.TestCase):
                 bam_filename=self.MUT_DIR_PATH + 'input.bam',
                 vac_filename=self.MUT_DIR_PATH + 'input_01.vac',
                 mut_bam_filename=self.MUT_DIR_PATH + 'output_01.bam',
-                diff_file=out_diff_file
+                diff_file=out_diff_file,
+                secret=bytes([255] * Diff.SECRET_SIZE)
             )
         
         self.assertEqual(19, self.mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
@@ -58,7 +59,8 @@ class TestBamMutator(unittest.TestCase):
                 bam_filename=self.MUT_DIR_PATH + 'input.bam',
                 vac_filename=self.MUT_DIR_PATH + 'input_02.vac',
                 mut_bam_filename=self.MUT_DIR_PATH + 'output_02.bam',
-                diff_file=out_diff_file
+                diff_file=out_diff_file,
+                secret=bytes([255] * Diff.SECRET_SIZE)
             )
         
         self.assertEqual(19, self.mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))

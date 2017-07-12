@@ -1,8 +1,6 @@
 import random
 import os
 
-from bitstring import BitArray
-
 from varlock.cigar import Cigar
 from varlock.common import *
 from varlock.diff import Diff
@@ -17,7 +15,6 @@ class Mutator:
             self,
             bam_file,
             rnd=random.SystemRandom(),
-            urandom: callable = lambda size: os.urandom(size),
             verbose: bool = False
     ):
         """
@@ -25,7 +22,6 @@ class Mutator:
         :param verbose:
         """
         self.rnd = rnd
-        self.urandom = urandom
         self.verbose = verbose
         self.fai = FastaIndex(bam_file)
         self.bam_file = bam_file
@@ -153,8 +149,8 @@ class Mutator:
     
     def validate_checksum(self, check_sum):
         if self.bam_checksum() != check_sum:
-            print(bin2hex(self.bam_checksum()))
-            print(bin2hex(check_sum))
+            # print(bin2hex(self.bam_checksum()))
+            # print(bin2hex(check_sum))
             raise ValueError("Invalid checksum.")
     
     def unmutate(
@@ -193,6 +189,7 @@ class Mutator:
             end_ref_name,
             end_ref_pos
         )
+        secret = Diff.read_header(diff_file)[3]
         
         alignment_queue = []
         
@@ -227,10 +224,12 @@ class Mutator:
                     self.__unmutate_overlap(alignment_queue, diff.mut_map)
                 
                 for snv_alignment in alignment_queue:
+                    # unmapped alignments in queue are already encrypted
                     self.__write_alignment(out_bam_file, snv_alignment.alignment)
                 
                 # write remaining alignments (in EOF DIFF case only)
                 while alignment is not None:
+                    self.__encrypt_unmapped(alignment, secret)
                     self.__write_alignment(out_bam_file, alignment)
                     alignment = next(bam_iter)
                 
@@ -241,6 +240,7 @@ class Mutator:
                 break
             
             elif alignment.is_unmapped or self.__is_before_index(alignment, diff.index):
+                self.__encrypt_unmapped(alignment, secret)
                 if len(alignment_queue) == 0:
                     # good to go, all preceeding alignments are written
                     self.__write_alignment(out_bam_file, alignment)
@@ -293,7 +293,7 @@ class Mutator:
         else:
             return alignment.query_sequence
     
-    def mutate(self, in_vac_file, out_bam_file, out_diff_file):
+    def mutate(self, in_vac_file, out_bam_file, out_diff_file, secret: bytes):
         """
         Mutate BAM file SNVs.
         :param in_vac_file: binary file
@@ -302,6 +302,7 @@ class Mutator:
         output bam file
         :param out_diff_file: binary file
         output diff file
+        :param secret: Secret key written into DIFF used for unmapped alignment encryption.
         """
         self.__init_counters()
         
@@ -321,7 +322,7 @@ class Mutator:
             diff_file=out_diff_file,
             start_index=self.fai.first_index(),
             end_index=self.fai.last_index(),
-            secret=self.urandom(Diff.SECRET_SIZE)
+            secret=secret
         )
         while True:
             if vac is None or alignment is None:
@@ -338,10 +339,12 @@ class Mutator:
                     self.__mutate_overlap(out_diff_file, alignment_queue, vac)
                 
                 for snv_alignment in alignment_queue:
+                    # unmapped alignments in queue are already encrypted
                     self.__write_alignment(out_bam_file, snv_alignment.alignment)
                 
                 # write remaining alignments (in EOF VAC case only)
                 while alignment is not None:
+                    self.__encrypt_unmapped(alignment, secret)
                     self.__write_alignment(out_bam_file, alignment)
                     alignment = next(bam_iter)
                 
@@ -352,6 +355,7 @@ class Mutator:
                 break
             
             elif alignment.is_unmapped or self.__is_before_index(alignment, vac.index):
+                self.__encrypt_unmapped(alignment, secret)
                 if len(alignment_queue) == 0:
                     # good to go, all preceeding alignments are written
                     self.__write_alignment(out_bam_file, alignment)
@@ -386,6 +390,24 @@ class Mutator:
         
         # noinspection PyAttributeOutsideInit
         self.snv_counter = vac_iter.counter
+    
+    @staticmethod
+    def __encrypt_unmapped(alignment, secret):
+        """
+        Stream cipher encryption method both for encryption and decryption.
+        alignment + secret => encrypted_alignment
+        encrypted_alignment + secret => alignment
+        :param alignment:
+        :param secret:
+        :return: encrypter/decrypted alignment
+        """
+        # TODO query_qualities ?
+        if alignment.is_unmapped:
+            # use 64B long hash (encrypts 256 bases)
+            sha512 = hashlib.sha512()
+            sha512.update(secret + alignment.query_name.encode())
+            mut_seq = stream_cipher(alignment.query_sequence, sha512.digest())
+            alignment.query_sequence = mut_seq
     
     def __mutate_overlap(self, out_diff_file, alignment_queue, vac):
         """
@@ -479,4 +501,3 @@ class Mutator:
             if snv_pos is not None:
                 # alignment is mapped at another new_snv position
                 snv_alignment.pos = snv_pos
-

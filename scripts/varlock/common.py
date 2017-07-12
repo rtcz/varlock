@@ -38,7 +38,7 @@ def stream_cipher(seq: str, key: bytes):
             except KeyError:
                 raise ValueError("Illegal DNA base %s" % seq[i])
             mut_seq += BITS2BASE[bits]
-    
+            
     return mut_seq
 
 
@@ -233,6 +233,7 @@ def set_base(alignment, pos, base):
     :param base: mutated base letter
     :return: mutated sequence string
     """
+    # TODO query_qualities
     mut_seq = alignment.query_sequence[:pos]
     mut_seq += base
     mut_seq += alignment.query_sequence[pos + 1:]
