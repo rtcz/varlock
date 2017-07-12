@@ -20,11 +20,6 @@ class TestBamMutator(unittest.TestCase):
         sam2bam(cls.MUT_DIR_PATH + 'input.sam', cls.MUT_DIR_PATH + 'input.bam')
         pysam.index(cls.MUT_DIR_PATH + 'input.bam')
     
-    # noinspection PyUnusedLocal
-    @staticmethod
-    def urandom(size):
-        return hex2bin('2615a77268818baf3c74e48b2ab8c0db')
-    
     def test_mutate_01(self):
         # EOF BAM case
         Vac.text2vac(self.MUT_DIR_PATH + 'input_01.vac.txt', self.MUT_DIR_PATH + 'input_01.vac')

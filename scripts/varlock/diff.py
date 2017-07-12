@@ -24,6 +24,7 @@ class Diff:
     CHECKSUM_SIZE = 16
     INT_SIZE = 4
     SECRET_SIZE = 16
+    SECRET_PLACEHOLDER = bytes(SECRET_SIZE)
     
     HEADER_SIZE = CHECKSUM_SIZE + INT_SIZE + INT_SIZE + SECRET_SIZE
     
@@ -265,8 +266,10 @@ class Diff:
         :param diff_file: diff to slice from
         :return: sliced diff
         """
+        diff_file.seek(0)
         sliced_diff = io.BytesIO()
         sliced_diff.write(diff_file.read(cls.HEADER_SIZE))
+        sliced_diff.seek(0)
         return sliced_diff
     
     @classmethod

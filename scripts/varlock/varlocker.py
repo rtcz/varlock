@@ -19,17 +19,18 @@ class Varlocker:
     AES_KEY_LENGTH = 32
     
     @staticmethod
-    def create_vac(bam_filename: str, vcf_filename: str, out_vac_filename: str):
+    def create_vac(bam_filename: str, vcf_filename: str, out_vac_filename: str, verbose=False):
         """
         :param bam_filename:
         :param vcf_filename:
         :param out_vac_filename:
+        :param verbose:
         :return:
         """
         with open_vcf(vcf_filename, 'rt') as vcf_file, \
                 open_bam(bam_filename, 'rb') as sam_file, \
                 open(out_vac_filename, 'wb') as out_vac_file:
-            vac = Vac(FastaIndex(sam_file, keep_chr=False))
+            vac = Vac(FastaIndex(sam_file, keep_chr=False), verbose)
             vac.vcf2vac(vcf_file, out_vac_file)
     
     @classmethod
@@ -121,6 +122,10 @@ class Varlocker:
             aes = vrl.FileAES(aes_key)
             aes.decrypt(enc_diff_file, diff_file)
             
+            secret = Diff.read_header(diff_file)[3]
+            if (unmapped_only or include_unmapped) and secret == Diff.SECRET_PLACEHOLDER:
+                raise ValueError('Attempt to decrypt unmapped reads without secret key')
+            
             if verbose:
                 print('Unmutating BAM')
             
@@ -186,16 +191,24 @@ class Varlocker:
             # decrypt diff
             aes = vrl.FileAES(aes_key)
             aes.decrypt(enc_diff_file, diff_file)
-            # TODO refactor
-            Diff.validate(diff_file)
+            
             mut = vrl.Mutator(sam_file)
-            start_index, end_index = mut.resolve_diff_range(
-                diff_file,
+            
+            # TODO refactor (diff file instance)
+            Diff.validate(diff_file)
+            checksum, diff_start_index, diff_end_index, secret = Diff.read_header(diff_file)
+            mut.validate_checksum(checksum)
+            start_index, end_index = mut.resolve_range(
+                diff_start_index,
+                diff_end_index,
                 start_ref_name,
                 start_ref_pos,
                 end_ref_name,
                 end_ref_pos
             )
+            
+            if (unmapped_only or include_unmapped) and secret == Diff.SECRET_PLACEHOLDER:
+                raise ValueError('Attempt to reencrypt unmapped reads without secret key')
             
             if unmapped_only:
                 new_diff = Diff.truncate(diff_file)
