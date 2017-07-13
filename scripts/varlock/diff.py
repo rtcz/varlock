@@ -136,6 +136,7 @@ class Diff:
     
     @classmethod
     def write_checksum(cls, diff_file, bam_checksum: bytes):
+        diff_file.seek(0)
         if len(bam_checksum) != cls.CHECKSUM_SIZE:
             raise ValueError('Invalid checksum size')
         
@@ -143,6 +144,7 @@ class Diff:
     
     @classmethod
     def write_secret(cls, diff_file, secret: bytes):
+        diff_file.seek(cls.CHECKSUM_SIZE + cls.INT_SIZE + cls.INT_SIZE)
         if len(secret) != cls.SECRET_SIZE:
             raise ValueError('Invalid secret size')
         

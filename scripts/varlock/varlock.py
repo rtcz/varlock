@@ -4,7 +4,7 @@ import sys
 
 from Crypto.PublicKey import RSA
 
-from .varlocker import Varlocker
+from varlock import Varlocker
 
 
 def main():
@@ -31,6 +31,12 @@ def main():
             parsed_args = parse_decrypt_args(args)
             with open(parsed_args.key, 'r') as key_file:
                 rsa_key = RSA.importKey(key_file.read(), passphrase=parsed_args.password)
+                
+                rsa_ver_key = None
+                if parsed_args.ver_key is not None:
+                    with open(parsed_args.ver_key, 'r') as ver_key_file:
+                        rsa_ver_key = RSA.importKey(ver_key_file.read())
+                
                 locker.decrypt(
                     rsa_key=rsa_key,
                     bam_filename=parsed_args.bam,
@@ -42,6 +48,7 @@ def main():
                     end_ref_pos=parsed_args.range[3],
                     include_unmapped=parsed_args.include_unmapped,
                     unmapped_only=parsed_args.unmapped_only,
+                    rsa_ver_key=rsa_ver_key,
                     verbose=parsed_args.verbose
                 )
         elif command == 'reencrypt':
@@ -49,11 +56,16 @@ def main():
             parsed_args = parse_reencrypt_args(args)
             with open(parsed_args.key, 'r') as key_file, \
                     open(parsed_args.pub_key, 'r') as pub_key_file:
-                rsa_dec_key = RSA.importKey(key_file.read(), passphrase=parsed_args.password)
+                rsa_key = RSA.importKey(key_file.read(), passphrase=parsed_args.password)
                 rsa_enc_key = RSA.importKey(pub_key_file.read())
                 
+                rsa_ver_key = None
+                if parsed_args.ver_key is not None:
+                    with open(parsed_args.ver_key, 'r') as ver_key_file:
+                        rsa_ver_key = RSA.importKey(ver_key_file.read())
+                
                 locker.reencrypt(
-                    rsa_dec_key=rsa_dec_key,
+                    rsa_key=rsa_key,
                     rsa_enc_key=rsa_enc_key,
                     bam_filename=parsed_args.bam,
                     enc_diff_filename=parsed_args.diff,
@@ -64,6 +76,7 @@ def main():
                     end_ref_pos=parsed_args.range[3],
                     include_unmapped=parsed_args.include_unmapped,
                     unmapped_only=parsed_args.unmapped_only,
+                    rsa_ver_key=rsa_ver_key,
                     verbose=True
                 )
         
@@ -129,8 +142,9 @@ def parse_decrypt_args(args):
     region_formats = "'chr1', 'chr1:chr2', 'chr1:10000:20000', 'chr1:10000:chr2:20000'"
     range_help = "range in one of following formats: " + region_formats + "; positions are 1-based"
     optional.add_argument('-r', '--range', type=is_sam_range, help=range_help, default=(None, None, None, None))
-    optional.add_argument('-i', '--include_unmapped', action='store_false', help="include all unplaced unmapped reads")
-    optional.add_argument('-u', '--unmapped_only', action='store_false', help="only unmapped reads")
+    optional.add_argument('-i', '--include_unmapped', action='store_true', help="include all unplaced unmapped reads")
+    optional.add_argument('-u', '--unmapped_only', action='store_true', help="only unmapped reads")
+    optional.add_argument('-s', '--ver_key', help="public key for verification", default=None)
     optional.add_argument('-v', '--verbose', action='store_true', help="explain what is being done")
     return parser.parse_args(args)
 
@@ -149,6 +163,9 @@ def parse_reencrypt_args(args):
     region_formats = "'chr1', 'chr1:chr2', 'chr1:10000:20000', 'chr1:10000:chr2:20000'"
     range_help = "range in one of following formats: " + region_formats + "; positions are 1-based"
     optional.add_argument('-r', '--range', type=is_sam_range, help=range_help, default=(None, None, None, None))
+    optional.add_argument('-i', '--include_unmapped', action='store_true', help="include all unplaced unmapped reads")
+    optional.add_argument('-u', '--unmapped_only', action='store_true', help="only unmapped reads")
+    optional.add_argument('-s', '--ver_key', help="public key for verification", default=None)
     optional.add_argument('-v', '--verbose', action='store_true', help="explain what is being done")
     
     return parser.parse_args(args)

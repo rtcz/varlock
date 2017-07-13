@@ -143,7 +143,7 @@ class Mutator:
             if self.verbose:
                 print("Calculating BAM's checksum.")
             
-            self._bam_checksum = calc_checksum(self.bam_file.filename)
+            self._bam_checksum = filename_checksum(self.bam_file.filename)
         
         return self._bam_checksum
     

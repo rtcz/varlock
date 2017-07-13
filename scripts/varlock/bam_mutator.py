@@ -2,7 +2,7 @@ import random
 import os
 
 from .bam import open_bam, mut_header, unmut_header
-from .common import calc_checksum, bin2hex
+from .common import filename_checksum, bin2hex
 from .diff import Diff
 from .mutator import Mutator
 
@@ -68,7 +68,7 @@ class BamMutator:
             if self.verbose:
                 print("Calculating VAC's checksum")
             
-            vac_checksum = bin2hex(calc_checksum(vac_filename))
+            vac_checksum = bin2hex(filename_checksum(vac_filename))
             bam_checksum = bin2hex(mut.bam_checksum())
             header = mut_header(sam_file.header, bam_checksum, vac_checksum)
             
@@ -94,19 +94,18 @@ class BamMutator:
             }
         
         # TODO resolve difference between mutated and converted (bam->sam->bam) bam
-        # print('before bam ' + bin2hex(calc_checksum(out_bam_file.filename)))
+        # print('before bam ' + bin2hex(filename_checksum(out_bam_file.filename)))
         # bam2sam(out_bam_file.filename, out_bam_file.filename + b'.sam')
-        # print('before sam ' + bin2hex(calc_checksum(out_bam_file.filename + b'.sam')))
+        # print('before sam ' + bin2hex(filename_checksum(out_bam_file.filename + b'.sam')))
         # sam2bam(out_bam_file.filename + b'.sam', out_bam_file.filename)
         #
-        # print('after bam ' + bin2hex(calc_checksum(out_bam_file.filename)))
+        # print('after bam ' + bin2hex(filename_checksum(out_bam_file.filename)))
         # bam2sam(out_bam_file.filename, out_bam_file.filename + b'.sam')
-        # print('after sam ' + bin2hex(calc_checksum(out_bam_file.filename + b'.sam')))
+        # print('after sam ' + bin2hex(filename_checksum(out_bam_file.filename + b'.sam')))
         # exit(0)
         
         # rewrite checksum placeholder with mutated BAM checksum
-        diff_file.seek(0)
-        Diff.write_checksum(diff_file, calc_checksum(out_bam_file.filename))
+        Diff.write_checksum(diff_file, filename_checksum(out_bam_file.filename))
     
     def unmutate(
             self,

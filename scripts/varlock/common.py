@@ -38,7 +38,7 @@ def stream_cipher(seq: str, key: bytes):
             except KeyError:
                 raise ValueError("Illegal DNA base %s" % seq[i])
             mut_seq += BITS2BASE[bits]
-            
+    
     return mut_seq
 
 
@@ -158,21 +158,28 @@ def bam2sam(bam_filename, sam_filename):
             sam_file.write(alignment)
 
 
-def bin2hex(byte_str):
+def bin2hex(byte_str: str):
     return binascii.hexlify(byte_str).decode()
 
 
-def hex2bin(hex_str):
+def hex2bin(hex_str: str):
     return binascii.unhexlify(hex_str)
 
 
-def calc_checksum(filename):
-    hash_md5 = hashlib.md5()
+def filename_checksum(filename: str):
+    hasher = hashlib.md5()
     with open(filename, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
-            hash_md5.update(chunk)
+            hasher.update(chunk)
     
-    return hash_md5.digest()
+    return hasher.digest()
+
+
+def file_checksum(file):
+    file.seek(0)
+    hasher = hashlib.md5()
+    hasher.update(file.read())
+    return hasher.digest()
 
 
 def ref_pos2seq_pos(alignment, ref_pos):

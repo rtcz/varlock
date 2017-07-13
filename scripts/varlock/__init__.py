@@ -5,3 +5,4 @@ from .fasta_index import FastaIndex
 from .mutator import Mutator
 from .po import DiffRecord, FaiRecord, SnvAlignment, SnvPosition, VacRecord
 from .vac import Vac
+from .varlocker import Varlocker
