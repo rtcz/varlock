@@ -3,8 +3,7 @@ import os
 import sys
 
 from Crypto.PublicKey import RSA
-
-from varlock import Varlocker
+from varlock.varlocker import Varlocker
 
 
 def main():
@@ -109,7 +108,7 @@ def print_usage():
     print()
     print('Command:\tencrypt\t\tcreate mutated BAM along with encrypted DIFF and it\'s key')
     print('\t\tdecrypt\t\trevert mutated BAM to original')
-    print('\t\treencrypt\t\tcreate encrypted slice of DIFF')
+    print('\t\treencrypt\tcreate encrypted slice of DIFF')
     print('\t\tvac\t\tconvert VCF to VAC')
 
 

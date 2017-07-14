@@ -5,11 +5,11 @@ import struct
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.PublicKey import RSA
 
-from .bam import open_bam
-from .common import open_vcf, file_checksum
-from .diff import Diff
-from .fasta_index import FastaIndex
-from .vac import Vac
+from varlock.bam import open_bam
+from varlock.common import open_vcf, file_checksum
+from varlock.diff import Diff
+from varlock.fasta_index import FastaIndex
+from varlock.vac import Vac
 
 
 class Varlocker:
