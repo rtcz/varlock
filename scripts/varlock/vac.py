@@ -111,7 +111,7 @@ class Vac:
         """
         assert len(info_ac) == len(alt_list)
         ref_ac = info_an - sum(info_ac)
-        assert ref_ac > 0
+        assert ref_ac >= 0
         
         base_list = [ref] + alt_list
         count_list = self.compact_base_count([ref_ac] + info_ac)

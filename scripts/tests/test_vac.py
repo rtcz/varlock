@@ -60,6 +60,12 @@ class TestVac(unittest.TestCase):
             {'A': 889, 'T': 100, 'G': 10, 'C': 1},
             vac.ac_map('A', ['T', 'G', 'C'], [100, 10, 1], 1000)
         )
+        
+        # FIXME reference is zero - is this valid case ?
+        self.assertDictEqual(
+            {'A': 8, 'T': 0, 'G': 0, 'C': 5000},
+            vac.ac_map('T', ['A', 'G', 'C'], [8, 0, 5000], 5008)
+        )
     
     def test_vcf2vac(self):
         vac = self.vac()

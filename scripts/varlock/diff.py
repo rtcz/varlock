@@ -16,7 +16,7 @@ class Diff:
     md5 checksum of mutated BAM file, 16B
     start, first genomic index of DIFF range, 4B
     end, last genomic index of DIFF range, 4B
-    unmapped secret, 64B
+    unmapped secret, 16B
     """
     RECORD_FORMAT = "<IB"  # int, char
     RECORD_SIZE = 5

@@ -12,14 +12,17 @@ def main():
         command, args = parse_command()
         if command == 'encrypt':
             # TODO add option for ommiting optional fields
-            # python3 varlock.py encrypt --pub_key resources/jozko.pub --bam resources/input.bam --vac resources/input.vac --out_bam resources/out.mut.bam --out_diff resources/out.diff.enc
+            # python3 varlock.py encrypt --key resources/jozko --pub_key resources/jozko.pub --bam resources/input.bam --vac resources/input.vac --out_bam resources/out.mut.bam --out_diff resources/out.diff.enc -v -p password
             parsed_args = parse_encrypt_args(args)
-            with open(parsed_args.pub_key, 'r') as pub_key_file:
-                rsa_key = RSA.importKey(pub_key_file.read())
+            with open(parsed_args.key, 'r') as key_file, \
+                    open(parsed_args.pub_key, 'r') as pub_key_file:
+                rsa_key = RSA.importKey(key_file.read(), passphrase=parsed_args.password)
+                rsa_pub_key = RSA.importKey(pub_key_file.read())
                 locker.encrypt(
+                    rsa_sign_key=rsa_key,
+                    rsa_enc_key=rsa_pub_key,
                     bam_filename=parsed_args.bam,
                     vac_filename=parsed_args.vac,
-                    rsa_key=rsa_key,
                     out_bam_filename=parsed_args.out_bam,
                     out_enc_diff_filename=parsed_args.out_diff,
                     verbose=parsed_args.verbose
@@ -116,13 +119,15 @@ def parse_encrypt_args(args):
     parser = argparse.ArgumentParser(prog='varlock encrypt')
     
     required = parser.add_argument_group("Required")
-    required.add_argument('-k', '--pub_key', type=is_file, help='public key for encryption', required=True)
+    required.add_argument('-k', '--key', type=is_file, help='private key for signing', required=True)
+    required.add_argument('-e', '--pub_key', type=is_file, help='public key for encryption', required=True)
     required.add_argument('-b', '--bam', type=is_file, help='BAM file', required=True)
     required.add_argument('-c', '--vac', type=is_file, help='VAC file', required=True)
     required.add_argument('-m', '--out_bam', type=str, help='output mutated BAM file', required=True)
     required.add_argument('-d', '--out_diff', type=str, help='output encrypted DIFF file', required=True)
     
     optional = parser.add_argument_group("Optional")
+    optional.add_argument('-p', '--password', type=str, help='private key password')
     optional.add_argument('-v', '--verbose', action='store_true', help="explain what is being done")
     return parser.parse_args(args)
 
@@ -151,11 +156,11 @@ def parse_decrypt_args(args):
 def parse_reencrypt_args(args):
     parser = argparse.ArgumentParser(prog='varlock reencrypt')
     required = parser.add_argument_group("Required")
-    required.add_argument('-d', '--key', type=is_file, help='private key for decryption', required=True)
+    required.add_argument('-k', '--key', type=is_file, help='private key for decryption', required=True)
     required.add_argument('-e', '--pub_key', type=is_file, help='public key for encryption', required=True)
     required.add_argument('-b', '--bam', type=is_file, help='mutated BAM file', required=True)
-    required.add_argument('-s', '--diff', type=is_file, help='source DIFF', required=True)
-    required.add_argument('-o', '--out_diff', type=str, help='output DIFF', required=True)
+    required.add_argument('-c', '--diff', type=is_file, help='encrypted DIFF input', required=True)
+    required.add_argument('-o', '--out_diff', type=str, help='encrypted DIFF output', required=True)
     
     optional = parser.add_argument_group("Optional")
     optional.add_argument('-p', '--password', type=str, help='private key password')

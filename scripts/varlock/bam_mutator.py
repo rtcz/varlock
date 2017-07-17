@@ -106,6 +106,7 @@ class BamMutator:
         
         # rewrite checksum placeholder with mutated BAM checksum
         Diff.write_checksum(diff_file, filename_checksum(out_bam_file.filename))
+        diff_file.seek(0)
     
     def unmutate(
             self,

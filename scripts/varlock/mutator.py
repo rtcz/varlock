@@ -140,7 +140,7 @@ class Mutator:
     def bam_checksum(self):
         if self._bam_checksum is None:
             if self.verbose:
-                print("Calculating BAM's checksum.")
+                print("Calculating BAM's checksum")
             
             self._bam_checksum = cmn.filename_checksum(self.bam_file.filename)
         
