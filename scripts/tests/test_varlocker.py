@@ -61,7 +61,4 @@ class TestVarlocker(unittest.TestCase):
                 unmapped_only=False,
                 rsa_ver_key=rsa_ver_key,
             )
-    
-    def test_vac(self):
-        # tested in vac_test
-        pass
+

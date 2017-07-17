@@ -2,9 +2,9 @@ import unittest
 import pysam
 from bitarray import bitarray
 
-from varlock import SnvAlignment
 from varlock.cigar import Cigar
 from varlock.common import *
+from varlock.po import SnvAlignment
 from .random_mockup import RandomMockup
 from random import Random
 
@@ -127,7 +127,7 @@ class TestCommon(unittest.TestCase):
     @staticmethod
     def bits2bytes(bit_str):
         return bitarray(bit_str).tobytes()
-        
+    
     def test_stream_cipher(self):
         # ATGC is 00011011
         # homogenic key
@@ -138,7 +138,7 @@ class TestCommon(unittest.TestCase):
         # heterogenic key
         self.assertEqual('CAAC', stream_cipher('ATGC', self.bits2bytes('11011000')))
         self.assertEqual('ATGC', stream_cipher('CAAC', self.bits2bytes('11011000')))
-
+        
         # unknown base
         self.assertEqual('CANC', stream_cipher('ATNC', self.bits2bytes('11011000')))
         self.assertEqual('ATNC', stream_cipher('CANC', self.bits2bytes('11011000')))
