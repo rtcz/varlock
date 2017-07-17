@@ -17,8 +17,6 @@ from varlock.vac import Vac
 
 
 class Varlocker:
-    RSA_KEY_LENGTH = 4096
-    RSA_CIPHER_LENGTH = 512
     AES_KEY_LENGTH = 32
     
     @staticmethod
@@ -32,6 +30,7 @@ class Varlocker:
         :param verbose:
         :return:
         """
+        # TODO verify that BAM and VCF are associated with the same reference genome ?
         with open_vcf(vcf_filename, 'rt') as vcf_file, \
                 open_bam(bam_filename, 'rb') as sam_file, \
                 open(out_vac_filename, 'wb') as out_vac_file:
@@ -114,6 +113,7 @@ class Varlocker:
         :param rsa_ver_key: RSA key with public key to verify DIFF
         :param verbose:
         """
+        # TODO verify if bam_filename is mutated ???
         # make sure that BAM is indexed
         pysam.index(bam_filename)
         with io.BytesIO() as diff_file, \
@@ -159,7 +159,7 @@ class Varlocker:
             include_unmapped: bool = False,
             unmapped_only: bool = False,
             rsa_ver_key: RSA = None,
-            verbose: bool = True
+            verbose: bool = False
     ):
         """
         Reencrypt DIFF file with supplied public_key.
@@ -180,6 +180,7 @@ class Varlocker:
         :param rsa_ver_key: RSA key with public key to verify DIFF
         :param verbose:
         """
+        # TODO verify if bam_filename is mutated ???
         # make sure that BAM is indexed
         pysam.index(bam_filename)
         with open_bam(bam_filename, 'rb') as sam_file, \
@@ -268,7 +269,7 @@ class Varlocker:
             # verification step
             if verbose:
                 print('--- Verifying DIFF ---')
-
+            
             # must use Crypto hash object
             hash_obj = MD5.new()
             diff.seek(0)

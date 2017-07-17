@@ -10,6 +10,7 @@ from varlock.vac import Vac
 from .random_mockup import RandomMockup
 
 
+# TODO refactor -> TestMutate, TestUnmutate
 class TestBamMutator(unittest.TestCase):
     MUT_DIR_PATH = 'tests/resources/mutator/mutate/'
     UNMUT_DIR_PATH = 'tests/resources/mutator/unmutate/'
