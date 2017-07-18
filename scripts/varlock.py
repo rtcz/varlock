@@ -11,7 +11,6 @@ def main():
         locker = Varlocker()
         command, args = parse_command()
         if command == 'encrypt':
-            # TODO add option for ommiting optional fields
             # python3 varlock.py encrypt --key resources/jozko --pub_key resources/jozko.pub --bam resources/input.bam --vac resources/input.vac --out_bam resources/out.mut.bam --out_diff resources/out.diff.enc -v -p password
             parsed_args = parse_encrypt_args(args)
             with open(parsed_args.key, 'r') as key_file, \

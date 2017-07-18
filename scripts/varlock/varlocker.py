@@ -113,7 +113,9 @@ class Varlocker:
         :param rsa_ver_key: RSA key with public key to verify DIFF
         :param verbose:
         """
-        # TODO verify if bam_filename is mutated ???
+        # TODO verify if bam_filename is mutated
+        # compare BAM's checksum to checksum stored in VAC header
+        
         # make sure that BAM is indexed
         pysam.index(bam_filename)
         with io.BytesIO() as diff_file, \
@@ -180,7 +182,7 @@ class Varlocker:
         :param rsa_ver_key: RSA key with public key to verify DIFF
         :param verbose:
         """
-        # TODO verify if bam_filename is mutated ???
+        # TODO verify if bam_filename is mutated
         # make sure that BAM is indexed
         pysam.index(bam_filename)
         with open_bam(bam_filename, 'rb') as sam_file, \
