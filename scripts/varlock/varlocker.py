@@ -50,7 +50,7 @@ class Varlocker:
     ):
         """
         Mutate BAM file and store it along with encrypted DIFF file.
-        BAM and VAC (vcf derivate file) should use same reference genome.
+        !!! BAM and VAC (VCF derivate file) should use the same reference genome !!!
         Output formats:
         .mut.bam
         .diff.enc

@@ -8,9 +8,11 @@ bam_filename = 'examples/resources/sample.bam'
 vcf_filename = 'examples/resources/sample.vcf.gz'
 out_filenam = 'examples/resources/sample.vac'
 
-bam_filename = 'resources/full_chr22.bam'
-vcf_filename = 'resources/full_chr22.vcf.gz'
-out_filenam = 'resources/full_chr22.vac'
+# bam_filename = 'resources/full_chr22.bam'
+# vcf_filename = 'resources/full_chr22.vcf.gz'
+# out_filenam = 'resources/full_chr22.vac'
+
+# TODO test two variants of temporary files merging
 
 with pysam.AlignmentFile(bam_filename, 'rb') as sam_file, \
         gzip.open(vcf_filename, 'rt') as vcf_file, \

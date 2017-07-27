@@ -3,6 +3,8 @@ import numpy as np
 import binascii
 import gzip
 import hashlib
+import math
+import os
 
 import pysam
 
@@ -22,18 +24,22 @@ def stream_cipher(seq: str, key: bytes):
     DNA base encryption using stream cipher.
     Input sequence of DNA bases is encrypted as another sequence of same length.
     Each 2 bits of the key stream are used to encrypt one base from the sequence.
-    If there is not enough bits of the key stream to encrypt whole sequence, new bits are repeated from start.
+    If there is not enough bits of the key stream to encrypt whole sequence, key stream repeats.
     """
     mut_seq = ''
     for i in range(len(seq)):
+        # obtain key byte
         secret_byte = key[int(i / 4) % len(key)]
+        # calculate padding
         rshift = 6 - (i % 4) * 2
         
         if seq[i] == UNKNOWN_BASE:
             mut_seq += UNKNOWN_BASE
         else:
             try:
+                # obtain 2 bits of the key byte
                 key_bits = (secret_byte & BASE_BITMASKS[i % 4]) >> rshift
+                # apply xor on 2 key bits and 2 base bits
                 bits = BASE2BITS[seq[i]] ^ key_bits
             except KeyError:
                 raise ValueError("Illegal DNA base %s" % seq[i])
@@ -166,6 +172,14 @@ def hex2bin(hex_str: str):
     return binascii.unhexlify(hex_str)
 
 
+def file_size(file_obj):
+    old_pos = file_obj.tell()
+    file_obj.seek(0, os.SEEK_END)
+    size = file_obj.tell()
+    file_obj.seek(old_pos, os.SEEK_SET)
+    return size
+
+
 def filename_checksum(filename: str):
     hasher = hashlib.md5()
     with open(filename, "rb") as f:
@@ -185,7 +199,7 @@ def ref_pos2seq_pos(alignment, ref_pos):
     None if alignment is not mapped at ref_pos (deletion)
     """
     # TODO check reference name, dont assume that reference position and alignment are on same reference
-    # TODO optimalize
+    # TODO optimalize (matches_only=True is possible)
     seq_pos = None
     for current_seq_pos, current_ref_pos in alignment.get_aligned_pairs(matches_only=False, with_seq=False):
         # search for base in snv position
@@ -245,3 +259,51 @@ def open_vcf(filename, mode):
         return gzip.open(filename, mode)
     else:
         return open(filename, mode)
+
+
+def seq2bytes(seq: str):
+    """
+    :param seq: DNA sequence
+    :return: DNA sequence encoded as 2bits per BASE.
+    Incomplete last byte is zero-filled.
+    """
+    seq_bytes = b''
+    byte = 0
+    for i in range(len(seq)):
+        # calculate padding
+        lshift = 6 - (i % 4) * 2
+        try:
+            byte |= BASE2BITS[seq[i]] << lshift
+        except KeyError:
+            raise ValueError("Illegal DNA base %s" % seq[i])
+        
+        if (i + 1) % 4 == 0 or len(seq) == i + 1:
+            # end of byte or end of sequence
+            seq_bytes += bytes([byte])
+            byte = 0
+    
+    return seq_bytes
+
+
+def bytes2seq(byte_list: bytes, seq_length: int):
+    """
+    :param byte_list: DNA sequence encoded as 2bits per BASE
+    :param seq_length: length of result
+    :return: DNA sequence
+    """
+    if math.ceil(seq_length / 4) > len(byte_list):
+        raise ValueError('Not enough bytes for supplied length')
+    
+    if math.ceil(seq_length / 4) < len(byte_list):
+        raise ValueError('Too much bytes for supplied length')
+    
+    seq = ''
+    for i in range(seq_length):
+        byte = byte_list[int(i / 4)]
+        # calculate padding
+        rshift = 6 - (i % 4) * 2
+        # extract next 2 bits
+        bits = (byte & BASE_BITMASKS[i % 4]) >> rshift
+        seq += BITS2BASE[bits]
+    
+    return seq

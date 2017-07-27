@@ -13,7 +13,7 @@ class VacIterator:
     
     def __next__(self):
         try:
-            index, ac_tuple = Vac.read_record(self.vac_file)
+            index, ac_tuple = Vac.read_snv_record(self.vac_file)
         except EOFError:
             return None
         

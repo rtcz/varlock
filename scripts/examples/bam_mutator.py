@@ -72,6 +72,6 @@ total of 517362 alignments processed
   3828681    4.416    0.000   19.347    0.000 calignedsegment.pyx:844(__get__)
   1059416    3.929    0.000    4.994    0.000 mutator.py:493(count_bases)
   3828681    3.825    0.000   14.931    0.000 calignmentfile.pyx:1652(getrname)
-  1059416    3.791    0.000    5.746    0.000 vac.py:180(read_record)
+  1059416    3.791    0.000    5.746    0.000 vac.py:180(read_snv_record)
   1059415    3.490    0.000   56.993    0.000 mutator.py:478(__set_seq_positions)
 """

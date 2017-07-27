@@ -75,7 +75,11 @@ python3 -m cProfile -s tottime examples/bam_mutator.py | head -n 140
 
 ## Samtools
 samtools view -H examples/resources/sample.mut.bam
+
 samtools view -h resources/out.mut.bam >> out.mut.sam
+
+less chr22.vcf.gz | egrep -v "^#" | cut -f 4,5 | awk 'length($1) > 2 || length($2) > 2'
+
 
 
 

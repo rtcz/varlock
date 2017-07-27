@@ -1,5 +1,6 @@
 import io
 import struct
+import os
 
 from .common import bin2hex, hex2bin
 
@@ -98,7 +99,7 @@ class Diff:
     def validate_header_range(cls, diff_file):
         checksum, header_start_index, header_end_index, secret = cls.read_header(diff_file)
         content_start_index = cls.__read_index(diff_file)
-        diff_file.seek(-cls.RECORD_SIZE, 2)
+        diff_file.seek(-cls.RECORD_SIZE, os.SEEK_END)
         content_end_index = cls.__read_index(diff_file)
         
         if header_start_index > content_start_index:
@@ -156,11 +157,6 @@ class Diff:
         return diff_file.tell()
     
     @classmethod
-    def get_end_pos(cls, diff_file):
-        diff_file.seek(0, 2)
-        return diff_file.tell()
-    
-    @classmethod
     def seek_subrange(cls, diff_file, start_index: int, end_index: int):
         assert start_index <= end_index
         
@@ -171,13 +167,11 @@ class Diff:
     
     @classmethod
     def __read_index(cls, diff_file):
-        index = struct.unpack('<I', diff_file.read(cls.INT_SIZE))[0]
-        # diff_file.seek(-cls.INT_LENGTH, 1)
-        return index
+        return struct.unpack('<I', diff_file.read(cls.INT_SIZE))[0]
     
     @classmethod
     def body_size(cls, diff_file):
-        diff_file.seek(0, 2)
+        diff_file.seek(0, os.SEEK_END)
         return diff_file.tell() - cls.HEADER_SIZE
     
     @classmethod
@@ -205,9 +199,9 @@ class Diff:
         """
         cls.validate(diff_file)
         
-        diff_file.seek(cls.HEADER_SIZE, 0)
+        diff_file.seek(cls.HEADER_SIZE)
         start_index = cls.__read_index(diff_file)
-        diff_file.seek(-Diff.RECORD_SIZE, 2)
+        diff_file.seek(-Diff.RECORD_SIZE, os.SEEK_END)
         end_index = cls.__read_index(diff_file)
         
         if index > end_index:
@@ -215,13 +209,13 @@ class Diff:
             if up:
                 raise IndexError("Upper index not found")
             else:
-                diff_file.seek(-cls.RECORD_SIZE, 2)
+                diff_file.seek(-cls.RECORD_SIZE, os.SEEK_END)
                 return diff_file.tell()
         
         if index < start_index:
             # index is before DIFF content
             if up:
-                diff_file.seek(cls.HEADER_SIZE, 0)
+                diff_file.seek(cls.HEADER_SIZE)
                 return diff_file.tell()
             else:
                 raise IndexError("Lower index not found")
@@ -241,19 +235,19 @@ class Diff:
                 else:
                     first = mid + 1
         
-        diff_file.seek(-cls.INT_SIZE, 1)
+        diff_file.seek(-cls.INT_SIZE, os.SEEK_CUR)
         offset = diff_file.tell()
         
         # final move
         if index < curr_index:
-            diff_file.seek(-cls.RECORD_SIZE, 1)
+            diff_file.seek(-cls.RECORD_SIZE, os.SEEK_CUR)
             prev_offset = diff_file.tell()
             prev_index = cls.__read_index(diff_file)
             if not up or index == prev_index:
                 offset = prev_offset
         
         elif index > curr_index:
-            diff_file.seek(cls.RECORD_SIZE, 1)
+            diff_file.seek(cls.RECORD_SIZE, os.SEEK_CUR)
             next_offset = diff_file.tell()
             next_index = cls.__read_index(diff_file)
             if up or index == next_index:

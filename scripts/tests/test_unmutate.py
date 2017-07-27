@@ -4,7 +4,7 @@ import unittest
 import pysam
 
 from varlock.bam_mutator import BamMutator
-from varlock.common import sam2bam, bam2sam, hex2bin
+from varlock.common import bam2sam
 from varlock.diff import Diff
 from varlock.vac import Vac
 from .random_mockup import RandomMockup
@@ -16,60 +16,6 @@ class TestUnmutate(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.mut = BamMutator(rnd=RandomMockup())
-        sam2bam(cls.MUT_DIR_PATH + 'input.sam', cls.MUT_DIR_PATH + 'input.bam')
-        pysam.index(cls.MUT_DIR_PATH + 'input.bam')
-    
-    def test_mutate_01(self):
-        # EOF BAM case
-        Vac.text2vac(self.MUT_DIR_PATH + 'input_01.vac.txt', self.MUT_DIR_PATH + 'input_01.vac')
-        with open(self.MUT_DIR_PATH + 'output_01.diff', 'wb') as out_diff_file:
-            self.mut.mutate(
-                bam_filename=self.MUT_DIR_PATH + 'input.bam',
-                vac_filename=self.MUT_DIR_PATH + 'input_01.vac',
-                mut_bam_filename=self.MUT_DIR_PATH + 'output_01.bam',
-                diff_file=out_diff_file,
-                secret=bytes([255] * Diff.SECRET_SIZE)
-            )
-        
-        self.assertEqual(19, self.mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
-        self.assertEqual(12, self.mut.stat(BamMutator.STAT_MUT_ALIGNMENT_COUNT))
-        self.assertEqual(5, self.mut.stat(BamMutator.STAT_MAX_COVERAGE))
-        self.assertEqual(5, self.mut.stat(BamMutator.STAT_SNV_COUNT))
-        self.assertEqual(12, self.mut.stat(BamMutator.STAT_MUT_COUNT))
-        self.assertEqual(4, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
-        
-        bam2sam(self.MUT_DIR_PATH + 'output_01.bam', self.MUT_DIR_PATH + 'output_01.sam')
-        is_equal = filecmp.cmp(self.MUT_DIR_PATH + 'desired_01.sam', self.MUT_DIR_PATH + 'output_01.sam')
-        self.assertEqual(True, is_equal)
-        Diff.diff2text(self.MUT_DIR_PATH + 'output_01.diff', self.MUT_DIR_PATH + 'output_01.diff.txt')
-        is_equal = filecmp.cmp(self.MUT_DIR_PATH + 'desired_01.diff.txt', self.MUT_DIR_PATH + 'output_01.diff.txt')
-        self.assertEqual(True, is_equal)
-    
-    def test_mutate_02(self):
-        # EOF VAC case
-        Vac.text2vac(self.MUT_DIR_PATH + 'input_02.vac.txt', self.MUT_DIR_PATH + 'input_02.vac')
-        with open(self.MUT_DIR_PATH + 'output_02.diff', 'wb') as out_diff_file:
-            self.mut.mutate(
-                bam_filename=self.MUT_DIR_PATH + 'input.bam',
-                vac_filename=self.MUT_DIR_PATH + 'input_02.vac',
-                mut_bam_filename=self.MUT_DIR_PATH + 'output_02.bam',
-                diff_file=out_diff_file,
-                secret=bytes([255] * Diff.SECRET_SIZE)
-            )
-        
-        self.assertEqual(19, self.mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
-        self.assertEqual(7, self.mut.stat(BamMutator.STAT_MUT_ALIGNMENT_COUNT))
-        self.assertEqual(3, self.mut.stat(BamMutator.STAT_MAX_COVERAGE))
-        self.assertEqual(4, self.mut.stat(BamMutator.STAT_SNV_COUNT))
-        self.assertEqual(7, self.mut.stat(BamMutator.STAT_MUT_COUNT))
-        self.assertEqual(3, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
-        
-        bam2sam(self.MUT_DIR_PATH + 'output_02.bam', self.MUT_DIR_PATH + 'output_02.sam')
-        is_equal = filecmp.cmp(self.MUT_DIR_PATH + 'desired_02.sam', self.MUT_DIR_PATH + 'output_02.sam')
-        self.assertEqual(True, is_equal)
-        Diff.diff2text(self.MUT_DIR_PATH + 'output_02.diff', self.MUT_DIR_PATH + 'output_02.diff.txt')
-        is_equal = filecmp.cmp(self.MUT_DIR_PATH + 'desired_02.diff.txt', self.MUT_DIR_PATH + 'output_02.diff.txt')
-        self.assertEqual(True, is_equal)
     
     def test_unmutate_01(self):
         # case 1

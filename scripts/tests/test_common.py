@@ -1,6 +1,7 @@
 import unittest
 import pysam
 from bitarray import bitarray
+from bitstring import BitArray
 
 from varlock.cigar import Cigar
 from varlock.common import *
@@ -10,6 +11,7 @@ from random import Random
 
 
 class TestCommon(unittest.TestCase):
+    
     def test_multi_random(self):
         self.assertEqual(2, multi_random([1, 1, 1, 1], RandomMockup()))
         self.assertEqual(0, multi_random([1, 0, 0, 0], RandomMockup()))
@@ -125,11 +127,15 @@ class TestCommon(unittest.TestCase):
         self.assertDictEqual({'A': 'G', 'T': 'T', 'G': 'C', 'C': 'A', 'N': 'N'}, mut_map)
     
     @staticmethod
-    def bits2bytes(bit_str):
+    def bits2bytes(bit_str: str):
         return bitarray(bit_str).tobytes()
     
+    @staticmethod
+    def bytes2bits(byte_list: bytes):
+        return BitArray(byte_list).bin
+    
     def test_stream_cipher(self):
-        # ATGC is 00011011
+        # ATGC is 00 01 10 11
         # homogenic key
         self.assertEqual('ATGC', stream_cipher('ATGC', self.bits2bytes('00000000')))
         self.assertEqual('CGTA', stream_cipher('ATGC', self.bits2bytes('11111111')))
@@ -154,6 +160,22 @@ class TestCommon(unittest.TestCase):
         self.assertEqual('ATGCATNC', stream_cipher('CAACCANC', self.bits2bytes('11011000')))
         self.assertEqual('CAACCA', stream_cipher('ATGCAT', self.bits2bytes('11011000')))
         self.assertEqual('ATGCAT', stream_cipher('CAACCA', self.bits2bytes('11011000')))
+    
+    def test_seq2bytes(self):
+        # ATGC is 00 01 10 11
+        self.assertEqual('00011011', self.bytes2bits(seq2bytes('ATGC')))
+        self.assertEqual('11100100', self.bytes2bits(seq2bytes('CGTA')))
+        self.assertEqual('00010000', self.bytes2bits(seq2bytes('AT')))
+        self.assertEqual('10110000', self.bytes2bits(seq2bytes('GC')))
+        self.assertEqual('0001101110110000', self.bytes2bits(seq2bytes('ATGCGC')))
+        # self.assertEqual(bitarray('00110111').tobytes(), seq2bytes('ATGCGC'))
+    
+    def test_bytes2seq(self):
+        self.assertEqual('ATGC', bytes2seq(self.bits2bytes('00011011'), 4))
+        self.assertEqual('CGTA', bytes2seq(self.bits2bytes('11100100'), 4))
+        self.assertEqual('AT', bytes2seq(self.bits2bytes('00010000'), 2))
+        self.assertEqual('GC', bytes2seq(self.bits2bytes('10110000'), 2))
+        self.assertEqual('ATGCGC', bytes2seq(self.bits2bytes('0001101110110000'), 6))
 
 
 if __name__ == '__main__':
