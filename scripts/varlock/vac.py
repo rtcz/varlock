@@ -14,6 +14,7 @@ class Vac:
     
     VAC header:
     number of SNVs, 4B
+    number of INDELs, 4B
     
     VAC SNV record:
     index 4B, 0-based absolute genomic position
@@ -45,6 +46,8 @@ class Vac:
     INT_SIZE = 4
     # LONG_SIZE = 8
     
+    HEADER_SIZE = INT_SIZE * 2
+    
     MAX_ALLELE_COUNT = 2 ** 16 - 1
     """
     Max value of 2 bytes
@@ -54,6 +57,9 @@ class Vac:
     SNV_RECORD_SIZE = 12  # bytes
     
     # INDEL_FORMAT = "<IH"  # int, short
+    
+    SNV_TEMP_EXT = '.snv.temp'
+    INDEL_TEMP_EXT = '.indel.temp'
     
     def __init__(self, fai, verbose=False):
         """
@@ -173,7 +179,7 @@ class Vac:
     
     @classmethod
     def read_header(cls, vac_file):
-        return struct.unpack('<II', vac_file.read(cls.INT_SIZE * 2))
+        return struct.unpack('<II', vac_file.read(cls.HEADER_SIZE))
     
     @classmethod
     def write_header(cls, vac_file, snv_count: int, indel_count: int):
@@ -181,10 +187,14 @@ class Vac:
     
     @classmethod
     def read_snv_record(cls, vac_file):
-        byte_string = vac_file.read(cls.SNV_RECORD_SIZE)
-        if len(byte_string) == 0:
+        """
+        :param vac_file:
+        :return: index, allele count tuple
+        """
+        byte_str = vac_file.read(cls.SNV_RECORD_SIZE)
+        if len(byte_str) == 0:
             raise EOFError()
-        index, a_ac, t_ac, c_ac, g_ac = struct.unpack(cls.SNV_FORMAT, byte_string)
+        index, a_ac, t_ac, c_ac, g_ac = struct.unpack(cls.SNV_FORMAT, byte_str)
         return index, (a_ac, t_ac, c_ac, g_ac)
     
     @classmethod
@@ -200,7 +210,15 @@ class Vac:
     
     @classmethod
     def read_indel_record(cls, vac_file):
-        index = struct.unpack('<I', vac_file.read(cls.INT_SIZE))[0]
+        """
+        :param vac_file:
+        :return: index, [(count_a, seq_a), (count_b, seq_b), ...]
+        """
+        byte_str = vac_file.read(cls.INT_SIZE)
+        if len(byte_str) == 0:
+            raise EOFError()
+        
+        index = struct.unpack('<I', byte_str)[0]
         length = int.from_bytes(vac_file.read(1), byteorder='little')
         
         indel_map = []
@@ -244,8 +262,8 @@ class Vac:
         snv_count = 0
         indel_count = 0
         
-        snv_filename = vac_file.name + '.snv.temp'
-        indel_filename = vac_file.name + '.indel.temp'
+        snv_filename = vac_file.name + self.SNV_TEMP_EXT
+        indel_filename = vac_file.name + self.INDEL_TEMP_EXT
         
         with open(snv_filename, 'wb') as snv_file, \
                 open(indel_filename, 'wb') as indel_file:
@@ -373,8 +391,8 @@ class Vac:
             text_file.write('%d\n' % snv_count)
             text_file.write('%d\n' % indel_count)
             for i in range(snv_count):
-                index, ac_tuple = cls.read_snv_record(vac_file)
-                ac_string = ','.join(map(str, ac_tuple))
+                index, count_list = cls.read_snv_record(vac_file)
+                ac_string = ','.join(map(str, count_list))
                 text_file.write('%d\t%s\n' % (index + 1, ac_string))
             
             for i in range(indel_count):

@@ -1,12 +1,21 @@
 import hashlib
 import random
 
+# import common
+# import varlock.iterator as iters
+#
+# from .cigar import Cigar
+# from .diff import Diff
+# from .fasta_index import FastaIndex
+# from .po import SnvAlignment, GenomicPosition, VacSnvRecord
+
+
 from varlock.cigar import Cigar
-import varlock.common as cmn
+import varlock.common as common
 from varlock.diff import Diff
 from varlock.fasta_index import FastaIndex
 import varlock.iterator as iters
-from varlock.po import SnvAlignment
+from varlock.po import SnvAlignment, GenomicPosition, VacSnvRecord
 
 
 class Mutator:
@@ -51,8 +60,8 @@ class Mutator:
         :param alignment: pysam.AlignedSegment
         :return:
         """
-        are_placed = self.prev_alignment is not None and cmn.is_placed_alignment(
-            alignment) and cmn.is_placed_alignment(self.prev_alignment)
+        are_placed = self.prev_alignment is not None and common.is_placed_alignment(
+            alignment) and common.is_placed_alignment(self.prev_alignment)
         # FIXME is case of placed after unplaced alignment valid ?
         if are_placed and alignment.reference_start < self.prev_alignment.reference_start:
             # safety check
@@ -72,7 +81,7 @@ class Mutator:
         self.alignment_counter = 0  # written alignments
         self.diff_counter = 0  # processed diff records
         self.mut_counter = 0  # all mutations
-        self.snv_counter = 0  # read vac records (SNVs)
+        self.vac_counter = 0  # read vac records (variants)
         
         self.mut_alignment_counter = 0  # mutated alignments
         self.max_coverage = 0  # maximum alignments overlapping single SNV
@@ -142,7 +151,7 @@ class Mutator:
             if self.verbose:
                 print("Calculating BAM's checksum")
             
-            self._bam_checksum = cmn.filename_checksum(self.bam_file.filename)
+            self._bam_checksum = common.filename_checksum(self.bam_file.filename)
         
         return self._bam_checksum
     
@@ -152,6 +161,7 @@ class Mutator:
             # print(bin2hex(check_sum))
             raise ValueError("Invalid checksum.")
     
+    # TODO refactor iterators as parameters
     def unmutate(
             self,
             diff_file,
@@ -263,7 +273,7 @@ class Mutator:
             
             else:  # alignment is covering diff position
                 # find sequence position of vac
-                seq_pos = cmn.ref_pos2seq_pos(alignment, diff.ref_pos)
+                seq_pos = common.ref_pos2seq_pos(alignment, diff.ref_pos)
                 alignment_queue.append(SnvAlignment(alignment, seq_pos))
                 alignment = next(bam_iter)
                 
@@ -284,7 +294,7 @@ class Mutator:
                 snv_alignment.pos = None
     
     def alignment2str(self, alignment):
-        if cmn.is_placed_alignment(alignment):
+        if common.is_placed_alignment(alignment):
             ref_name = alignment.reference_name
             ref_start = alignment.reference_start
             # unplaced alignment
@@ -292,10 +302,11 @@ class Mutator:
         else:
             return alignment.query_sequence
     
-    def mutate(self, in_vac_file, out_bam_file, out_diff_file, secret: bytes):
+    # TODO refactor, iterators as parameters
+    def mutate(self, vac_filename: str, out_bam_file, out_diff_file, secret: bytes):
         """
         Mutate BAM file SNVs.
-        :param in_vac_file: binary file
+        :param vac_filename:
         input variant allele count file
         :param out_bam_file: pysam.AlignmentFile
         output bam file
@@ -310,7 +321,7 @@ class Mutator:
         bam_iter = iters.FullBamIterator(self.bam_file)
         alignment = next(bam_iter)
         
-        vac_iter = iters.VacIterator(in_vac_file, self.fai)
+        vac_iter = iters.VacIterator(vac_filename, self.fai)
         vac = next(vac_iter)
         
         if self.verbose:
@@ -378,7 +389,7 @@ class Mutator:
             
             else:  # alignment is covering vac position
                 # find sequence position of vac
-                seq_pos = cmn.ref_pos2seq_pos(alignment, vac.ref_pos)
+                seq_pos = common.ref_pos2seq_pos(alignment, vac.ref_pos)
                 alignment_queue.append(SnvAlignment(alignment, seq_pos))
                 alignment = next(bam_iter)
                 
@@ -388,7 +399,7 @@ class Mutator:
                 self.max_coverage = max(len(alignment_queue), self.max_coverage)
         
         # noinspection PyAttributeOutsideInit
-        self.snv_counter = vac_iter.counter
+        self.vac_counter = vac_iter.counter
     
     @staticmethod
     def __encrypt_unmapped(alignment, secret):
@@ -405,37 +416,40 @@ class Mutator:
             # use 64B long hash (encrypts 256 bases)
             sha512 = hashlib.sha512()
             sha512.update(secret + alignment.query_name.encode())
-            mut_seq = cmn.stream_cipher(alignment.query_sequence, sha512.digest())
+            mut_seq = common.stream_cipher(alignment.query_sequence, sha512.digest())
             alignment.query_sequence = mut_seq
     
-    def __mutate_overlap(self, out_diff_file, alignment_queue, vac):
+    def __mutate_overlap(self, out_diff_file, alignment_queue, vac: GenomicPosition):
         """
-        Mutate alignments at current SNV position by allele frequencies of the SNV
+        Mutate alignments at position of the variant
         :param alignment_queue: alignments together with vac positions
-        :param vac: SNV
+        :param vac: variant allele count list
         :return: True if NS mutation has occured
         """
         is_mutated = False
         # get pileup of bases from alignments at vac mapping position
-        base_pileup = cmn.get_base_pileup(alignment_queue)
-        alt_ac = cmn.count_bases(base_pileup)
+        base_pileup = common.get_base_pileup(alignment_queue)
+        alt_ac = common.count_bases(base_pileup)
         
-        mut_map = cmn.create_mut_map(alt_ac=alt_ac, ref_ac=vac.ac, rnd=self.rnd)
+        if isinstance(vac, VacSnvRecord):
+            mut_map = common.create_mut_map(alt_ac=alt_ac, ref_ac=vac.ac, rnd=self.rnd)
+            
+            for snv_alignment in alignment_queue:
+                if snv_alignment.pos is not None:
+                    # alignment has vac to mutate
+                    is_mutated |= self.__mutate_alignment(snv_alignment.alignment, snv_alignment.pos, mut_map)
+                    # done with current vac
+                    snv_alignment.pos = None
+            
+            if is_mutated:
+                # at least one alignment has been mutated
+                self.__write_diff(
+                    out_diff_file=out_diff_file,
+                    index=vac.index,
+                    mut_map=mut_map
+                )
         
-        for snv_alignment in alignment_queue:
-            if snv_alignment.pos is not None:
-                # alignment has vac to mutate
-                is_mutated |= self.__mutate_alignment(snv_alignment.alignment, snv_alignment.pos, mut_map)
-                # done with current vac
-                snv_alignment.pos = None
-        
-        if is_mutated:
-            # at least one alignment has been mutated
-            self.__write_diff(
-                out_diff_file=out_diff_file,
-                index=vac.index,
-                mut_map=mut_map
-            )
+        # TODO isinstance(vac, VacIndelRecord)
         
         return is_mutated
     
@@ -449,14 +463,14 @@ class Mutator:
         """
         is_mutated = False
         # alignment is mapped at snv position
-        snv_base = cmn.get_base(alignment, seq_pos)
+        snv_base = common.get_base(alignment, seq_pos)
         mut_base = mut_map[snv_base]
         
         if snv_base != mut_base:
             # base has been mutated to another base
             self.mut_counter += 1
             is_mutated = True
-            cmn.set_base(alignment, seq_pos, mut_base)
+            common.set_base(alignment, seq_pos, mut_base)
             Cigar.validate(alignment, seq_pos)
         
         return is_mutated
@@ -496,7 +510,7 @@ class Mutator:
         """
         for snv_alignment in alignment_queue:
             # TODO optimize, skip when ref_pos is greater than alignment reference end
-            snv_pos = cmn.ref_pos2seq_pos(snv_alignment.alignment, ref_pos)
+            snv_pos = common.ref_pos2seq_pos(snv_alignment.alignment, ref_pos)
             if snv_pos is not None:
                 # alignment is mapped at another new_snv position
                 snv_alignment.pos = snv_pos

@@ -6,6 +6,11 @@ from varlock.varlocker import Varlocker
 
 
 class TestVarlocker(unittest.TestCase):
+    """
+    Tests are order sensitive.
+    """
+    # TODO make tests isolated
+    
     RESOURCE_PATH = 'tests/resources/varlocker/'
     KEY_PASS = 'password'
     
@@ -13,7 +18,7 @@ class TestVarlocker(unittest.TestCase):
     def setUpClass(cls):
         cls.locker = Varlocker()
     
-    def test_encrypt(self):
+    def test1_encrypt(self):
         with open(self.RESOURCE_PATH + 'admin', 'r') as key_file, \
                 open(self.RESOURCE_PATH + 'admin.pub', 'r') as pub_key_file:
             rsa_key = RSA.importKey(key_file.read(), passphrase=self.KEY_PASS)
@@ -29,7 +34,7 @@ class TestVarlocker(unittest.TestCase):
                 out_enc_diff_filename=self.RESOURCE_PATH + 'encrypt/output.diff.enc'
             )
     
-    def test_reencrypt(self):
+    def test2_reencrypt(self):
         with open(self.RESOURCE_PATH + 'admin', 'r') as key_file, \
                 open(self.RESOURCE_PATH + 'user.pub', 'r') as pub_key_file, \
                 open(self.RESOURCE_PATH + 'admin.pub', 'r') as ver_key_file:
@@ -49,7 +54,7 @@ class TestVarlocker(unittest.TestCase):
                 rsa_ver_key=rsa_ver_key
             )
     
-    def test_decrypt(self):
+    def test3_decrypt(self):
         with open(self.RESOURCE_PATH + 'user', 'r') as key_file, \
                 open(self.RESOURCE_PATH + 'admin.pub', 'r') as ver_key_file:
             rsa_key = RSA.importKey(key_file.read(), passphrase=self.KEY_PASS)
@@ -65,7 +70,7 @@ class TestVarlocker(unittest.TestCase):
                 rsa_ver_key=rsa_ver_key,
             )
     
-    def test_reencrypt_unmapped(self):
+    def test4_reencrypt_unmapped(self):
         with open(self.RESOURCE_PATH + 'admin', 'r') as key_file, \
                 open(self.RESOURCE_PATH + 'user.pub', 'r') as pub_key_file, \
                 open(self.RESOURCE_PATH + 'admin.pub', 'r') as ver_key_file:
@@ -96,12 +101,12 @@ class TestVarlocker(unittest.TestCase):
                 rsa_ver_key=rsa_ver_key
             )
     
-    def test_decrypt_unmapped(self):
+    def test5_decrypt_unmapped(self):
         with open(self.RESOURCE_PATH + 'admin', 'r') as key_file, \
                 open(self.RESOURCE_PATH + 'admin.pub', 'r') as ver_key_file:
             rsa_key = RSA.importKey(key_file.read(), passphrase=self.KEY_PASS)
             rsa_ver_key = RSA.importKey(ver_key_file.read())
-
+            
             # missing DIFF secret
             self.assertRaises(ValueError, lambda: self.locker.decrypt(
                 rsa_key=rsa_key,
@@ -122,4 +127,3 @@ class TestVarlocker(unittest.TestCase):
                 unmapped_only=True,
                 rsa_ver_key=rsa_ver_key,
             )
-

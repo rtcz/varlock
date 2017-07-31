@@ -34,7 +34,7 @@ class TestMutate(unittest.TestCase):
         self.assertEqual(19, self.mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
         self.assertEqual(12, self.mut.stat(BamMutator.STAT_MUT_ALIGNMENT_COUNT))
         self.assertEqual(5, self.mut.stat(BamMutator.STAT_MAX_COVERAGE))
-        self.assertEqual(5, self.mut.stat(BamMutator.STAT_SNV_COUNT))
+        self.assertEqual(5, self.mut.stat(BamMutator.STAT_VAC_COUNT))
         self.assertEqual(12, self.mut.stat(BamMutator.STAT_MUT_COUNT))
         self.assertEqual(4, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
         
@@ -60,7 +60,7 @@ class TestMutate(unittest.TestCase):
         self.assertEqual(19, self.mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
         self.assertEqual(7, self.mut.stat(BamMutator.STAT_MUT_ALIGNMENT_COUNT))
         self.assertEqual(3, self.mut.stat(BamMutator.STAT_MAX_COVERAGE))
-        self.assertEqual(4, self.mut.stat(BamMutator.STAT_SNV_COUNT))
+        self.assertEqual(4, self.mut.stat(BamMutator.STAT_VAC_COUNT))
         self.assertEqual(7, self.mut.stat(BamMutator.STAT_MUT_COUNT))
         self.assertEqual(3, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
         

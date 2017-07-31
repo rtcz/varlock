@@ -1,5 +1,6 @@
 import filecmp
 import io
+import os
 import unittest
 
 from varlock import Vac, FastaIndex
@@ -121,13 +122,16 @@ class TestVac(unittest.TestCase):
     
     def test_vcf2vac(self):
         vac = self.vac()
+        vac_filename = self.RESOURCE_PATH + 'output.vac'
         with open(self.RESOURCE_PATH + 'input.vcf', 'rt') as vcf_file, \
-                open(self.RESOURCE_PATH + 'output.vac', 'wb') as out_vac_file:
-            vac.vcf2vac(vcf_file, out_vac_file)
+                open(vac_filename, 'wb') as vac_file:
+            vac.vcf2vac(vcf_file, vac_file)
         
         vac.vac2text(self.RESOURCE_PATH + 'output.vac', self.RESOURCE_PATH + 'output.vac.txt')
         is_equal = filecmp.cmp(self.RESOURCE_PATH + 'output.vac.txt', self.RESOURCE_PATH + 'desired.vac.txt')
         self.assertEqual(True, is_equal)
+        self.assertFalse(os.path.isfile(vac_filename + Vac.SNV_TEMP_EXT))
+        self.assertFalse(os.path.isfile(vac_filename + Vac.INDEL_TEMP_EXT))
 
 
 if __name__ == '__main__':

@@ -1,4 +1,3 @@
-from ..common import is_placed_alignment
 from ..fasta_index import FastaIndex
 
 
@@ -120,6 +119,8 @@ class UnmappedBamIterator:
         except StopIteration:
             return None
 
+
+# TODO refactor - use filenames as parameters
 
 class FullBamIterator:
     def __init__(self, bam_file):
