@@ -3,7 +3,7 @@ import struct
 from .common import *
 import os
 
-
+# TODO refactor like file object interface
 class Vac:
     # TODO add header with VCF's checksum ?
     """
@@ -26,11 +26,9 @@ class Vac:
     VAC INDEL record:
     index 4B, 0-based absolute genomic position
     length 1B, number of INDELs
-    list:, sorted by allele count and sequence
-        INDEL allele count 2B
-        INDEL base length 2B, length of INDEL sequence
+    list:, sorted by allele count and sequence (descending)
         list:
-            INDEL sequence 1B, can encode 4 bases
+            INDEL 4 base sequence, 1B
     """
     VCF_CHROM_ID = 0
     VCF_POS_ID = 1
