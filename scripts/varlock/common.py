@@ -5,6 +5,7 @@ import gzip
 import hashlib
 import math
 import os
+import json
 
 import pysam
 
@@ -18,13 +19,13 @@ BITS2BASE = {0b00: 'A', 0b01: 'T', 0b10: 'G', 0b11: 'C'}
 
 def stream_cipher(seq: str, key: bytes):
     """
-    :param seq: sequence of DNA bases
+    :param seq: sequence of DNA base letters
     :param key: key stream
-    :return: cipher stream in form of DNA bases
+    :return: cipher stream in form of DNA base letters
     DNA base encryption using stream cipher.
-    Input sequence of DNA bases is encrypted as another sequence of same length.
+    Input sequence of DNA bases is encrypted as another sequence of the same length.
     Each 2 bits of the key stream are used to encrypt one base from the sequence.
-    If there is not enough bits of the key stream to encrypt whole sequence, key stream repeats.
+    If there is not enough bits of the key stream to encrypt whole sequence, key stream is repeated.
     """
     mut_seq = ''
     for i in range(len(seq)):
@@ -55,7 +56,9 @@ def create_mut_map(alt_ac, ref_ac, rnd):
     :param alt_ac: list of DNA bases frequencies
     :param ref_ac:
     :param rnd: random number generator
-    :return: dict which is specific mutation mapping
+    :return: mut_map: dict which is specific mutation mapping
+    mut_map.key: original base
+    mut_map.value: mutated base
     """
     ref_bases = list(BASES)
     alt_bases = list(BASES)
@@ -287,8 +290,8 @@ def seq2bytes(seq: str):
 
 def bytes2seq(byte_list: bytes, seq_length: int):
     """
-    :param byte_list: DNA sequence encoded as 2bits per BASE
-    :param seq_length: length of result
+    :param byte_list: DNA sequence encoded as 2 bits per BASE
+    :param seq_length: length of result sequence
     :return: DNA sequence
     """
     if math.ceil(seq_length / 4) > len(byte_list):
@@ -307,3 +310,11 @@ def bytes2seq(byte_list: bytes, seq_length: int):
         seq += BITS2BASE[bits]
     
     return seq
+
+
+def dict2bytes(value: dict):
+    return json.dumps(value, separators=(',', ':')).encode()
+
+
+def bytes2dict(value: bytes):
+    return json.loads(value.decode())

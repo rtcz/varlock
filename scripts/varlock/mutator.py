@@ -8,17 +8,17 @@ import random
 # from .diff import Diff
 # from .fasta_index import FastaIndex
 # from .po import SnvAlignment, GenomicPosition, VacSnvRecord
-
-
+from varlock.bdiff import BdiffFile
 from varlock.cigar import Cigar
 import varlock.common as common
 from varlock.diff import Diff
 from varlock.fasta_index import FastaIndex
 import varlock.iterator as iters
-from varlock.po import SnvAlignment, GenomicPosition, VacSnvRecord
+from varlock.po import SnvAlignment, GenomicPosition, VacSnvRecord, VacIndelRecord
 
 
 class Mutator:
+    
     def __init__(
             self,
             bam_file,
@@ -151,7 +151,7 @@ class Mutator:
             if self.verbose:
                 print("Calculating BAM's checksum")
             
-            self._bam_checksum = common.filename_checksum(self.bam_file.filename)
+            self._bam_checksum = common.filename_checksum(self.bam_file._filename)
         
         return self._bam_checksum
     
@@ -230,7 +230,7 @@ class Mutator:
                 # last mutation
                 if diff is not None:
                     # noinspection PyTypeChecker
-                    self.__unmutate_overlap(alignment_queue, diff.mut_map)
+                    self.__unmutate_pos(alignment_queue, diff.mut_map)
                 
                 for snv_alignment in alignment_queue:
                     # unmapped alignments in queue are already encrypted
@@ -260,7 +260,7 @@ class Mutator:
                 alignment = next(bam_iter)
             
             elif self.__is_after_index(alignment, diff.index):
-                self.__unmutate_overlap(alignment_queue, diff.mut_map)
+                self.__unmutate_pos(alignment_queue, diff.mut_map)
                 # done with this diff, read next
                 prev_diff = diff
                 diff = next(diff_iter)
@@ -285,7 +285,7 @@ class Mutator:
         # noinspection PyAttributeOutsideInit
         self.diff_counter = diff_iter.counter
     
-    def __unmutate_overlap(self, alignment_queue, mut_map):
+    def __unmutate_pos(self, alignment_queue, mut_map):
         for snv_alignment in alignment_queue:
             if snv_alignment.pos is not None:
                 # alignment has vac to mutate
@@ -303,15 +303,13 @@ class Mutator:
             return alignment.query_sequence
     
     # TODO refactor, iterators as parameters
-    def mutate(self, vac_filename: str, out_bam_file, out_diff_file, secret: bytes):
+    def mutate(self, vac_filename: str, out_bam_file, secret: bytes):
         """
         Mutate BAM file SNVs.
         :param vac_filename:
         input variant allele count file
         :param out_bam_file: pysam.AlignmentFile
         output bam file
-        :param out_diff_file: binary file
-        output diff file
         :param secret: Secret key written into DIFF used for unmapped alignment encryption.
         """
         self.__init_counters()
@@ -327,6 +325,10 @@ class Mutator:
         if self.verbose:
             print('first vac: %s' % vac)
             print('first alignment: %s' % self.alignment2str(alignment))
+
+        out_diff_file = BdiffFile.open(header={
+        
+        })
         
         Diff.write_header(
             diff_file=out_diff_file,
@@ -346,7 +348,7 @@ class Mutator:
                 # last mutation
                 if vac is not None:
                     # noinspection PyTypeChecker
-                    self.__mutate_overlap(out_diff_file, alignment_queue, vac)
+                    self.__mutate_pos(out_diff_file, alignment_queue, vac)
                 
                 for snv_alignment in alignment_queue:
                     # unmapped alignments in queue are already encrypted
@@ -376,7 +378,7 @@ class Mutator:
                 alignment = next(bam_iter)
             
             elif self.__is_after_index(alignment, vac.index):
-                self.__mutate_overlap(out_diff_file, alignment_queue, vac)
+                self.__mutate_pos(out_diff_file, alignment_queue, vac)
                 # done with this vac, read next
                 prev_vac = vac
                 vac = next(vac_iter)
@@ -419,7 +421,7 @@ class Mutator:
             mut_seq = common.stream_cipher(alignment.query_sequence, sha512.digest())
             alignment.query_sequence = mut_seq
     
-    def __mutate_overlap(self, out_diff_file, alignment_queue, vac: GenomicPosition):
+    def __mutate_pos(self, out_diff_file, alignment_queue, vac: GenomicPosition):
         """
         Mutate alignments at position of the variant
         :param alignment_queue: alignments together with vac positions
@@ -449,7 +451,11 @@ class Mutator:
                     mut_map=mut_map
                 )
         
-        # TODO isinstance(vac, VacIndelRecord)
+        elif isinstance(vac, VacIndelRecord):
+            # TODO isinstance(vac, VacIndelRecord)
+            pass
+        else:
+            raise ValueError("%s is not VAC record instance" % type(vac).__name__)
         
         return is_mutated
     
@@ -476,6 +482,14 @@ class Mutator:
         return is_mutated
     
     def __write_diff(self, out_diff_file, index, mut_map):
+        """
+        :param out_diff_file:
+        :param index:
+        :param mut_map:
+        mut_map.key: original base
+        mut_map.value: mutated base
+        :return:
+        """
         self.diff_counter += 1
         mut_tuple = (mut_map['A'], mut_map['T'], mut_map['G'], mut_map['C'])
         Diff.write_record(out_diff_file, index, mut_tuple)

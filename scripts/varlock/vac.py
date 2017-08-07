@@ -96,7 +96,7 @@ class Vac:
         seq_found = False
         for allele in allele_list:
             if len(allele) >= 2:
-                # at lest one allele must have multiple bases
+                # at least one allele must have multiple bases
                 seq_found = True
             if any([base not in BASES for base in allele]):
                 return False

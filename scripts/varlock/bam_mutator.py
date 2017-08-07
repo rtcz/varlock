@@ -50,16 +50,15 @@ class BamMutator:
             bam_filename: str,
             vac_filename: str,
             mut_bam_filename: str,
-            diff_file,
             secret: bytes = None
     ):
         """
         :param bam_filename:
         :param vac_filename:
         :param mut_bam_filename:
-        :param diff_file:
         :param secret: Secret key written into DIFF used for unmapped alignment encryption.
         Secret must be of size specified by DIFF format.
+        :return diff_file:
         """
         self._stats = {}
         with open_bam(bam_filename, 'rb') as bam_file:
@@ -76,10 +75,9 @@ class BamMutator:
                 secret = os.urandom(Diff.SECRET_SIZE)
             
             with open_bam(mut_bam_filename, 'wb', header=header) as out_bam_file:
-                mut.mutate(
+                diff_file = mut.mutate(
                     vac_filename=vac_filename,
                     out_bam_file=out_bam_file,
-                    out_diff_file=diff_file,
                     secret=secret
                 )
             
@@ -92,20 +90,24 @@ class BamMutator:
                 self.STAT_DIFF_COUNT: mut.diff_counter
             }
         
+        
+        
         # TODO resolve difference between mutated and converted (bam->sam->bam) bam
-        # print('before bam ' + bin2hex(filename_checksum(out_bam_file.filename)))
-        # bam2sam(out_bam_file.filename, out_bam_file.filename + b'.sam')
-        # print('before sam ' + bin2hex(filename_checksum(out_bam_file.filename + b'.sam')))
-        # sam2bam(out_bam_file.filename + b'.sam', out_bam_file.filename)
+        # print('before bam ' + bin2hex(filename_checksum(out_bam_file._filename)))
+        # bam2sam(out_bam_file._filename, out_bam_file._filename + b'.sam')
+        # print('before sam ' + bin2hex(filename_checksum(out_bam_file._filename + b'.sam')))
+        # sam2bam(out_bam_file._filename + b'.sam', out_bam_file._filename)
         #
-        # print('after bam ' + bin2hex(filename_checksum(out_bam_file.filename)))
-        # bam2sam(out_bam_file.filename, out_bam_file.filename + b'.sam')
-        # print('after sam ' + bin2hex(filename_checksum(out_bam_file.filename + b'.sam')))
+        # print('after bam ' + bin2hex(filename_checksum(out_bam_file._filename)))
+        # bam2sam(out_bam_file._filename, out_bam_file._filename + b'.sam')
+        # print('after sam ' + bin2hex(filename_checksum(out_bam_file._filename + b'.sam')))
         # exit(0)
         
         # rewrite checksum placeholder with mutated BAM checksum
         Diff.write_checksum(diff_file, filename_checksum(mut_bam_filename))
         diff_file.seek(0)
+
+        return diff_file
     
     def unmutate(
             self,

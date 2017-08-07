@@ -1,38 +1,46 @@
 import io
 import unittest
 
+from varlock.bdiff import BdiffFile
 from varlock.diff import Diff
 
 
-class TestDiff(unittest.TestCase):
-    SECRET = bytes([255] * Diff.SECRET_SIZE)
-    CHECKSUM = b'0123456789ABCDEF'
+class TestBbiff(unittest.TestCase):
+    # SECRET = bytes([255] * Diff.SECRET_SIZE)
+    # CHECKSUM = b'0123456789ABCDEF'
+    RESOURCE_PATH = 'tests/resources/bdiff/'
     
     @classmethod
-    def __build_diff_file(cls):
-        diff_file = io.BytesIO()
-        Diff.write_header(diff_file, 2000000000, 3000000000, cls.CHECKSUM, cls.SECRET)
-        Diff.write_record(diff_file, 2830728741, ('C', 'A', 'T', 'G'))
-        Diff.write_record(diff_file, 2830728781, ('G', 'A', 'T', 'C'))
-        Diff.write_record(diff_file, 2830728786, ('T', 'G', 'A', 'C'))
-        Diff.write_record(diff_file, 2830728806, ('G', 'C', 'A', 'T'))
-        diff_file.seek(0)
-        return diff_file
+    def setUpClass(cls):
+        with BdiffFile(cls.RESOURCE_PATH + 'input.bdiff', 'w') as bdiff_file:
+            bdiff_file.write_snv(10011, ('C', 'A', 'T', 'G'))
+            bdiff_file.write_snv(10021, ('G', 'A', 'T', 'C'))
+            bdiff_file.write_indel(10032, ['AT', 'ATT', 'A'])
+            bdiff_file.write_snv(10041, ('T', 'G', 'A', 'C'))
+            bdiff_file.write_indel(10052, ['T', 'TT'])
+            bdiff_file.write_indel(10062, ['GCG', 'G', 'GCGCG'])
+            bdiff_file.write_snv(10071, ('G', 'C', 'A', 'T'))
     
     def test_io(self):
-        diff_file = self.__build_diff_file()
-        self.assertTupleEqual(
-            (self.CHECKSUM, 2000000000, 3000000000, self.SECRET),
-            Diff.read_header(diff_file)
-        )
-        self.assertTupleEqual((2830728741, ('C', 'A', 'T', 'G')), Diff.read_record(diff_file))
-        self.assertTupleEqual((2830728781, ('G', 'A', 'T', 'C')), Diff.read_record(diff_file))
-        self.assertTupleEqual((2830728786, ('T', 'G', 'A', 'C')), Diff.read_record(diff_file))
-        self.assertTupleEqual((2830728806, ('G', 'C', 'A', 'T')), Diff.read_record(diff_file))
-        self.assertRaises(EOFError, lambda: Diff.read_record(diff_file))
+        with BdiffFile(self.RESOURCE_PATH + 'input.bdiff', 'r') as bdiff_file:
+            self.assertEqual(bdiff_file.filename, self.RESOURCE_PATH + 'input.bdiff')
+            self.assertEqual(bdiff_file.mode, 'r')
+            self.assertDictEqual({}, bdiff_file.header)
+            self.assertEqual(4, bdiff_file.snv_count)
+            self.assertEqual(3, bdiff_file.indel_count)
+            self.assertTupleEqual((10011, ('C', 'A', 'T', 'G')), bdiff_file.read_snv())
+            self.assertTupleEqual((10021, ('G', 'A', 'T', 'C')), bdiff_file.read_snv())
+            self.assertTupleEqual((10041, ('T', 'G', 'A', 'C')), bdiff_file.read_snv())
+            self.assertTupleEqual((10071, ('G', 'C', 'A', 'T')), bdiff_file.read_snv())
+            self.assertRaises(EOFError, lambda: bdiff_file.read_snv())
+            
+            self.assertTupleEqual((10032, ['AT', 'ATT', 'A']), bdiff_file.read_indel())
+            self.assertTupleEqual((10052, ['T', 'TT']), bdiff_file.read_indel())
+            self.assertTupleEqual((10062, ['GCG', 'G', 'GCGCG']), bdiff_file.read_indel())
+            self.assertRaises(EOFError, lambda: bdiff_file.read_indel())
     
     def test_seek_index(self):
-        diff_file = self.__build_diff_file()
+        # TODO
         self.assertEqual(self.rec_offset(0), Diff.seek_closest_index(diff_file, 2830728740))
         self.assertEqual(self.rec_offset(0), Diff.seek_closest_index(diff_file, 2830728741))
         self.assertEqual(self.rec_offset(1), Diff.seek_closest_index(diff_file, 2830728780))
@@ -42,7 +50,7 @@ class TestDiff(unittest.TestCase):
         self.assertEqual(self.rec_offset(3), Diff.seek_closest_index(diff_file, 2830728790))
         self.assertEqual(self.rec_offset(3), Diff.seek_closest_index(diff_file, 2830728806))
         self.assertRaises(IndexError, lambda: Diff.seek_closest_index(diff_file, 2830728807))
-        
+
         self.assertRaises(IndexError, lambda: Diff.seek_closest_index(diff_file, 2830728740, False))
         self.assertEqual(self.rec_offset(0), Diff.seek_closest_index(diff_file, 2830728741, False))
         self.assertEqual(self.rec_offset(0), Diff.seek_closest_index(diff_file, 2830728780, False))

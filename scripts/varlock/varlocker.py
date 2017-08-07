@@ -65,11 +65,11 @@ class Varlocker:
         aes_key = os.urandom(cls.AES_KEY_LENGTH)
         mut = vrl.BamMutator(verbose=verbose)
         
-        with io.BytesIO() as diff_file, open(out_enc_diff_filename, 'wb') as enc_diff_file:
+        with open(out_enc_diff_filename, 'wb') as enc_diff_file:
             if verbose:
                 print('--- Mutating BAM ---')
             
-            mut.mutate(bam_filename, vac_filename, out_bam_filename, diff_file)
+            diff_file = mut.mutate(bam_filename, vac_filename, out_bam_filename)
             
             if verbose:
                 print('stats: %s' % mut.all_stats())
@@ -114,7 +114,7 @@ class Varlocker:
         :param verbose:
         """
         # TODO verify if bam_filename is mutated
-        # compare BAM's checksum to checksum stored in VAC header
+        # TODO compare mutated BAM checksum to checksum stored in DIFF header
         
         # make sure that BAM is indexed
         pysam.index(bam_filename)

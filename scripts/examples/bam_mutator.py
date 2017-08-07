@@ -25,7 +25,7 @@ total of 10000 alignments processed
 
    Ordered by: internal time
 
-   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+   ncalls  tottime  percall  cumtime  percall _filename:lineno(function)
     23800    0.491    0.000    0.809    0.000 common.py:84(ref_pos2seq_pos)
     10000    0.425    0.000    0.428    0.000 calignmentfile.pyx:1361(write)
        14    0.358    0.026    0.358    0.026 {method 'read' of '_io.TextIOWrapper' objects}
@@ -37,7 +37,7 @@ total of 10000 alignments processed
     29280    0.222    0.000    0.669    0.000 fromnumeric.py:43(_wrapit)
     29280    0.198    0.000    0.867    0.000 fromnumeric.py:917(argmax)
     34961    0.127    0.000    0.138    0.000 calignmentfile.pyx:672(get_reference_name)
-     9760    0.120    0.000    2.084    0.000 mutator.py:365(__mutate_overlap)
+     9760    0.120    0.000    2.084    0.000 mutator.py:365(__mutate_pos)
 """
 
 """
@@ -47,7 +47,7 @@ total of 517362 alignments processed
 
    Ordered by: internal time
 
-   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+   ncalls  tottime  percall  cumtime  percall _filename:lineno(function)
   2688971   39.119    0.000   63.576    0.000 common.py:84(ref_pos2seq_pos)
   2688971   21.604    0.000   21.604    0.000 calignedsegment.pyx:1449(get_aligned_pairs)
   1059416   21.457    0.000  125.544    0.000 mutator.py:511(create_mut_map)
@@ -58,7 +58,7 @@ total of 517362 alignments processed
    517362   14.372    0.000   14.477    0.000 calignmentfile.pyx:1361(write)
   3178248   14.329    0.000   64.386    0.000 fromnumeric.py:917(argmax)
   3828681   10.228    0.000   11.106    0.000 calignmentfile.pyx:672(get_reference_name)
-  1059416    9.203    0.000  155.791    0.000 mutator.py:365(__mutate_overlap)
+  1059416    9.203    0.000  155.791    0.000 mutator.py:365(__mutate_pos)
   2273799    8.814    0.000   27.776    0.000 mutator.py:37(__is_before_index)
   1059416    8.271    0.000   25.467    0.000 vac_iterator.py:14(__next__)
   3178248    7.519    0.000    7.519    0.000 {method 'argmax' of 'numpy.ndarray' objects}

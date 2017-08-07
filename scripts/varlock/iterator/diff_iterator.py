@@ -1,9 +1,9 @@
 from ..diff import Diff
-from ..po import DiffRecord
+from ..po import DiffSnvRecord
 from ..common import BASES
 
 
-# TODO refactor - use filename as parameter
+# TODO refactor - use _filename as parameter
 
 class DiffIterator:
     def __init__(self, diff_file, fai, start_index, end_index):
@@ -20,17 +20,29 @@ class DiffIterator:
         return self
     
     def __next__(self):
+        """
+        :return: diff record with reversed mutation map
+        mut_map.key: mutated base
+        mut_map.value: original base
+        """
         try:
             index, mut_tuple = Diff.read_record(self.diff_file)
         except EOFError:
+            self.diff_file.close()
             return None
         
         ref_name, ref_pos = self.fai.index2pos(index)
         self.counter += 1
         
-        return DiffRecord(
+        return DiffSnvRecord(
             index=index,
             ref_name=ref_name,
             ref_pos=ref_pos,
             mut_map=dict(zip(mut_tuple, BASES))
         )
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self):
+        self.diff_file.close()

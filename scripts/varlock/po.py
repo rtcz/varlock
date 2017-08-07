@@ -8,10 +8,16 @@ class GenomicPosition(object):
         return '#%d %s:%d' % (self.index, self.ref_name, self.ref_pos)
 
 
-class DiffRecord(GenomicPosition):
+class DiffSnvRecord(GenomicPosition):
     def __init__(self, index: int, ref_name: str, ref_pos: int, mut_map: dict):
         super().__init__(index, ref_name, ref_pos)
         self.mut_map = mut_map
+
+
+class DiffIndelRecord(GenomicPosition):
+    def __init__(self, index: int, ref_name: str, ref_pos: int, alt_list: list):
+        super().__init__(index, ref_name, ref_pos)
+        self.alt_list = alt_list
 
 
 class VacSnvRecord(GenomicPosition):

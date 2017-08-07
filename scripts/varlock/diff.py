@@ -7,20 +7,34 @@ from .common import bin2hex, hex2bin
 
 class Diff:
     """
-    Diff is binary file, where each record represent one SNV mapping from original BAM to mutated BAM.
+    Diff is binary file, consisting of two blocks.
+    The first block contains SNV records, the second INDEL records.
+    Diff uses two temporary files when writing. These files are deleted after writing is finished.
     
-    Diff record:
-    index, 4B, absolute position of SNV in genome
-    mapping, 1B, id of bases permutation
-
     Diff header:
     md5 checksum of mutated BAM file, 16B
     start, first genomic index of DIFF range, 4B
     end, last genomic index of DIFF range, 4B
     unmapped secret, 16B
+    number of SNV records, 4B
+    number of INDEL records, 4B
+    
+    Diff SNV record: permutation of bases (A,T,G,C)
+    index 4B, 0-based absolute genomic position
+    mapping, 1B, id of base permutation
+    
+    DIFF INDEL record: permutation of sequences
+    index 4B, 0-based absolute genomic position
+    length 1B, index of INDEL value
+    list:, sorted by sequence (ascending)
+        INDEL allele count 2B
+        INDEL base length 2B, length of INDEL sequence
+        list:
+            INDEL 4 base sequence, 1B
+    
     """
-    RECORD_FORMAT = "<IB"  # int, char
-    RECORD_SIZE = 5
+    SNV_RECORD_FORMAT = "<IB"  # int, char
+    SNV_RECORD_SIZE = 5
     
     CHECKSUM_SIZE = 16
     INT_SIZE = 4
@@ -89,17 +103,18 @@ class Diff:
         :param diff_file:
         :return:
         """
-        diff_file.seek(0)
+        # diff_file.seek(0)
         checksum = diff_file.read(cls.CHECKSUM_SIZE)
         start_index, end_index = struct.unpack('<II', diff_file.read(cls.INT_SIZE * 2))
         secret = diff_file.read(cls.SECRET_SIZE)
+        snv_count, indel_count = struct.unpack('<II', diff_file.read(cls.INT_SIZE * 2))
         return checksum, start_index, end_index, secret
     
     @classmethod
     def validate_header_range(cls, diff_file):
         checksum, header_start_index, header_end_index, secret = cls.read_header(diff_file)
         content_start_index = cls.__read_index(diff_file)
-        diff_file.seek(-cls.RECORD_SIZE, os.SEEK_END)
+        diff_file.seek(-cls.SNV_RECORD_SIZE, os.SEEK_END)
         content_end_index = cls.__read_index(diff_file)
         
         if header_start_index > content_start_index:
@@ -124,15 +139,15 @@ class Diff:
     
     @classmethod
     def read_record(cls, diff_file):
-        byte_string = diff_file.read(cls.RECORD_SIZE)
+        byte_string = diff_file.read(cls.SNV_RECORD_SIZE)
         if len(byte_string) == 0:
             raise EOFError()
-        index, mut_index = struct.unpack(cls.RECORD_FORMAT, byte_string)
+        index, mut_index = struct.unpack(cls.SNV_RECORD_FORMAT, byte_string)
         return index, cls.INDEX_2_MUT[mut_index]
     
     @classmethod
     def write_record(cls, diff_file, index: int, mut_tuple: tuple):
-        byte_string = struct.pack(cls.RECORD_FORMAT, index, cls.MUT_2_INDEX[mut_tuple])
+        byte_string = struct.pack(cls.SNV_RECORD_FORMAT, index, cls.MUT_2_INDEX[mut_tuple])
         diff_file.write(byte_string)
     
     @classmethod
@@ -163,7 +178,7 @@ class Diff:
         start_offset = cls.seek_closest_index(diff_file, start_index, True)
         end_offset = cls.seek_closest_index(diff_file, end_index, False)
         
-        return start_offset, end_offset + cls.RECORD_SIZE
+        return start_offset, end_offset + cls.SNV_RECORD_SIZE
     
     @classmethod
     def __read_index(cls, diff_file):
@@ -184,7 +199,7 @@ class Diff:
             # file is empty - return position after header
             raise EOFError("Diff is empty")
         
-        if body_size % cls.RECORD_SIZE != 0:
+        if body_size % cls.SNV_RECORD_SIZE != 0:
             raise IOError("Diff file has invalid number of bytes")
         
         cls.validate_header_range(diff_file)
@@ -201,7 +216,7 @@ class Diff:
         
         diff_file.seek(cls.HEADER_SIZE)
         start_index = cls.__read_index(diff_file)
-        diff_file.seek(-Diff.RECORD_SIZE, os.SEEK_END)
+        diff_file.seek(-Diff.SNV_RECORD_SIZE, os.SEEK_END)
         end_index = cls.__read_index(diff_file)
         
         if index > end_index:
@@ -209,7 +224,7 @@ class Diff:
             if up:
                 raise IndexError("Upper index not found")
             else:
-                diff_file.seek(-cls.RECORD_SIZE, os.SEEK_END)
+                diff_file.seek(-cls.SNV_RECORD_SIZE, os.SEEK_END)
                 return diff_file.tell()
         
         if index < start_index:
@@ -221,11 +236,11 @@ class Diff:
                 raise IndexError("Lower index not found")
         
         first = 0
-        last = cls.body_size(diff_file) / cls.RECORD_SIZE - 1
+        last = cls.body_size(diff_file) / cls.SNV_RECORD_SIZE - 1
         curr_index = index
         while first <= last:
             mid = int((first + last) / 2)
-            diff_file.seek(cls.HEADER_SIZE + (mid * cls.RECORD_SIZE))
+            diff_file.seek(cls.HEADER_SIZE + (mid * cls.SNV_RECORD_SIZE))
             curr_index = cls.__read_index(diff_file)
             if index == curr_index:
                 break
@@ -240,14 +255,14 @@ class Diff:
         
         # final move
         if index < curr_index:
-            diff_file.seek(-cls.RECORD_SIZE, os.SEEK_CUR)
+            diff_file.seek(-cls.SNV_RECORD_SIZE, os.SEEK_CUR)
             prev_offset = diff_file.tell()
             prev_index = cls.__read_index(diff_file)
             if not up or index == prev_index:
                 offset = prev_offset
         
         elif index > curr_index:
-            diff_file.seek(cls.RECORD_SIZE, os.SEEK_CUR)
+            diff_file.seek(cls.SNV_RECORD_SIZE, os.SEEK_CUR)
             next_offset = diff_file.tell()
             next_index = cls.__read_index(diff_file)
             if up or index == next_index:
