@@ -8,17 +8,16 @@ import random
 # from .diff import Diff
 # from .fasta_index import FastaIndex
 # from .po import SnvAlignment, GenomicPosition, VacSnvRecord
-from varlock.bdiff import BdiffFile
 from varlock.cigar import Cigar
 import varlock.common as common
 from varlock.diff import Diff
 from varlock.fasta_index import FastaIndex
 import varlock.iterator as iters
 from varlock.po import SnvAlignment, GenomicPosition, VacSnvRecord, VacIndelRecord
+import varlock.bdiff as bdiff
 
 
 class Mutator:
-    
     def __init__(
             self,
             bam_file,
@@ -325,8 +324,8 @@ class Mutator:
         if self.verbose:
             print('first vac: %s' % vac)
             print('first alignment: %s' % self.alignment2str(alignment))
-
-        out_diff_file = BdiffFile.open(header={
+        
+        out_diff_file = bdiff.BdiffIO(meta={
         
         })
         

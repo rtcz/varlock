@@ -3,6 +3,7 @@ import struct
 from .common import *
 import os
 
+
 # TODO refactor like file object interface
 class Vac:
     # TODO add header with VCF's checksum ?

@@ -10,6 +10,8 @@ from varlock.bam import open_bam
 class TestVac(unittest.TestCase):
     RESOURCE_PATH = 'tests/resources/vac/'
     
+    # TODO test empty and single record file
+    
     @classmethod
     def vac(cls):
         with open_bam(cls.RESOURCE_PATH + 'input.sam', 'rb') as sam_file:

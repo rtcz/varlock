@@ -1,5 +1,5 @@
 from varlock import FastaIndex
-from varlock.bdiff import BdiffFile
+from varlock.bdiff import BdiffIO
 from varlock.po import DiffSnvRecord, DiffIndelRecord
 
 
@@ -7,7 +7,7 @@ class BdiffIterator:
     def __init__(self, filename, fai: FastaIndex, start_index, end_index):
         self._fai = fai
         self._counter = 0
-        self._bdiff = BdiffFile(filename, 'r')
+        self._bdiff = BdiffIO(filename, 'r')
         
         self._read_snv()
         self._read_indel()
