@@ -2,8 +2,7 @@ import random
 import os
 
 from .bam import open_bam, mut_header, unmut_header
-from .common import filename_checksum, bin2hex
-from .diff import Diff
+from .common import checksum, bytes2hex
 from .mutator import Mutator
 
 
@@ -11,9 +10,8 @@ class BamMutator:
     # written alignments
     STAT_ALIGNMENT_COUNT = 'alignment_count'
     
-    # mutated alignments
     # number of alignments covering vac / diff position
-    STAT_MUT_ALIGNMENT_COUNT = 'mut_alignment_count'
+    STAT_COVERING_COUNT = 'covering_count'
     
     # maximum alignments overlapping single SNV
     STAT_MAX_COVERAGE = 'max_coverage'
@@ -26,6 +24,11 @@ class BamMutator:
     
     # number of diff records written / read
     STAT_DIFF_COUNT = 'diff_count'
+    
+    FROM_INDEX = 'from_index'
+    TO_INDEX = 'to_index'
+    SECRET = 'secret'
+    MB_CHECKSUM = 'mb_checksum'
     
     def __init__(
             self,
@@ -50,7 +53,7 @@ class BamMutator:
             bam_filename: str,
             vac_filename: str,
             mut_bam_filename: str,
-            secret: bytes = None
+            secret: bytes
     ):
         """
         :param bam_filename:
@@ -67,15 +70,12 @@ class BamMutator:
             if self.verbose:
                 print("Calculating VAC's checksum")
             
-            vac_checksum = bin2hex(filename_checksum(vac_filename))
-            bam_checksum = bin2hex(mut.bam_checksum())
+            vac_checksum = bytes2hex(checksum(vac_filename))
+            bam_checksum = bytes2hex(mut.bam_checksum())
             header = mut_header(bam_file.header, bam_checksum, vac_checksum)
             
-            if secret is None:
-                secret = os.urandom(Diff.SECRET_SIZE)
-            
             with open_bam(mut_bam_filename, 'wb', header=header) as out_bam_file:
-                diff_file = mut.mutate(
+                bdiff_io = mut.mutate(
                     vac_filename=vac_filename,
                     out_bam_file=out_bam_file,
                     secret=secret
@@ -83,31 +83,31 @@ class BamMutator:
             
             self._stats = {
                 self.STAT_ALIGNMENT_COUNT: mut.alignment_counter,
-                self.STAT_MUT_ALIGNMENT_COUNT: mut.mut_alignment_counter,
+                self.STAT_COVERING_COUNT: mut.covering_counter,
                 self.STAT_MAX_COVERAGE: mut.max_coverage,
                 self.STAT_VAC_COUNT: mut.vac_counter,
                 self.STAT_MUT_COUNT: mut.mut_counter,
                 self.STAT_DIFF_COUNT: mut.diff_counter
             }
         
-        
-        
         # TODO resolve difference between mutated and converted (bam->sam->bam) bam
-        # print('before bam ' + bin2hex(filename_checksum(out_bam_file._filename)))
+        # print('before bam ' + bytes2hex(checksum(out_bam_file._filename)))
         # bam2sam(out_bam_file._filename, out_bam_file._filename + b'.sam')
-        # print('before sam ' + bin2hex(filename_checksum(out_bam_file._filename + b'.sam')))
+        # print('before sam ' + bytes2hex(checksum(out_bam_file._filename + b'.sam')))
         # sam2bam(out_bam_file._filename + b'.sam', out_bam_file._filename)
         #
-        # print('after bam ' + bin2hex(filename_checksum(out_bam_file._filename)))
+        # print('after bam ' + bytes2hex(checksum(out_bam_file._filename)))
         # bam2sam(out_bam_file._filename, out_bam_file._filename + b'.sam')
-        # print('after sam ' + bin2hex(filename_checksum(out_bam_file._filename + b'.sam')))
+        # print('after sam ' + bytes2hex(checksum(out_bam_file._filename + b'.sam')))
         # exit(0)
         
         # rewrite checksum placeholder with mutated BAM checksum
-        Diff.write_checksum(diff_file, filename_checksum(mut_bam_filename))
-        diff_file.seek(0)
-
-        return diff_file
+        return bdiff_io.file(header={
+            self.FROM_INDEX: mut.fai.first_index(),
+            self.TO_INDEX: mut.fai.last_index(),
+            self.MB_CHECKSUM: bytes2hex(checksum(mut_bam_filename)),
+            self.SECRET: bytes2hex(secret)
+        })
     
     def unmutate(
             self,
@@ -152,7 +152,7 @@ class BamMutator:
             
             self._stats = {
                 self.STAT_ALIGNMENT_COUNT: mut.alignment_counter,
-                self.STAT_MUT_ALIGNMENT_COUNT: mut.mut_alignment_counter,
+                self.STAT_COVERING_COUNT: mut.covering_counter,
                 self.STAT_MAX_COVERAGE: mut.max_coverage,
                 self.STAT_MUT_COUNT: mut.mut_counter,
                 self.STAT_DIFF_COUNT: mut.diff_counter

@@ -3,8 +3,7 @@ from ..po import DiffSnvRecord
 from ..common import BASES
 
 
-# TODO refactor - use _filename as parameter
-
+@DeprecationWarning
 class DiffIterator:
     def __init__(self, diff_file, fai, start_index, end_index):
         assert start_index < end_index

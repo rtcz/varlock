@@ -82,7 +82,7 @@ class Mutator:
         self.mut_counter = 0  # all mutations
         self.vac_counter = 0  # read vac records (variants)
         
-        self.mut_alignment_counter = 0  # mutated alignments
+        self.covering_counter = 0  # mutated alignments
         self.max_coverage = 0  # maximum alignments overlapping single SNV
     
     def resolve_diff_range(
@@ -150,14 +150,14 @@ class Mutator:
             if self.verbose:
                 print("Calculating BAM's checksum")
             
-            self._bam_checksum = common.filename_checksum(self.bam_file._filename)
+            self._bam_checksum = common.checksum(self.bam_file.filename)
         
         return self._bam_checksum
     
     def validate_checksum(self, check_sum):
         if self.bam_checksum() != check_sum:
-            # print(bin2hex(self.bam_checksum()))
-            # print(bin2hex(check_sum))
+            # print(bytes2hex(self.bam_checksum()))
+            # print(bytes2hex(check_sum))
             raise ValueError("Invalid checksum.")
     
     # TODO refactor iterators as parameters
@@ -189,7 +189,7 @@ class Mutator:
         """
         self.__init_counters()
         
-        Diff.validate(diff_file)
+        # Diff.validate(diff_file)
         start_index, end_index = self.resolve_diff_range(
             diff_file,
             start_ref_name,
@@ -276,7 +276,7 @@ class Mutator:
                 alignment_queue.append(SnvAlignment(alignment, seq_pos))
                 alignment = next(bam_iter)
                 
-                self.mut_alignment_counter += 1
+                self.covering_counter += 1
                 # noinspection PyAttributeOutsideInit
                 # TODO this is not the real coverage
                 self.max_coverage = max(len(alignment_queue), self.max_coverage)
@@ -301,7 +301,7 @@ class Mutator:
         else:
             return alignment.query_sequence
     
-    # TODO refactor, iterators as parameters
+    # TODO refactor, iterators as parameters ?
     def mutate(self, vac_filename: str, out_bam_file, secret: bytes):
         """
         Mutate BAM file SNVs.
@@ -309,7 +309,9 @@ class Mutator:
         input variant allele count file
         :param out_bam_file: pysam.AlignmentFile
         output bam file
-        :param secret: Secret key written into DIFF used for unmapped alignment encryption.
+        :param secret: secret key for unmapped alignment encryption
+        secret is stored in BDIFF file
+        :return: bdiff_io
         """
         self.__init_counters()
         
@@ -325,16 +327,7 @@ class Mutator:
             print('first vac: %s' % vac)
             print('first alignment: %s' % self.alignment2str(alignment))
         
-        out_diff_file = bdiff.BdiffIO(meta={
-        
-        })
-        
-        Diff.write_header(
-            diff_file=out_diff_file,
-            start_index=self.fai.first_index(),
-            end_index=self.fai.last_index(),
-            secret=secret
-        )
+        bdiff_io = bdiff.BdiffIO()
         while True:
             if vac is None or alignment is None:
                 # finish
@@ -347,7 +340,7 @@ class Mutator:
                 # last mutation
                 if vac is not None:
                     # noinspection PyTypeChecker
-                    self.__mutate_pos(out_diff_file, alignment_queue, vac)
+                    self.__mutate_pos(bdiff_io, alignment_queue, vac)
                 
                 for snv_alignment in alignment_queue:
                     # unmapped alignments in queue are already encrypted
@@ -377,7 +370,7 @@ class Mutator:
                 alignment = next(bam_iter)
             
             elif self.__is_after_index(alignment, vac.index):
-                self.__mutate_pos(out_diff_file, alignment_queue, vac)
+                self.__mutate_pos(bdiff_io, alignment_queue, vac)
                 # done with this vac, read next
                 prev_vac = vac
                 vac = next(vac_iter)
@@ -394,33 +387,35 @@ class Mutator:
                 alignment_queue.append(SnvAlignment(alignment, seq_pos))
                 alignment = next(bam_iter)
                 
-                self.mut_alignment_counter += 1
+                self.covering_counter += 1
                 # noinspection PyAttributeOutsideInit
                 # TODO this is not the real coverage
                 self.max_coverage = max(len(alignment_queue), self.max_coverage)
         
         # noinspection PyAttributeOutsideInit
         self.vac_counter = vac_iter.counter
+        return bdiff_io
     
     @staticmethod
     def __encrypt_unmapped(alignment, secret):
         """
-        Stream cipher encryption method both for encryption and decryption.
+        Stream cipher encryption / decryption.
         alignment + secret => encrypted_alignment
         encrypted_alignment + secret => alignment
         :param alignment:
         :param secret:
         :return: encrypter/decrypted alignment
         """
-        # TODO query_qualities ?
         if alignment.is_unmapped:
             # use 64B long hash (encrypts 256 bases)
             sha512 = hashlib.sha512()
+            # TODO maybe include query quality?
             sha512.update(secret + alignment.query_name.encode())
+            
             mut_seq = common.stream_cipher(alignment.query_sequence, sha512.digest())
             alignment.query_sequence = mut_seq
     
-    def __mutate_pos(self, out_diff_file, alignment_queue, vac: GenomicPosition):
+    def __mutate_pos(self, bdiff_io: bdiff.BdiffIO, alignment_queue, vac: GenomicPosition):
         """
         Mutate alignments at position of the variant
         :param alignment_queue: alignments together with vac positions
@@ -445,7 +440,7 @@ class Mutator:
             if is_mutated:
                 # at least one alignment has been mutated
                 self.__write_diff(
-                    out_diff_file=out_diff_file,
+                    bdiff_io=bdiff_io,
                     index=vac.index,
                     mut_map=mut_map
                 )
@@ -480,18 +475,16 @@ class Mutator:
         
         return is_mutated
     
-    def __write_diff(self, out_diff_file, index, mut_map):
+    def __write_diff(self, bdiff_io: bdiff.BdiffIO, index: int, mut_map: dict):
         """
-        :param out_diff_file:
+        :param bdiff_io:
         :param index:
         :param mut_map:
         mut_map.key: original base
         mut_map.value: mutated base
-        :return:
         """
         self.diff_counter += 1
-        mut_tuple = (mut_map['A'], mut_map['T'], mut_map['G'], mut_map['C'])
-        Diff.write_record(out_diff_file, index, mut_tuple)
+        bdiff_io.write_snv(index, (mut_map['A'], mut_map['T'], mut_map['G'], mut_map['C']))
     
     def __write_done(self, out_bam_file, alignment_queue, index):
         """

@@ -1,6 +1,14 @@
-e4ce96635e70ec48ea5e8f46a0e057f2
-0-3095693982
-ffffffffffffffffffffffffffffffff
-2830728741	C,A,T,G
-2830728781	G,A,T,C
-2830728786	T,G,A,C
+{
+    "from_index": 0,
+    "mb_checksum": "e4ce96635e70ec48ea5e8f46a0e057f2",
+    "secret": "ffffffffffffffffffffffffffffffff",
+    "to_index": 3095693982
+}
+snvs	3
+indels	0
+last_index	2830728787
+index_res	1000
+index_size	0
+2830728742	C,A,T,G
+2830728782	G,A,T,C
+2830728787	T,G,A,C

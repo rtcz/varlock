@@ -3,6 +3,7 @@ from varlock.bdiff import BdiffIO
 from varlock.po import DiffSnvRecord, DiffIndelRecord
 
 
+
 class BdiffIterator:
     def __init__(self, filename, fai: FastaIndex, start_index, end_index):
         self._fai = fai

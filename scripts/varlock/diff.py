@@ -2,9 +2,10 @@ import io
 import struct
 import os
 
-from .common import bin2hex, hex2bin
+from .common import bytes2hex, hex2bytes
 
 
+@DeprecationWarning
 class Diff:
     """
     Diff is binary file, consisting of two blocks.
@@ -313,7 +314,7 @@ class Diff:
         with open(diff_filepath, 'rb') as diff_file, \
                 open(text_filepath, 'wt') as text_file:
             checksum, start_index, end_index, unmapped_secret = cls.read_header(diff_file)
-            text_file.write('%s\n%d-%d\n%s\n' % (bin2hex(checksum), start_index, end_index, bin2hex(unmapped_secret)))
+            text_file.write('%s\n%d-%d\n%s\n' % (bytes2hex(checksum), start_index, end_index, bytes2hex(unmapped_secret)))
             while True:
                 try:
                     index, mut_tuple = cls.read_record(diff_file)
@@ -328,8 +329,8 @@ class Diff:
             checksum_hex = text_file.readline().rstrip()
             start_index, end_index = text_file.readline().rstrip().split('-')
             secret = text_file.readline().rstrip()
-            cls.write_header(diff_file, int(start_index), int(end_index), hex2bin(checksum_hex),
-                             hex2bin(secret))
+            cls.write_header(diff_file, int(start_index), int(end_index), hex2bytes(checksum_hex),
+                             hex2bytes(secret))
             for line in text_file:
                 index, mut = line.rstrip().split('\t')
                 Diff.write_record(diff_file, int(index), tuple(mut.split(',')))

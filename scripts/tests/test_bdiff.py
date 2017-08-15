@@ -6,6 +6,7 @@ from varlock.bdiff import BdiffIO
 class TestBdiff(unittest.TestCase):
     # SECRET = bytes([255] * Diff.SECRET_SIZE)
     # CHECKSUM = b'0123456789ABCDEF'
+    RESOURCE_PATH = 'tests/resources/bdiff/'
     
     @classmethod
     def setUpClass(cls):
@@ -19,8 +20,19 @@ class TestBdiff(unittest.TestCase):
         bdiff.write_snv(1070, ('G', 'C', 'A', 'T'))
         cls._bdiff_file = bdiff.file()
     
-    # def setUp(self):
-    #     self._bdiff_file.seek(0)
+    def test_to_string_io(self):
+        pass
+        # with BdiffFile(cls.RESOURCE_PATH + 'input.bdiff', 'w') as bdiff_file:
+        #     bdiff_file.write_snv(10011, ('C', 'A', 'T', 'G'))
+        #     bdiff_file.write_snv(10021, ('G', 'A', 'T', 'C'))
+        #     bdiff_file.write_indel(10032, ['AT', 'ATT', 'A'])
+        #     bdiff_file.write_snv(10041, ('T', 'G', 'A', 'C'))
+        #     bdiff_file.write_indel(10052, ['T', 'TT'])
+        #     bdiff_file.write_indel(10062, ['GCG', 'G', 'GCGCG'])
+        #     bdiff_file.write_snv(10071, ('G', 'C', 'A', 'T'))
+    
+    def test_to_bytes_io(self):
+        pass
     
     def test_io(self):
         bdiff = BdiffIO(self._bdiff_file)

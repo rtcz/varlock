@@ -31,7 +31,7 @@ class TestUnmutate(unittest.TestCase):
         
         self.assertEqual(15, self.mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
         # not 12 as in "mutate" because one snv is same as the reference (no diff record)
-        self.assertEqual(11, self.mut.stat(BamMutator.STAT_MUT_ALIGNMENT_COUNT))
+        self.assertEqual(11, self.mut.stat(BamMutator.STAT_COVERING_COUNT))
         self.assertEqual(5, self.mut.stat(BamMutator.STAT_MAX_COVERAGE))
         self.assertEqual(12, self.mut.stat(BamMutator.STAT_MUT_COUNT))
         self.assertEqual(4, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
@@ -53,7 +53,7 @@ class TestUnmutate(unittest.TestCase):
             )
         
         self.assertEqual(15, self.mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
-        self.assertEqual(6, self.mut.stat(BamMutator.STAT_MUT_ALIGNMENT_COUNT))
+        self.assertEqual(6, self.mut.stat(BamMutator.STAT_COVERING_COUNT))
         self.assertEqual(3, self.mut.stat(BamMutator.STAT_MAX_COVERAGE))
         self.assertEqual(7, self.mut.stat(BamMutator.STAT_MUT_COUNT))
         self.assertEqual(3, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
@@ -78,7 +78,7 @@ class TestUnmutate(unittest.TestCase):
             )
         
         self.assertEqual(7, self.mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
-        self.assertEqual(5, self.mut.stat(BamMutator.STAT_MUT_ALIGNMENT_COUNT))
+        self.assertEqual(5, self.mut.stat(BamMutator.STAT_COVERING_COUNT))
         self.assertEqual(3, self.mut.stat(BamMutator.STAT_MAX_COVERAGE))
         self.assertEqual(5, self.mut.stat(BamMutator.STAT_MUT_COUNT))
         self.assertEqual(2, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
@@ -103,7 +103,7 @@ class TestUnmutate(unittest.TestCase):
             )
         
         self.assertEqual(4, self.mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
-        self.assertEqual(3, self.mut.stat(BamMutator.STAT_MUT_ALIGNMENT_COUNT))
+        self.assertEqual(3, self.mut.stat(BamMutator.STAT_COVERING_COUNT))
         self.assertEqual(2, self.mut.stat(BamMutator.STAT_MAX_COVERAGE))
         self.assertEqual(4, self.mut.stat(BamMutator.STAT_MUT_COUNT))
         self.assertEqual(2, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
@@ -125,7 +125,7 @@ class TestUnmutate(unittest.TestCase):
             )
         
         self.assertEqual(19, self.mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
-        self.assertEqual(11, self.mut.stat(BamMutator.STAT_MUT_ALIGNMENT_COUNT))
+        self.assertEqual(11, self.mut.stat(BamMutator.STAT_COVERING_COUNT))
         self.assertEqual(5, self.mut.stat(BamMutator.STAT_MAX_COVERAGE))
         self.assertEqual(12, self.mut.stat(BamMutator.STAT_MUT_COUNT))
         self.assertEqual(4, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
@@ -151,7 +151,7 @@ class TestUnmutate(unittest.TestCase):
             )
         
         self.assertEqual(11, self.mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
-        self.assertEqual(5, self.mut.stat(BamMutator.STAT_MUT_ALIGNMENT_COUNT))
+        self.assertEqual(5, self.mut.stat(BamMutator.STAT_COVERING_COUNT))
         self.assertEqual(3, self.mut.stat(BamMutator.STAT_MAX_COVERAGE))
         self.assertEqual(5, self.mut.stat(BamMutator.STAT_MUT_COUNT))
         self.assertEqual(2, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
@@ -173,7 +173,7 @@ class TestUnmutate(unittest.TestCase):
             )
         
         self.assertEqual(4, self.mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
-        self.assertEqual(0, self.mut.stat(BamMutator.STAT_MUT_ALIGNMENT_COUNT))
+        self.assertEqual(0, self.mut.stat(BamMutator.STAT_COVERING_COUNT))
         self.assertEqual(0, self.mut.stat(BamMutator.STAT_MAX_COVERAGE))
         self.assertEqual(0, self.mut.stat(BamMutator.STAT_MUT_COUNT))
         # only first diff is read

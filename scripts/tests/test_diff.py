@@ -4,6 +4,7 @@ import unittest
 from varlock.diff import Diff
 
 
+@DeprecationWarning
 class TestDiff(unittest.TestCase):
     SECRET = bytes([255] * Diff.SECRET_SIZE)
     CHECKSUM = b'0123456789ABCDEF'

@@ -167,11 +167,11 @@ def bam2sam(bam_filename, sam_filename):
             sam_file.write(alignment)
 
 
-def bin2hex(byte_str: bytes):
+def bytes2hex(byte_str: bytes):
     return binascii.hexlify(byte_str).decode()
 
 
-def hex2bin(hex_str: str):
+def hex2bytes(hex_str: str):
     return binascii.unhexlify(hex_str)
 
 
@@ -183,7 +183,7 @@ def file_size(file_obj):
     return size
 
 
-def filename_checksum(filename: str):
+def checksum(filename: str):
     hasher = hashlib.md5()
     with open(filename, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
