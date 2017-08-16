@@ -20,18 +20,12 @@ class TestBdiff(unittest.TestCase):
         bdiff.write_snv(1070, ('G', 'C', 'A', 'T'))
         cls._bdiff_file = bdiff.file()
     
-    def test_to_string_io(self):
+    def test_from_text_file(self):
+        # TODO
         pass
-        # with BdiffFile(cls.RESOURCE_PATH + 'input.bdiff', 'w') as bdiff_file:
-        #     bdiff_file.write_snv(10011, ('C', 'A', 'T', 'G'))
-        #     bdiff_file.write_snv(10021, ('G', 'A', 'T', 'C'))
-        #     bdiff_file.write_indel(10032, ['AT', 'ATT', 'A'])
-        #     bdiff_file.write_snv(10041, ('T', 'G', 'A', 'C'))
-        #     bdiff_file.write_indel(10052, ['T', 'TT'])
-        #     bdiff_file.write_indel(10062, ['GCG', 'G', 'GCGCG'])
-        #     bdiff_file.write_snv(10071, ('G', 'C', 'A', 'T'))
     
-    def test_to_bytes_io(self):
+    def test_to_text_file(self):
+        # TODO
         pass
     
     def test_io(self):

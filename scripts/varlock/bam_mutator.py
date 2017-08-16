@@ -1,11 +1,16 @@
 import random
-import os
+import io
 
-from .bam import open_bam, mut_header, unmut_header
-from .common import checksum, bytes2hex
-from .mutator import Mutator
+from varlock.fasta_index import FastaIndex
+from varlock.mutator import Mutator
+
+import varlock.common as cmn
+import varlock.iters as iters
+import varlock.bam as bam
+import varlock.bdiff as bdiff
 
 
+# TODO rename MutatorWrapper ?
 class BamMutator:
     # written alignments
     STAT_ALIGNMENT_COUNT = 'alignment_count'
@@ -32,12 +37,23 @@ class BamMutator:
     
     def __init__(
             self,
+            filename: str,
             rnd=random.SystemRandom(),
             verbose: bool = False
     ):
-        self.rnd = rnd
-        self.verbose = verbose
+        self._verbose = verbose
+        self._rnd = rnd
         self._stats = {}
+        self._bam_filename = filename
+        
+        with bam.open_bam(self._bam_filename, 'rb') as bam_file:
+            self._bam_header = bam_file.header
+        self._fai = FastaIndex(self._bam_header)
+        
+        if self._verbose:
+            print("Calculating VAC's checksum")
+        
+        self._bam_checksum = cmn.checksum(self._bam_filename)
     
     def stat(self, stat_id):
         if stat_id in self._stats:
@@ -45,18 +61,17 @@ class BamMutator:
         else:
             raise ValueError('Stat not found.')
     
-    def all_stats(self):
+    @property
+    def stats(self):
         return self._stats
     
     def mutate(
             self,
-            bam_filename: str,
             vac_filename: str,
             mut_bam_filename: str,
             secret: bytes
     ):
         """
-        :param bam_filename:
         :param vac_filename:
         :param mut_bam_filename:
         :param secret: Secret key written into DIFF used for unmapped alignment encryption.
@@ -64,31 +79,31 @@ class BamMutator:
         :return diff_file:
         """
         self._stats = {}
-        with open_bam(bam_filename, 'rb') as bam_file:
-            mut = Mutator(bam_file, rnd=self.rnd, verbose=self.verbose)
-            
-            if self.verbose:
-                print("Calculating VAC's checksum")
-            
-            vac_checksum = bytes2hex(checksum(vac_filename))
-            bam_checksum = bytes2hex(mut.bam_checksum())
-            header = mut_header(bam_file.header, bam_checksum, vac_checksum)
-            
-            with open_bam(mut_bam_filename, 'wb', header=header) as out_bam_file:
-                bdiff_io = mut.mutate(
-                    vac_filename=vac_filename,
-                    out_bam_file=out_bam_file,
-                    secret=secret
-                )
-            
-            self._stats = {
-                self.STAT_ALIGNMENT_COUNT: mut.alignment_counter,
-                self.STAT_COVERING_COUNT: mut.covering_counter,
-                self.STAT_MAX_COVERAGE: mut.max_coverage,
-                self.STAT_VAC_COUNT: mut.vac_counter,
-                self.STAT_MUT_COUNT: mut.mut_counter,
-                self.STAT_DIFF_COUNT: mut.diff_counter
-            }
+        
+        vac_checksum = cmn.bytes2hex(cmn.checksum(vac_filename))
+        # noinspection PyTypeChecker
+        bam_checksum = cmn.bytes2hex(self._bam_checksum)
+        header = bam.mut_header(self._bam_header, bam_checksum, vac_checksum)
+        
+        mut = Mutator(fai=self._fai, rnd=self._rnd, verbose=self._verbose)
+        with bam.open_bam(mut_bam_filename, 'wb', header=header) as mut_bam_file, \
+                iters.VacIterator(vac_filename, self._fai) as vac_iter, \
+                iters.FullBamIterator(self._bam_filename) as bam_iter:
+            bdiff_io = mut.mutate(
+                mut_bam_file=mut_bam_file,
+                vac_iter=vac_iter,
+                bam_iter=bam_iter,
+                secret=secret
+            )
+        
+        self._stats = {
+            self.STAT_ALIGNMENT_COUNT: mut.alignment_counter,
+            self.STAT_COVERING_COUNT: mut.covering_counter,
+            self.STAT_MAX_COVERAGE: mut.max_coverage,
+            self.STAT_VAC_COUNT: mut.vac_counter,
+            self.STAT_MUT_COUNT: mut.mut_counter,
+            self.STAT_DIFF_COUNT: mut.diff_counter
+        }
         
         # TODO resolve difference between mutated and converted (bam->sam->bam) bam
         # print('before bam ' + bytes2hex(checksum(out_bam_file._filename)))
@@ -103,16 +118,15 @@ class BamMutator:
         
         # rewrite checksum placeholder with mutated BAM checksum
         return bdiff_io.file(header={
-            self.FROM_INDEX: mut.fai.first_index(),
-            self.TO_INDEX: mut.fai.last_index(),
-            self.MB_CHECKSUM: bytes2hex(checksum(mut_bam_filename)),
-            self.SECRET: bytes2hex(secret)
+            self.FROM_INDEX: self._fai.first_index(),
+            self.TO_INDEX: self._fai.last_index(),
+            self.MB_CHECKSUM: cmn.bytes2hex(cmn.checksum(mut_bam_filename)),
+            self.SECRET: cmn.bytes2hex(secret)
         })
     
     def unmutate(
             self,
-            bam_filename: str,
-            diff_file: object,
+            bdiff_file: io.BytesIO,
             out_bam_filename: str,
             start_ref_name: str = None,
             start_ref_pos: int = None,
@@ -122,32 +136,57 @@ class BamMutator:
             unmapped_only: bool = False
     ):
         """
-        :param bam_filename:
-        :param diff_file:
+        Unmutate BAM file in range specified by DIFF file or by parameters.
+        :param bdiff_file:
         :param out_bam_filename:
         :param start_ref_name: inclusive
         :param start_ref_pos: 0-based, inclusive
         :param end_ref_name: inclusive
         :param end_ref_pos: 0-based, inclusive
-        :param include_unmapped:
-        :param unmapped_only:
+        :param include_unmapped: Include all unplaced unmapped reads.
+        :param unmapped_only: Only unmapped reads - both placed and unplaced.
+         Overrides other parameters.
+        
+        When range is supplied partialy covered reads are also included,
+        but only snv's within range are unmutated.
         """
         self._stats = {}
         
-        with open_bam(bam_filename, 'rb') as sam_file:
-            header = unmut_header(sam_file.header)
-            mut = Mutator(sam_file, rnd=self.rnd, verbose=self.verbose)
+        with bam.open_bam(self._bam_filename, 'rb') as bam_file:
+            header = bam.unmut_header(bam_file.header)
+            mut = Mutator(fai=self._fai, rnd=self._rnd, verbose=self._verbose)
             
-            with open_bam(out_bam_filename, 'wb', header=header) as out_sam_file:
-                mut.unmutate(
-                    diff_file=diff_file,
-                    out_bam_file=out_sam_file,
+            with bam.open_bam(out_bam_filename, 'wb', header=header) as out_bam_file:
+                bdiff_io = bdiff.BdiffIO(bdiff_file)
+                # validate checksum
+                if self._bam_checksum != cmn.hex2bytes(bdiff_io.header[self.MB_CHECKSUM]):
+                    raise ValueError('BDIFF does not refer to this BAM')
+                # TODO user friendly exception on missing bdiff_io header value
+                start_index, end_index = self.resolve_range(
+                    bdiff_from_index=bdiff_io.header[self.FROM_INDEX],
+                    bdiff_to_index=bdiff_io.header[self.TO_INDEX],
                     start_ref_name=start_ref_name,
                     start_ref_pos=start_ref_pos,
                     end_ref_name=end_ref_name,
-                    end_ref_pos=end_ref_pos,
-                    include_unmapped=include_unmapped,
-                    unmapped_only=unmapped_only
+                    end_ref_pos=end_ref_pos
+                )
+                # TODO move iterators to with statement
+                mut.unmutate(
+                    bam_iter=iters.bam_iterator(
+                        self._bam_filename,
+                        start_index,
+                        end_index,
+                        unmapped_only,
+                        include_unmapped
+                    ),
+                    bdiff_iter=iters.BdiffIterator(
+                        bdiff_io=bdiff_io,
+                        fai=self._fai,
+                        start_index=start_index,
+                        end_index=end_index
+                    ),
+                    out_bam_file=out_bam_file,
+                    secret=cmn.hex2bytes(bdiff_io.header[self.SECRET])
                 )
             
             self._stats = {
@@ -157,3 +196,45 @@ class BamMutator:
                 self.STAT_MUT_COUNT: mut.mut_counter,
                 self.STAT_DIFF_COUNT: mut.diff_counter
             }
+    
+    def resolve_range(
+            self,
+            bdiff_from_index,
+            bdiff_to_index,
+            start_ref_name: str,
+            start_ref_pos: int,
+            end_ref_name: str,
+            end_ref_pos: int
+    ):
+        """
+        Resolve between DIFF range and user specified range.
+        :param bdiff_from_index:
+        :param bdiff_to_index:
+        :param start_ref_name:
+        :param start_ref_pos:
+        :param end_ref_name:
+        :param end_ref_pos:
+        :return: tuple (from_index, to_index)
+        """
+        if start_ref_name is not None or end_ref_name is not None:
+            # use user range
+            from_index = self._fai.resolve_start_index(start_ref_name, start_ref_pos)
+            to_index = self._fai.resolve_end_index(end_ref_name, end_ref_pos)
+            # validate user range
+            # TODO show 1-based positions
+            if from_index < bdiff_from_index:
+                args = (start_ref_name, start_ref_pos) \
+                       + self._fai.index2pos(bdiff_from_index) \
+                       + self._fai.index2pos(bdiff_to_index)  # type: tuple
+                # noinspection PyStringFormat
+                raise ValueError("Start position [%s, %d] must be within BDIFF range [%s, %d]:[%s, %d]." % args)
+            if to_index > bdiff_to_index:
+                args = (end_ref_name, end_ref_pos) \
+                       + self._fai.index2pos(bdiff_from_index) \
+                       + self._fai.index2pos(bdiff_to_index)  # type: tuple
+                # noinspection PyStringFormat
+                raise ValueError("End position [%s, %d] must be within BDIFF range [%s, %d]:[%s, %d]." % args)
+            return from_index, to_index
+        else:
+            # use diff range
+            return bdiff_from_index, bdiff_to_index

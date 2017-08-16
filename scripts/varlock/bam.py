@@ -9,12 +9,13 @@ VALID_HEADER_TYPES[MUT_TAG] = dict
 KNOWN_HEADER_FIELDS[MUT_TAG] = {MUT_BAM_TAG: str, MUT_VAC_TAG: str}
 
 
-def mut_header(header_map, bam_checksum, vac_checksum):
-    if MUT_TAG in header_map:
+def mut_header(header: dict, bam_checksum: str, vac_checksum: str):
+    if MUT_TAG in header:
         raise ValueError("File appears to be already mutated.")
     else:
-        header_map[MUT_TAG] = {MUT_BAM_TAG: bam_checksum, MUT_VAC_TAG: vac_checksum}
-        return header_map
+        result_header = header.copy()
+        result_header[MUT_TAG] = {MUT_BAM_TAG: bam_checksum, MUT_VAC_TAG: vac_checksum}
+        return result_header
 
 
 def unmut_header(header_map):

@@ -1,26 +1,20 @@
 import hashlib
 import random
+import pysam
 
-# import common
-# import varlock.iterator as iters
-#
-# from .cigar import Cigar
-# from .diff import Diff
-# from .fasta_index import FastaIndex
-# from .po import SnvAlignment, GenomicPosition, VacSnvRecord
-from varlock.cigar import Cigar
-import varlock.common as common
-from varlock.diff import Diff
-from varlock.fasta_index import FastaIndex
-import varlock.iterator as iters
-from varlock.po import SnvAlignment, GenomicPosition, VacSnvRecord, VacIndelRecord
 import varlock.bdiff as bdiff
+import varlock.common as common
+import varlock.iters as iters
+import varlock.po as po
+
+from varlock.cigar import Cigar
+from varlock.fasta_index import FastaIndex
 
 
 class Mutator:
     def __init__(
             self,
-            bam_file,
+            fai: FastaIndex,
             rnd=random.SystemRandom(),
             verbose: bool = False
     ):
@@ -28,10 +22,9 @@ class Mutator:
         :param rnd: (secure) random generator
         :param verbose:
         """
-        self.rnd = rnd
-        self.verbose = verbose
-        self.fai = FastaIndex(bam_file)
-        self.bam_file = bam_file
+        self._fai = fai
+        self._rnd = rnd
+        self._verbose = verbose
         self._bam_checksum = None
         
         self.prev_alignment = None
@@ -43,7 +36,7 @@ class Mutator:
         """
         # reference_end points to one past the last aligned residue
         ref_end = alignment.reference_end - 1
-        alignment_end = self.fai.pos2index(alignment.reference_name, ref_end)
+        alignment_end = self._fai.pos2index(alignment.reference_name, ref_end)
         return alignment_end < index
     
     def __is_after_index(self, alignment, index):
@@ -51,7 +44,7 @@ class Mutator:
         Check if alignment is mapped after index.
         :return: True if alignment start is mapped after index
         """
-        alignment_start = self.fai.pos2index(alignment.reference_name, alignment.reference_start)
+        alignment_start = self._fai.pos2index(alignment.reference_name, alignment.reference_start)
         return alignment_start > index
     
     def __write_alignment(self, bam_file, alignment):
@@ -73,7 +66,7 @@ class Mutator:
         self.alignment_counter += 1
         self.prev_alignment = alignment
         
-        if self.verbose and self.alignment_counter % 10000 == 0:
+        if self._verbose and self.alignment_counter % 10000 == 0:
             print("%d alignments processed" % self.alignment_counter)
     
     def __init_counters(self):
@@ -85,142 +78,122 @@ class Mutator:
         self.covering_counter = 0  # mutated alignments
         self.max_coverage = 0  # maximum alignments overlapping single SNV
     
-    def resolve_diff_range(
+    def mutate(
             self,
-            diff_file,
-            start_ref_name,
-            start_ref_pos,
-            end_ref_name,
-            end_ref_pos
-    ):
-        checksum, diff_start_index, diff_end_index, secret = Diff.read_header(diff_file)
-        self.validate_checksum(checksum)
-        
-        return self.resolve_range(
-            diff_start_index,
-            diff_end_index,
-            start_ref_name,
-            start_ref_pos,
-            end_ref_name,
-            end_ref_pos
-        )
-    
-    def resolve_range(
-            self,
-            diff_start_index,
-            diff_end_index,
-            start_ref_name,
-            start_ref_pos,
-            end_ref_name,
-            end_ref_pos
+            mut_bam_file: pysam.AlignmentFile,
+            vac_iter: iters.VacIterator,
+            bam_iter: iters.FullBamIterator,
+            secret: bytes
     ):
         """
-        Resolve between DIFF range and user specified range.
-        :param diff_start_index:
-        :param diff_end_index:
-        :param start_ref_name:
-        :param start_ref_pos:
-        :param end_ref_name:
-        :param end_ref_pos:
-        :return: tuple (start_index, end_index)
-        """
-        if start_ref_name is not None or end_ref_name is not None:
-            # apply user range
-            start_index = self.fai.resolve_start_index(start_ref_name, start_ref_pos)
-            end_index = self.fai.resolve_end_index(end_ref_name, end_ref_pos)
-            
-            diff_range = self.fai.index2pos(diff_start_index) + self.fai.index2pos(diff_end_index)  # type: tuple
-            
-            if start_index < diff_start_index:
-                args = self.fai.index2pos(start_index) + diff_range  # type: tuple
-                # noinspection PyStringFormat
-                raise ValueError("Start position [%s, %d] must be within DIFF range [%s, %d]:[%s, %d]." % args)
-            if end_index > diff_end_index:
-                args = self.fai.index2pos(end_index) + diff_range  # type: tuple
-                # noinspection PyStringFormat
-                raise ValueError("End position [%s, %d] must be within DIFF range [%s, %d]:[%s, %d]." % args)
-            return start_index, end_index
-        
-        else:
-            # apply diff range
-            return diff_start_index, diff_end_index
-    
-    def bam_checksum(self):
-        if self._bam_checksum is None:
-            if self.verbose:
-                print("Calculating BAM's checksum")
-            
-            self._bam_checksum = common.checksum(self.bam_file.filename)
-        
-        return self._bam_checksum
-    
-    def validate_checksum(self, check_sum):
-        if self.bam_checksum() != check_sum:
-            # print(bytes2hex(self.bam_checksum()))
-            # print(bytes2hex(check_sum))
-            raise ValueError("Invalid checksum.")
-    
-    # TODO refactor iterators as parameters
-    def unmutate(
-            self,
-            diff_file,
-            out_bam_file,
-            start_ref_name: str = None,
-            start_ref_pos: int = None,
-            end_ref_name: str = None,
-            end_ref_pos: int = None,
-            include_unmapped: bool = False,
-            unmapped_only: bool = False
-    ):
-        """
-        Unmutate BAM file in range specified by DIFF file or by parameters.
-        :param diff_file: binary file
-        :param out_bam_file: pysam.AlignmentFile
-        :param start_ref_name: inclusive
-        :param start_ref_pos: 0-based, inclusive
-        :param end_ref_name: inclusive
-        :param end_ref_pos: 0-based, inclusive
-        :param include_unmapped: Include all unplaced unmapped reads.
-        :param unmapped_only: Only unmapped reads - both placed and unplaced.
-         Overrides other parameters.
-         
-         When range is supplied partialy covered reads are also included,
-         but only snv's within range are unmutated.
+        :param mut_bam_file:
+        :param vac_iter:
+        :param bam_iter:
+        :param secret:
+        :return: BdiffIO object
+        BDIFF records are written only if bases at VAC position differ after mutation.
         """
         self.__init_counters()
         
-        # Diff.validate(diff_file)
-        start_index, end_index = self.resolve_diff_range(
-            diff_file,
-            start_ref_name,
-            start_ref_pos,
-            end_ref_name,
-            end_ref_pos
-        )
-        secret = Diff.read_header(diff_file)[3]
+        alignment_queue = []
+        alignment = next(bam_iter)
+        vac = next(vac_iter)
+        
+        if self._verbose:
+            print('first vac: %s' % vac)
+            print('first alignment: %s' % self.alignment2str(alignment))
+        
+        bdiff_io = bdiff.BdiffIO()
+        while True:
+            if vac is None or alignment is None:
+                # finish
+                if self._verbose:
+                    if vac is None:
+                        print("EOF VAC")
+                    else:
+                        print("EOF BAM")
+                
+                # last mutation
+                if vac is not None:
+                    # noinspection PyTypeChecker
+                    self.__mutate_pos(bdiff_io, alignment_queue, vac)
+                
+                for snv_alignment in alignment_queue:
+                    # unmapped alignments in queue are already encrypted
+                    self.__write_alignment(mut_bam_file, snv_alignment.alignment)
+                
+                # write remaining alignments (in EOF VAC case only)
+                while alignment is not None:
+                    self.__encrypt_unmapped(alignment, secret)
+                    self.__write_alignment(mut_bam_file, alignment)
+                    alignment = next(bam_iter)
+                
+                if self._verbose:
+                    print('last alignment: %s' % self.alignment2str(self.prev_alignment))
+                    print("total of %d alignments processed" % self.alignment_counter)
+                
+                break
+            
+            elif alignment.is_unmapped or self.__is_before_index(alignment, vac.index):
+                self.__encrypt_unmapped(alignment, secret)
+                if len(alignment_queue) == 0:
+                    # good to go, all preceeding alignments are written
+                    self.__write_alignment(mut_bam_file, alignment)
+                else:
+                    # append to queue
+                    alignment_queue.append(po.SnvAlignment(alignment, None))
+                
+                alignment = next(bam_iter)
+            
+            elif self.__is_after_index(alignment, vac.index):
+                self.__mutate_pos(bdiff_io, alignment_queue, vac)
+                # done with this vac, read next
+                prev_vac = vac
+                vac = next(vac_iter)
+                if vac is not None:
+                    # could be end of VAC file
+                    self.__write_done(mut_bam_file, alignment_queue, vac.index)
+                    self.__set_seq_positions(alignment_queue, vac.ref_pos)
+                elif self._verbose:
+                    print('last vac: %s' % prev_vac)
+            
+            else:  # alignment is covering vac position
+                # find sequence position of vac
+                seq_pos = common.ref_pos2seq_pos(alignment, vac.ref_pos)
+                alignment_queue.append(po.SnvAlignment(alignment, seq_pos))
+                alignment = next(bam_iter)
+                
+                self.covering_counter += 1
+                # noinspection PyAttributeOutsideInit
+                # TODO this is not the real coverage
+                self.max_coverage = max(len(alignment_queue), self.max_coverage)
+        
+        # noinspection PyAttributeOutsideInit
+        self.vac_counter = vac_iter.counter
+        # noinspection PyAttributeOutsideInit
+        self.diff_counter = bdiff_io.snv_count + bdiff_io.indel_count
+        return bdiff_io
+    
+    def unmutate(
+            self,
+            bam_iter: iters.BamIterator,
+            bdiff_iter: iters.BdiffIterator,
+            out_bam_file,
+            secret: bytes
+    ):
+        self.__init_counters()
         
         alignment_queue = []
-        
-        if unmapped_only:
-            bam_iter = iters.UnmappedBamIterator(self.bam_file)
-        elif include_unmapped:
-            bam_iter = iters.RangedBamIterator(self.bam_file, start_index, end_index)
-        else:
-            # mapped only
-            bam_iter = iters.MappedBamIterator(self.bam_file, start_index, end_index)
-        
         alignment = next(bam_iter)
-        diff_iter = iters.DiffIterator(diff_file, self.fai, start_index, end_index)
-        diff = next(diff_iter)
-        
-        if self.verbose:
+        diff = next(bdiff_iter)
+        if self._verbose:
             print('first diff: %s' % diff)
             print('first alignment: %s' % self.alignment2str(alignment))
         
         while True:
             if diff is None or alignment is None:
                 # finish
-                if self.verbose:
+                if self._verbose:
                     if diff is None:
                         print("EOF DIFF")
                     else:
@@ -241,7 +214,7 @@ class Mutator:
                     self.__write_alignment(out_bam_file, alignment)
                     alignment = next(bam_iter)
                 
-                if self.verbose:
+                if self._verbose:
                     print('last alignment: %s' % self.alignment2str(self.prev_alignment))
                     print("total of %d alignments processed" % self.alignment_counter)
                 
@@ -254,7 +227,7 @@ class Mutator:
                     self.__write_alignment(out_bam_file, alignment)
                 else:
                     # append to queue
-                    alignment_queue.append(SnvAlignment(alignment, None))
+                    alignment_queue.append(po.SnvAlignment(alignment, None))
                 
                 alignment = next(bam_iter)
             
@@ -262,18 +235,18 @@ class Mutator:
                 self.__unmutate_pos(alignment_queue, diff.mut_map)
                 # done with this diff, read next
                 prev_diff = diff
-                diff = next(diff_iter)
+                diff = next(bdiff_iter)
                 if diff is not None:
                     # could be end of DIFF file
                     self.__write_done(out_bam_file, alignment_queue, diff.index)
                     self.__set_seq_positions(alignment_queue, diff.ref_pos)
-                elif self.verbose:
+                elif self._verbose:
                     print('last diff: %s' % prev_diff)
             
             else:  # alignment is covering diff position
                 # find sequence position of vac
                 seq_pos = common.ref_pos2seq_pos(alignment, diff.ref_pos)
-                alignment_queue.append(SnvAlignment(alignment, seq_pos))
+                alignment_queue.append(po.SnvAlignment(alignment, seq_pos))
                 alignment = next(bam_iter)
                 
                 self.covering_counter += 1
@@ -282,7 +255,7 @@ class Mutator:
                 self.max_coverage = max(len(alignment_queue), self.max_coverage)
         
         # noinspection PyAttributeOutsideInit
-        self.diff_counter = diff_iter.counter
+        self.diff_counter = bdiff_iter.counter
     
     def __unmutate_pos(self, alignment_queue, mut_map):
         for snv_alignment in alignment_queue:
@@ -297,107 +270,12 @@ class Mutator:
             ref_name = alignment.reference_name
             ref_start = alignment.reference_start
             # unplaced alignment
-            return '#%d %s:%d' % (self.fai.pos2index(ref_name, ref_start), ref_name, ref_start)
+            return '#%d %s:%d' % (self._fai.pos2index(ref_name, ref_start), ref_name, ref_start)
         else:
             return alignment.query_sequence
     
-    # TODO refactor, iterators as parameters ?
-    def mutate(self, vac_filename: str, out_bam_file, secret: bytes):
-        """
-        Mutate BAM file SNVs.
-        :param vac_filename:
-        input variant allele count file
-        :param out_bam_file: pysam.AlignmentFile
-        output bam file
-        :param secret: secret key for unmapped alignment encryption
-        secret is stored in BDIFF file
-        :return: bdiff_io
-        """
-        self.__init_counters()
-        
-        alignment_queue = []
-        
-        bam_iter = iters.FullBamIterator(self.bam_file)
-        alignment = next(bam_iter)
-        
-        vac_iter = iters.VacIterator(vac_filename, self.fai)
-        vac = next(vac_iter)
-        
-        if self.verbose:
-            print('first vac: %s' % vac)
-            print('first alignment: %s' % self.alignment2str(alignment))
-        
-        bdiff_io = bdiff.BdiffIO()
-        while True:
-            if vac is None or alignment is None:
-                # finish
-                if self.verbose:
-                    if vac is None:
-                        print("EOF VAC")
-                    else:
-                        print("EOF BAM")
-                
-                # last mutation
-                if vac is not None:
-                    # noinspection PyTypeChecker
-                    self.__mutate_pos(bdiff_io, alignment_queue, vac)
-                
-                for snv_alignment in alignment_queue:
-                    # unmapped alignments in queue are already encrypted
-                    self.__write_alignment(out_bam_file, snv_alignment.alignment)
-                
-                # write remaining alignments (in EOF VAC case only)
-                while alignment is not None:
-                    self.__encrypt_unmapped(alignment, secret)
-                    self.__write_alignment(out_bam_file, alignment)
-                    alignment = next(bam_iter)
-                
-                if self.verbose:
-                    print('last alignment: %s' % self.alignment2str(self.prev_alignment))
-                    print("total of %d alignments processed" % self.alignment_counter)
-                
-                break
-            
-            elif alignment.is_unmapped or self.__is_before_index(alignment, vac.index):
-                self.__encrypt_unmapped(alignment, secret)
-                if len(alignment_queue) == 0:
-                    # good to go, all preceeding alignments are written
-                    self.__write_alignment(out_bam_file, alignment)
-                else:
-                    # append to queue
-                    alignment_queue.append(SnvAlignment(alignment, None))
-                
-                alignment = next(bam_iter)
-            
-            elif self.__is_after_index(alignment, vac.index):
-                self.__mutate_pos(bdiff_io, alignment_queue, vac)
-                # done with this vac, read next
-                prev_vac = vac
-                vac = next(vac_iter)
-                if vac is not None:
-                    # could be end of VAC file
-                    self.__write_done(out_bam_file, alignment_queue, vac.index)
-                    self.__set_seq_positions(alignment_queue, vac.ref_pos)
-                elif self.verbose:
-                    print('last vac: %s' % prev_vac)
-            
-            else:  # alignment is covering vac position
-                # find sequence position of vac
-                seq_pos = common.ref_pos2seq_pos(alignment, vac.ref_pos)
-                alignment_queue.append(SnvAlignment(alignment, seq_pos))
-                alignment = next(bam_iter)
-                
-                self.covering_counter += 1
-                # noinspection PyAttributeOutsideInit
-                # TODO this is not the real coverage
-                self.max_coverage = max(len(alignment_queue), self.max_coverage)
-        
-        # noinspection PyAttributeOutsideInit
-        self.vac_counter = vac_iter.counter
-        return bdiff_io
-    
     @staticmethod
-    def __encrypt_unmapped(alignment, secret):
+    def __encrypt_unmapped(alignment, secret: bytes):
         """
         Stream cipher encryption / decryption.
         alignment + secret => encrypted_alignment
@@ -415,9 +293,9 @@ class Mutator:
             mut_seq = common.stream_cipher(alignment.query_sequence, sha512.digest())
             alignment.query_sequence = mut_seq
     
-    def __mutate_pos(self, bdiff_io: bdiff.BdiffIO, alignment_queue, vac: GenomicPosition):
+    def __mutate_pos(self, bdiff_io: bdiff.BdiffIO, alignment_queue, vac: po.GenomicPosition):
         """
-        Mutate alignments at position of the variant
+        Mutate alignments at the variant allele count position.
         :param alignment_queue: alignments together with vac positions
         :param vac: variant allele count list
         :return: True if NS mutation has occured
@@ -427,8 +305,8 @@ class Mutator:
         base_pileup = common.get_base_pileup(alignment_queue)
         alt_ac = common.count_bases(base_pileup)
         
-        if isinstance(vac, VacSnvRecord):
-            mut_map = common.create_mut_map(alt_ac=alt_ac, ref_ac=vac.ac, rnd=self.rnd)
+        if isinstance(vac, po.VacSnvRecord):
+            mut_map = common.create_mut_map(alt_ac=alt_ac, ref_ac=vac.ac, rnd=self._rnd)
             
             for snv_alignment in alignment_queue:
                 if snv_alignment.pos is not None:
@@ -445,9 +323,9 @@ class Mutator:
                     mut_map=mut_map
                 )
         
-        elif isinstance(vac, VacIndelRecord):
+        elif isinstance(vac, po.VacIndelRecord):
             # TODO isinstance(vac, VacIndelRecord)
-            pass
+            raise ValueError("VAC indel not implemented yet!")
         else:
             raise ValueError("%s is not VAC record instance" % type(vac).__name__)
         
@@ -475,6 +353,7 @@ class Mutator:
         
         return is_mutated
     
+    # noinspection PyMethodMayBeStatic
     def __write_diff(self, bdiff_io: bdiff.BdiffIO, index: int, mut_map: dict):
         """
         :param bdiff_io:
@@ -483,7 +362,6 @@ class Mutator:
         mut_map.key: original base
         mut_map.value: mutated base
         """
-        self.diff_counter += 1
         bdiff_io.write_snv(index, (mut_map['A'], mut_map['T'], mut_map['G'], mut_map['C']))
     
     def __write_done(self, out_bam_file, alignment_queue, index):

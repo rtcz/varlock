@@ -3,73 +3,46 @@ import unittest
 
 import pysam
 
+from varlock import bdiff
 from varlock.bam_mutator import BamMutator
-from varlock.common import bam2sam
-from varlock.diff import Diff
-from varlock.vac import Vac
+from varlock.common import bam2sam, sam2bam
 from .random_mockup import RandomMockup
 
-
+# TODO use
 class TestUnmutate(unittest.TestCase):
     RESOURCE_PATH = 'tests/resources/unmutate/'
     
     @classmethod
     def setUpClass(cls):
-        cls.mut = BamMutator(rnd=RandomMockup())
+        # TODO
+        # sam2bam(cls.RESOURCE_PATH + 'input.sam', cls.RESOURCE_PATH + 'input.bam')
+        # pysam.index(cls.RESOURCE_PATH + 'input.bam')
+        cls.mut = BamMutator(cls.RESOURCE_PATH + 'input.bam', RandomMockup())
     
     def test_unmutate_01(self):
         # case 1
-        # sam2bam(self.UNMUT_DIR_PATH + 'input_01.sam', self.UNMUT_DIR_PATH + 'input_01.bam')
-        pysam.index(self.RESOURCE_PATH + 'input_01.bam')
-        Diff.text2diff(self.RESOURCE_PATH + 'input_01.diff.txt', self.RESOURCE_PATH + 'input_01.diff')
-        with open(self.RESOURCE_PATH + 'input_01.diff', 'rb') as diff_file:
+        with bdiff.from_text_file(self.RESOURCE_PATH + 'input.diff.txt') as bdiff_file:
             self.mut.unmutate(
-                bam_filename=self.RESOURCE_PATH + 'input_01.bam',
-                diff_file=diff_file,
+                bdiff_file=bdiff_file,
                 out_bam_filename=self.RESOURCE_PATH + 'output_01.bam'
             )
         
         self.assertEqual(15, self.mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
-        # not 12 as in "mutate" because one snv is same as the reference (no diff record)
+        # not 12 as in "test_mutate" because one snv is same as the reference (no diff record)
         self.assertEqual(11, self.mut.stat(BamMutator.STAT_COVERING_COUNT))
         self.assertEqual(5, self.mut.stat(BamMutator.STAT_MAX_COVERAGE))
         self.assertEqual(12, self.mut.stat(BamMutator.STAT_MUT_COUNT))
         self.assertEqual(4, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
         
         bam2sam(self.RESOURCE_PATH + 'output_01.bam', self.RESOURCE_PATH + 'output_01.sam')
-        is_equal = filecmp.cmp(self.RESOURCE_PATH + 'desired_01_02.sam', self.RESOURCE_PATH + 'output_01.sam')
-        self.assertEqual(True, is_equal)
-    
-    def test_unmutate_02(self):
-        # case 2
-        # sam2bam(self.UNMUT_DIR_PATH + 'input_02.sam', self.UNMUT_DIR_PATH + 'input_02.bam')
-        pysam.index(self.RESOURCE_PATH + 'input_02.bam')
-        Diff.text2diff(self.RESOURCE_PATH + 'input_02.diff.txt', self.RESOURCE_PATH + 'input_02.diff')
-        with open(self.RESOURCE_PATH + 'input_02.diff', 'rb') as diff_file:
-            self.mut.unmutate(
-                bam_filename=self.RESOURCE_PATH + 'input_02.bam',
-                diff_file=diff_file,
-                out_bam_filename=self.RESOURCE_PATH + 'output_02.bam'
-            )
-        
-        self.assertEqual(15, self.mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
-        self.assertEqual(6, self.mut.stat(BamMutator.STAT_COVERING_COUNT))
-        self.assertEqual(3, self.mut.stat(BamMutator.STAT_MAX_COVERAGE))
-        self.assertEqual(7, self.mut.stat(BamMutator.STAT_MUT_COUNT))
-        self.assertEqual(3, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
-        
-        bam2sam(self.RESOURCE_PATH + 'output_02.bam', self.RESOURCE_PATH + 'output_02.sam')
-        is_equal = filecmp.cmp(self.RESOURCE_PATH + 'desired_01_02.sam', self.RESOURCE_PATH + 'output_02.sam')
+        is_equal = filecmp.cmp(self.RESOURCE_PATH + 'desired_01.sam', self.RESOURCE_PATH + 'output_01.sam')
         self.assertEqual(True, is_equal)
     
     def test_unmutate_03(self):
         # range supplied
-        pysam.index(self.RESOURCE_PATH + 'input_01.bam')
-        Diff.text2diff(self.RESOURCE_PATH + 'input_01.diff.txt', self.RESOURCE_PATH + 'input_01.diff')
-        with open(self.RESOURCE_PATH + 'input_01.diff', 'rb') as diff_file:
+        with bdiff.from_text_file(self.RESOURCE_PATH + 'input.diff.txt') as bdiff_file:
             self.mut.unmutate(
-                bam_filename=self.RESOURCE_PATH + 'input_01.bam',
-                diff_file=diff_file,
+                bdiff_file=bdiff_file,
                 out_bam_filename=self.RESOURCE_PATH + 'output_03.bam',
                 start_ref_name='chr22',
                 start_ref_pos=1000021,
@@ -89,12 +62,9 @@ class TestUnmutate(unittest.TestCase):
     
     def test_unmutate_04(self):
         # range covers unmapped read
-        pysam.index(self.RESOURCE_PATH + 'input_01.bam')
-        Diff.text2diff(self.RESOURCE_PATH + 'input_01.diff.txt', self.RESOURCE_PATH + 'input_01.diff')
-        with open(self.RESOURCE_PATH + 'input_01.diff', 'rb') as diff_file:
+        with bdiff.from_text_file(self.RESOURCE_PATH + 'input.diff.txt') as bdiff_file:
             self.mut.unmutate(
-                bam_filename=self.RESOURCE_PATH + 'input_01.bam',
-                diff_file=diff_file,
+                bdiff_file=bdiff_file,
                 out_bam_filename=self.RESOURCE_PATH + 'output_04.bam',
                 start_ref_name='chr22',
                 start_ref_pos=1000054,
@@ -106,7 +76,7 @@ class TestUnmutate(unittest.TestCase):
         self.assertEqual(3, self.mut.stat(BamMutator.STAT_COVERING_COUNT))
         self.assertEqual(2, self.mut.stat(BamMutator.STAT_MAX_COVERAGE))
         self.assertEqual(4, self.mut.stat(BamMutator.STAT_MUT_COUNT))
-        self.assertEqual(2, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
+        self.assertEqual(3, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
         
         bam2sam(self.RESOURCE_PATH + 'output_04.bam', self.RESOURCE_PATH + 'output_04.sam')
         is_equal = filecmp.cmp(self.RESOURCE_PATH + 'desired_04.sam', self.RESOURCE_PATH + 'output_04.sam')
@@ -114,12 +84,9 @@ class TestUnmutate(unittest.TestCase):
     
     def test_unmutate_05(self):
         # include unmapped
-        pysam.index(self.RESOURCE_PATH + 'input_01.bam')
-        Diff.text2diff(self.RESOURCE_PATH + 'input_01.diff.txt', self.RESOURCE_PATH + 'input_01.diff')
-        with open(self.RESOURCE_PATH + 'input_01.diff', 'rb') as diff_file:
+        with bdiff.from_text_file(self.RESOURCE_PATH + 'input.diff.txt') as bdiff_file:
             self.mut.unmutate(
-                bam_filename=self.RESOURCE_PATH + 'input_01.bam',
-                diff_file=diff_file,
+                bdiff_file=bdiff_file,
                 out_bam_filename=self.RESOURCE_PATH + 'output_05.bam',
                 include_unmapped=True
             )
@@ -136,12 +103,9 @@ class TestUnmutate(unittest.TestCase):
     
     def test_unmutate_06(self):
         # include unmapped with range
-        pysam.index(self.RESOURCE_PATH + 'input_01.bam')
-        Diff.text2diff(self.RESOURCE_PATH + 'input_01.diff.txt', self.RESOURCE_PATH + 'input_01.diff')
-        with open(self.RESOURCE_PATH + 'input_01.diff', 'rb') as diff_file:
+        with bdiff.from_text_file(self.RESOURCE_PATH + 'input.diff.txt') as bdiff_file:
             self.mut.unmutate(
-                bam_filename=self.RESOURCE_PATH + 'input_01.bam',
-                diff_file=diff_file,
+                bdiff_file=bdiff_file,
                 out_bam_filename=self.RESOURCE_PATH + 'output_06.bam',
                 start_ref_name='chr22',
                 start_ref_pos=1000021,
@@ -162,12 +126,9 @@ class TestUnmutate(unittest.TestCase):
     
     def test_unmutate_07(self):
         # include unmapped
-        pysam.index(self.RESOURCE_PATH + 'input_01.bam')
-        Diff.text2diff(self.RESOURCE_PATH + 'input_01.diff.txt', self.RESOURCE_PATH + 'input_01.diff')
-        with open(self.RESOURCE_PATH + 'input_01.diff', 'rb') as diff_file:
+        with bdiff.from_text_file(self.RESOURCE_PATH + 'input.diff.txt') as bdiff_file:
             self.mut.unmutate(
-                bam_filename=self.RESOURCE_PATH + 'input_01.bam',
-                diff_file=diff_file,
+                bdiff_file=bdiff_file,
                 out_bam_filename=self.RESOURCE_PATH + 'output_07.bam',
                 unmapped_only=True
             )

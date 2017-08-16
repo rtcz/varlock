@@ -3,7 +3,8 @@ import io
 import os
 import unittest
 
-from varlock import Vac, FastaIndex
+from varlock.vac import Vac
+from varlock.fasta_index import FastaIndex
 from varlock.bam import open_bam
 
 
@@ -15,7 +16,9 @@ class TestVac(unittest.TestCase):
     @classmethod
     def vac(cls):
         with open_bam(cls.RESOURCE_PATH + 'input.sam', 'rb') as sam_file:
-            return Vac(FastaIndex(sam_file, keep_chr=False))
+            sam_header = sam_file.header
+        
+        return Vac(FastaIndex(sam_header))
     
     @classmethod
     def __build_vac_file(cls):

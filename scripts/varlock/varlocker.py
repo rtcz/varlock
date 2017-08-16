@@ -30,7 +30,7 @@ class Varlocker:
         :param verbose:
         :return:
         """
-        # TODO verify that BAM and VCF are associated with the same reference genome ?
+        # TODO verify that BAM and VCF share the same reference genome ?
         with open_vcf(vcf_filename, 'rt') as vcf_file, \
                 open_bam(bam_filename, 'rb') as sam_file, \
                 open(out_vac_filename, 'wb') as out_vac_file:
