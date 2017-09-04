@@ -31,9 +31,9 @@ class BdiffIterator:
     def __next__(self):
         """
         :return: next DIFF record (SNV or INDEL) by genomic index order
-        SNV diff record
-            mut_map.key: mutated base
-            mut_map.value: original base
+        BDIFF reversed mut_map:
+            key: mutated variation
+            value: original variation
         """
         record = None
         if self._bdiff_io.tell() <= self._end_pos:
@@ -41,19 +41,22 @@ class BdiffIterator:
             ref_name, ref_pos = self._fai.index2pos(index)
             if isinstance(alts, tuple):
                 # is SNV
+                # it is assumed that SNV record was saved as:
+                # BASES -> permuted(BASES)
                 record = DiffSnvRecord(
                     index,
                     ref_name,
                     ref_pos,
-                    mut_map=dict(zip(alts, BASES))
+                    dict(zip(alts, BASES))
                 )
             else:
-                # is INDEL
+                # it is assumed that INDEL record was saved as:
+                # sorted(alts) -> permuted(alts)
                 record = DiffIndelRecord(
                     index,
                     ref_name,
                     ref_pos,
-                    alts
+                    dict(zip(alts, sorted(alts)))
                 )
         
         self._counter += 1

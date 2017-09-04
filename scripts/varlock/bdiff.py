@@ -34,8 +34,7 @@ class BdiffIO:
     DIFF INDEL record: permutation of sequences
     index 4B, 0-based absolute genomic position
     length 1B, number of alternatives
-    list:, of length and sorted by sequence (ascending)
-        INDEL allele count 2B
+    list:, of length, permutation of sorted (ascending) alternative sequences
         INDEL base length 2B, length of INDEL sequence
         list:
             INDEL 4 base sequence, 1B
@@ -243,10 +242,10 @@ class BdiffIO:
         """
         alt_list = [None] * length
         for i in range(length):
-            allele_count, base_length = struct.unpack('<HH', self._diff_file.read(self.SHORT_SIZE * 2))
+            base_length = struct.unpack('<H', self._diff_file.read(self.SHORT_SIZE))[0]
             seq_byte_size = math.ceil(base_length / 4)
             seq = cmn.bytes2seq(self._diff_file.read(seq_byte_size), base_length)
-            alt_list[i] = (allele_count, seq)
+            alt_list[i] = seq
         
         return alt_list
     
@@ -262,14 +261,21 @@ class BdiffIO:
         if self._snv_count % self._index_resolution == 0:
             self._file_index.append((index, self._record_file.tell() - len(record)))
     
-    def write_indel(self, index: int, alt_list: list):
+    def write_indel(self, index: int, mut_map: dict):
+        """
+        :param index: genomic index
+        :param mut_map: original sequences -> permuted sequences
+        """
         assert not self.is_read_mode
         assert index > self._last_index
-        assert 1 < len(alt_list) < 256
+        assert 1 < len(mut_map) < 256
         
-        record = struct.pack('<IB', index, len(alt_list))
-        for allele_count, seq in alt_list:
-            record += struct.pack('<HH', allele_count, len(seq)) + cmn.seq2bytes(seq)
+        record = struct.pack('<IB', index, len(mut_map))
+        # create pseudo map sorted by its keys
+        tuple_map = sorted(mut_map.items(), key=lambda x: x[0])
+        
+        for item in tuple_map:
+            record += struct.pack('<H', len(item[1])) + cmn.seq2bytes(item[1])
         
         self._record_file.write(record)
         
@@ -459,11 +465,8 @@ def to_text_file(bytes_io: io.BytesIO(), filename: str):
             text_file.write('%d\t%d' % (index + 1, pos))
         
         for index, alts in bdiff:
-            if isinstance(alts, tuple):
-                text_file.write('%d\t%s\n' % (index + 1, ','.join(alts)))
-            else:  # is indel
-                str_alts = [':'.join(alt) for alt in alts]
-                text_file.write('%d\t%s\n' % (index + 1, ','.join(str_alts)))
+            is_indel = isinstance(alts, list)
+            text_file.write('%d\t%d\t%s\n' % (index + 1, is_indel, ','.join(alts)))
 
 
 def from_text_file(filename: str):
@@ -498,20 +501,16 @@ def from_text_file(filename: str):
         bdiff = BdiffIO(index_resolution=index_res)
         line = text_file.readline().rstrip()
         while line != '':
-            raw_index, raw_alts = line.split('\t')
+            raw_index, raw_is_indel, raw_alts = line.split('\t')
             index = int(raw_index) - 1
+            is_snv = raw_is_indel == '0'
             alts = raw_alts.split(',')
-            assert len(alts) > 0
-            if len(alts[0]) == 1:
+            if is_snv:
                 # snvs
                 bdiff.write_snv(index, tuple(alts))
             else:
                 # indel
-                parsed_alts = [] * len(alts)
-                for i in range(len(alts)):
-                    parsed_alts[i] = alts[i].split(':')
-                    parsed_alts[i][0] = int(parsed_alts[i][0])
-                    bdiff.write_indel(index, parsed_alts)
+                bdiff.write_indel(index, dict(zip(sorted(alts), alts)))
             
             line = text_file.readline().rstrip()
     

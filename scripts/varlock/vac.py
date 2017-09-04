@@ -26,8 +26,10 @@ class Vac:
     
     VAC INDEL record:
     index 4B, 0-based absolute genomic position
-    length 1B, number of INDELs
+    length 1B, number of alternatives
     list:, sorted by allele count and sequence (descending)
+        INDEL allele count 2B
+        INDEL base length 2B, length of INDEL sequence
         list:
             INDEL 4 base sequence, 1B
     """
@@ -211,7 +213,7 @@ class Vac:
     def read_indel_record(cls, vac_file):
         """
         :param vac_file:
-        :return: index, [(count_a, seq_a), (count_b, seq_b), ...]
+        :return:
         """
         byte_str = vac_file.read(cls.INT_SIZE)
         if len(byte_str) == 0:
@@ -220,15 +222,18 @@ class Vac:
         index = struct.unpack('<I', byte_str)[0]
         length = int.from_bytes(vac_file.read(1), byteorder='little')
         
-        indel_map = []
+        counts = [0] * length
+        seqs = [''] * length
         for i in range(length):
-            allele_count, base_length = struct.unpack('<HH', vac_file.read(cls.SHORT_SIZE * 2))
+            count, base_length = struct.unpack('<HH', vac_file.read(cls.SHORT_SIZE * 2))
             seq_byte_size = math.ceil(base_length / 4)
             seq = bytes2seq(vac_file.read(seq_byte_size), base_length)
-            indel_map.append((allele_count, seq))
+            counts[i] = count
+            seqs[i] = seq
         
-        return index, indel_map
+        return index, counts, seqs
     
+    # TODO parameters: index, counts, seqs
     @staticmethod
     def write_indel_record(indel_file, index: int, indel_map: list):
         """
@@ -239,6 +244,7 @@ class Vac:
         assert len(indel_map) < 256
         # single allele can be replaced only by itself
         # if len(indel_map) > 1 and sum(indel_map.values()) > 0:
+        # noinspection PyTypeChecker
         record = struct.pack('<I', index) + bytes([len(indel_map)])
         
         # sort indel_map by count and sequence
@@ -395,12 +401,12 @@ class Vac:
                 text_file.write('%d\t%s\n' % (index + 1, ac_string))
             
             for i in range(indel_count):
-                index, indel_map = cls.read_indel_record(vac_file)
+                index, counts, seqs = cls.read_indel_record(vac_file)
                 
                 text_file.write('%d\t' % (index + 1))
                 indels = []
-                for allele_count, sequence in indel_map:
-                    indels.append('%d:%s' % (allele_count, sequence))
+                for count, seq in zip(counts, seqs):
+                    indels.append('%d:%s' % (count, seq))
                 
                 text_file.write(','.join(indels))
                 text_file.write('\n')

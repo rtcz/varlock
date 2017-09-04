@@ -3,7 +3,7 @@ import random
 import pysam
 
 import varlock.bdiff as bdiff
-import varlock.common as common
+import varlock.common as cmn
 import varlock.iters as iters
 import varlock.po as po
 
@@ -52,8 +52,8 @@ class Mutator:
         :param alignment: pysam.AlignedSegment
         :return:
         """
-        are_placed = self.prev_alignment is not None and common.is_placed_alignment(
-            alignment) and common.is_placed_alignment(self.prev_alignment)
+        are_placed = self.prev_alignment is not None and cmn.is_placed_alignment(
+            alignment) and cmn.is_placed_alignment(self.prev_alignment)
         # FIXME is case of placed after unplaced alignment valid ?
         if are_placed and alignment.reference_start < self.prev_alignment.reference_start:
             # safety check
@@ -141,7 +141,7 @@ class Mutator:
                     self.__write_alignment(mut_bam_file, alignment)
                 else:
                     # append to queue
-                    alignment_queue.append(po.SnvAlignment(alignment, None))
+                    alignment_queue.append(po.AlignedVariant(alignment))
                 
                 alignment = next(bam_iter)
             
@@ -151,16 +151,17 @@ class Mutator:
                 prev_vac = vac
                 vac = next(vac_iter)
                 if vac is not None:
-                    # could be end of VAC file
+                    # not the end of VAC file
                     self.__write_done(mut_bam_file, alignment_queue, vac.index)
-                    self.__set_seq_positions(alignment_queue, vac.ref_pos)
+                    # update alignment queue
+                    for i in range(len(alignment_queue)):
+                        alignment_queue[i] = cmn.vac_aligned_variant(alignment_queue[i].alignment, vac)
+                
                 elif self._verbose:
                     print('last vac: %s' % prev_vac)
             
             else:  # alignment is covering vac position
-                # find sequence position of vac
-                seq_pos = common.ref_pos2seq_pos(alignment, vac.ref_pos)
-                alignment_queue.append(po.SnvAlignment(alignment, seq_pos))
+                alignment_queue.append(cmn.vac_aligned_variant(alignment, vac))
                 alignment = next(bam_iter)
                 
                 self.covering_counter += 1
@@ -186,6 +187,7 @@ class Mutator:
         alignment_queue = []
         alignment = next(bam_iter)
         diff = next(bdiff_iter)
+        
         if self._verbose:
             print('first diff: %s' % diff)
             print('first alignment: %s' % self.alignment2str(alignment))
@@ -227,7 +229,7 @@ class Mutator:
                     self.__write_alignment(out_bam_file, alignment)
                 else:
                     # append to queue
-                    alignment_queue.append(po.SnvAlignment(alignment, None))
+                    alignment_queue.append(po.AlignedVariant(alignment))
                 
                 alignment = next(bam_iter)
             
@@ -237,16 +239,16 @@ class Mutator:
                 prev_diff = diff
                 diff = next(bdiff_iter)
                 if diff is not None:
-                    # could be end of DIFF file
+                    # not the end of DIFF file
                     self.__write_done(out_bam_file, alignment_queue, diff.index)
-                    self.__set_seq_positions(alignment_queue, diff.ref_pos)
+                    # update alignment queue
+                    for i in range(len(alignment_queue)):
+                        alignment_queue[i] = cmn.diff_aligned_variant(alignment_queue[i].alignment, diff)
                 elif self._verbose:
                     print('last diff: %s' % prev_diff)
             
             else:  # alignment is covering diff position
-                # find sequence position of vac
-                seq_pos = common.ref_pos2seq_pos(alignment, diff.ref_pos)
-                alignment_queue.append(po.SnvAlignment(alignment, seq_pos))
+                alignment_queue.append(cmn.diff_aligned_variant(alignment, diff))
                 alignment = next(bam_iter)
                 
                 self.covering_counter += 1
@@ -257,16 +259,16 @@ class Mutator:
         # noinspection PyAttributeOutsideInit
         self.diff_counter = bdiff_iter.counter
     
-    def __unmutate_pos(self, alignment_queue, mut_map):
-        for snv_alignment in alignment_queue:
-            if snv_alignment.pos is not None:
+    def __unmutate_pos(self, variant_queue: list, mut_map: dict):
+        for variant in variant_queue:
+            if variant.is_present():
                 # alignment has vac to mutate
-                self.__mutate_alignment(snv_alignment.alignment, snv_alignment.pos, mut_map)
+                self._mutate_variant(variant, mut_map)
                 # done with current vac
-                snv_alignment.pos = None
+                variant.clear()
     
     def alignment2str(self, alignment):
-        if common.is_placed_alignment(alignment):
+        if cmn.is_placed_alignment(alignment):
             ref_name = alignment.reference_name
             ref_start = alignment.reference_start
             # unplaced alignment
@@ -290,111 +292,93 @@ class Mutator:
             # TODO maybe include query quality?
             sha512.update(secret + alignment.query_name.encode())
             
-            mut_seq = common.stream_cipher(alignment.query_sequence, sha512.digest())
+            mut_seq = cmn.stream_cipher(alignment.query_sequence, sha512.digest())
             alignment.query_sequence = mut_seq
     
-    def __mutate_pos(self, bdiff_io: bdiff.BdiffIO, alignment_queue, vac: po.GenomicPosition):
+    def __mutate_pos(self, bdiff_io: bdiff.BdiffIO, variant_queue: list, vac: po.GenomicPosition):
         """
         Mutate alignments at the variant allele count position.
-        :param alignment_queue: alignments together with vac positions
+        :param variant_queue: list of SnvAlignment
         :param vac: variant allele count list
         :return: True if NS mutation has occured
         """
         is_mutated = False
-        # get pileup of bases from alignments at vac mapping position
-        base_pileup = common.get_base_pileup(alignment_queue)
-        alt_ac = common.count_bases(base_pileup)
+        variant_seqs = cmn.variant_seqs(variant_queue)
         
         if isinstance(vac, po.VacSnvRecord):
-            mut_map = common.create_mut_map(alt_ac=alt_ac, ref_ac=vac.ac, rnd=self._rnd)
+            # all present variants should be SNVs
+            # get pileup of bases from alignments at vac mapping position
+            alt_freqs = cmn.base_freqs(variant_seqs)
+            mut_map = cmn.snv_mut_map(alt_freqs=alt_freqs, ref_freqs=vac.freqs, rnd=self._rnd)
             
-            for snv_alignment in alignment_queue:
-                if snv_alignment.pos is not None:
+            for variant in variant_queue:  # type: po.AlignedVariant
+                if variant.is_present():
                     # alignment has vac to mutate
-                    is_mutated |= self.__mutate_alignment(snv_alignment.alignment, snv_alignment.pos, mut_map)
+                    is_mutated |= self._mutate_variant(variant, mut_map)
                     # done with current vac
-                    snv_alignment.pos = None
+                    variant.clear()
             
             if is_mutated:
                 # at least one alignment has been mutated
-                self.__write_diff(
-                    bdiff_io=bdiff_io,
-                    index=vac.index,
-                    mut_map=mut_map
-                )
+                bdiff_io.write_snv(vac.index, (mut_map['A'], mut_map['T'], mut_map['G'], mut_map['C']))
         
         elif isinstance(vac, po.VacIndelRecord):
-            # TODO isinstance(vac, VacIndelRecord)
-            raise ValueError("VAC indel not implemented yet!")
+            # all present variants should be INDELs
+            alt_freq_map = cmn.freq_map(variant_seqs)
+            mut_map = cmn.indel_mut_map(alt_freq_map, dict(zip(vac.seqs, vac.freqs)), rnd=self._rnd)
+            
+            for variant in variant_queue:  # type: po.AlignedVariant
+                if variant.is_present():
+                    # alignment has vac to mutate
+                    is_mutated |= self._mutate_variant(variant, mut_map)
+                    # done with current vac
+                    variant.clear()
+            
+            if is_mutated:
+                bdiff_io.write_indel(vac.index, mut_map)
         else:
             raise ValueError("%s is not VAC record instance" % type(vac).__name__)
         
         return is_mutated
     
-    def __mutate_alignment(self, alignment, seq_pos, mut_map):
+    def _mutate_variant(self, variant: po.AlignedVariant, mut_map: dict):
         """
         Mutate alignment by mutation map at SNV position.
-        :param alignment: pysam.AlignedSegment
-        :param seq_pos: position of SNV in aligned sequence
+        :param variant:
         :param mut_map: mutation map
         :return: True if base has been mutated
         """
         is_mutated = False
-        # alignment is mapped at snv position
-        snv_base = common.get_base(alignment, seq_pos)
-        mut_base = mut_map[snv_base]
         
-        if snv_base != mut_base:
+        # alignment is mapped at snv position
+        mut_seq = mut_map[variant.seq]
+        
+        if variant.seq != mut_seq:
             # base has been mutated to another base
             self.mut_counter += 1
             is_mutated = True
-            common.set_base(alignment, seq_pos, mut_base)
-            Cigar.validate(alignment, seq_pos)
+            variant.seq = mut_seq
+            Cigar.validate(variant)
         
         return is_mutated
     
-    # noinspection PyMethodMayBeStatic
-    def __write_diff(self, bdiff_io: bdiff.BdiffIO, index: int, mut_map: dict):
-        """
-        :param bdiff_io:
-        :param index:
-        :param mut_map:
-        mut_map.key: original base
-        mut_map.value: mutated base
-        """
-        bdiff_io.write_snv(index, (mut_map['A'], mut_map['T'], mut_map['G'], mut_map['C']))
-    
-    def __write_done(self, out_bam_file, alignment_queue, index):
+    def __write_done(self, out_bam_file, variant_queue, index):
         """
         Write snv alignments while their end reference position is before index.
         :param out_bam_file:
-        :param alignment_queue:
+        :param variant_queue:
         :param index:
         :return:
         """
-        tmp_alignment_queue = alignment_queue[:]
-        for snv_alignment in tmp_alignment_queue:
-            is_mapped = not snv_alignment.alignment.is_unmapped
-            if is_mapped and not self.__is_before_index(snv_alignment.alignment, index):
+        # TODO optimize, search for index, then cut the array
+        tmp_queue = variant_queue[:]
+        for variant in tmp_queue:
+            is_mapped = not variant.alignment.is_unmapped
+            if is_mapped and not self.__is_before_index(variant.alignment, index):
                 # break to keep alignments in order
                 # otherwise shorter alignment could be written before longer alignment
                 break
             
-            self.__write_alignment(out_bam_file, snv_alignment.alignment)
+            self.__write_alignment(out_bam_file, variant.alignment)
             # remove written alignment
-            alignment_queue.remove(snv_alignment)
-    
-    @staticmethod
-    def __set_seq_positions(alignment_queue, ref_pos):
-        """
-        Set SNV position derived from reference position for each alignment.
-        :param alignment_queue:
-        :param ref_pos:
-        :return:
-        """
-        for snv_alignment in alignment_queue:
-            # TODO optimize, skip when ref_pos is greater than alignment reference end
-            snv_pos = common.ref_pos2seq_pos(snv_alignment.alignment, ref_pos)
-            if snv_pos is not None:
-                # alignment is mapped at another new_snv position
-                snv_alignment.pos = snv_pos
+            variant_queue.remove(variant)

@@ -6,22 +6,25 @@ class FastaIndex:
         """
         :param bam_header: bam header parsed by pysam
         """
-        fai_list = []
+        indices = []
         start = 0
         counter = 0
         
         for record in bam_header['SQ']:
             # ref_name = record['SN'] if keep_chr else strip_chr(record['SN'])
             ref_name = record['SN']
-            fai_list.append(FaiRecord(index=counter, name=ref_name, start=start, length=record['LN']))
+            indices.append(FaiRecord(index=counter, name=ref_name, start=start, length=record['LN']))
             start += record['LN']
             counter += 1
         
-        if len(fai_list) == 0:
+        if len(indices) == 0:
             raise ValueError("Empty BAM sequence header")
         
-        self._list = fai_list
-        self._dict = dict((reference.name, reference) for reference in self._list)
+        self._indices = indices
+        self._dict = dict((reference.name, reference) for reference in self._indices)
+    
+    def __getitem__(self, item):
+        return self._indices[item]
     
     def resolve_start_index(self, start_ref_name, start_ref_pos):
         if start_ref_name is None and start_ref_pos is not None:
@@ -48,10 +51,10 @@ class FastaIndex:
         return self.pos2index(end_ref_name, end_ref_pos)
     
     def first_ref(self):
-        return self._list[0]
+        return self._indices[0]
     
     def last_ref(self):
-        return self._list[len(self._list) - 1]
+        return self._indices[len(self._indices) - 1]
     
     def first_index(self):
         return self.first_ref().start
@@ -73,14 +76,14 @@ class FastaIndex:
             return self.index2pos(end_index)
     
     def ref_id(self, ref_name):
-        for i in range(len(self._list)):
-            if self._list[i].name == ref_name:
+        for i in range(len(self._indices)):
+            if self._indices[i].name == ref_name:
                 return i
         
         raise ValueError("Reference name not found in BAM sequence header.")
     
     def ref_name(self, ref_id):
-        return self._list[ref_id].name
+        return self._indices[ref_id].name
     
     def index2pos(self, index):
         """
@@ -89,7 +92,7 @@ class FastaIndex:
         :return: reference position as tuple (<reference name>, <0-based position>)
         """
         ref_pos = index
-        for ref in self._list:
+        for ref in self._indices:
             new_ref_pos = ref_pos - ref.length
             if new_ref_pos < 0:
                 return ref.name, ref_pos

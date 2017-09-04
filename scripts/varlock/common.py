@@ -6,6 +6,7 @@ import hashlib
 import math
 import os
 import json
+import varlock.po as po
 
 import pysam
 
@@ -49,53 +50,83 @@ def stream_cipher(seq: str, key: bytes):
     return mut_seq
 
 
-def create_mut_map(alt_ac, ref_ac, rnd):
+def snv_mut_map(alt_freqs: list, ref_freqs: list, rnd):
     """
-    Creates mutation mapping for base pileup column.
-    pileup base -> mutated base
-    :param alt_ac: list of DNA bases frequencies
-    :param ref_ac:
+    :param alt_freqs: list of alternative A,T,G,C DNA bases frequencies
+    :param ref_freqs: list of reference A,T,G,C DNA bases frequencies
     :param rnd: random number generator
-    :return: mut_map: dict which is specific mutation mapping
-    mut_map.key: original base
-    mut_map.value: mutated base
+    :return: Map as bijection between bases and premuted bases.
     """
-    ref_bases = list(BASES)
-    alt_bases = list(BASES)
-    ref_ac = list(ref_ac)
-    
+    assert len(alt_freqs) == len(ref_freqs) == len(BASES)
     # add random value to distinguish tied values
-    alt_ac = [ac + rnd.random() for ac in alt_ac]
-    
-    # init mutation mapping
-    mut_map = dict.fromkeys(BASES)
-    # unknown base is always mapped to itself
+    alt_freqs = [ac + rnd.random() for ac in alt_freqs]
+    mut_map = _mut_map(list(BASES), alt_freqs, list(ref_freqs), rnd)
     mut_map[UNKNOWN_BASE] = UNKNOWN_BASE
+    return mut_map
+
+
+def indel_mut_map(alt_freq_map: dict, ref_freq_map: dict, rnd):
+    """
+    Create indel mutation mapping from intersection
+    of alternative indels with reference indels.
+    :param alt_freq_map: {seq:count, ...}
+    :param ref_freq_map: {seq:count, ...}
+    :param rnd: random number generator
+    :return: Map as bijection between indels and permuted indels.
+    """
+    # find intersection of indels
+    seqs = list(set(alt_freq_map) & set(ref_freq_map))
+    
+    alt_freqs = [0] * len(seqs)
+    ref_freqs = [0] * len(seqs)
+    for i in range(len(seqs)):
+        # add random value to distinguish tied values
+        alt_freqs[i] = alt_freq_map[seqs[i]] + rnd.random()
+        ref_freqs[i] = ref_freq_map[seqs[i]]
+    
+    return _mut_map(seqs, alt_freqs, ref_freqs, rnd)
+
+
+def _mut_map(seqs: list, alt_freqs: list, ref_freqs: list, rnd):
+    """
+    Function tampers with parameters to avoid list copying.
+    :param seqs: sequences to mutate
+    :param alt_freqs: alternative sequences frequencies
+    :param ref_freqs: reference sequences frequencies
+    :return: Map as bijection between seqs and permuted seqs.
+    """
+    assert len(seqs) == len(alt_freqs) == len(ref_freqs)
+    ref_seqs = seqs
+    alt_seqs = seqs[:]
+    
+    mut_map = {}
     # map bases but skip last unmapped base
-    for i in range(len(BASES) - 1):
-        # draw ref base with multinomial probability
-        ref_base_id = multi_random(ref_ac, rnd)
-        # draw most abundant base from alt alleles
-        alt_base_id = np.argmax(alt_ac)  # type: int
+    
+    for i in range(len(ref_freqs) - 1):
+        # draw ref indel with multinomial probability
+        ref_indel_id = multi_random(ref_freqs, rnd)
+        # draw most abundant indel from alt alleles
+        # TODO why not use multi random here?
+        alt_indel_id = np.argmax(alt_freqs)  # type: int
         # add mapping
-        mut_map[alt_bases[alt_base_id]] = ref_bases[ref_base_id]
+        mut_map[alt_seqs[alt_indel_id]] = ref_seqs[ref_indel_id]
         
         # delete processed items
-        del ref_bases[ref_base_id]
-        del ref_ac[ref_base_id]
-        del alt_bases[alt_base_id]
-        del alt_ac[alt_base_id]
+        del ref_seqs[ref_indel_id]
+        del ref_freqs[ref_indel_id]
+        del alt_seqs[alt_indel_id]
+        del alt_freqs[alt_indel_id]
     
     # last base mapping is obvious
-    mut_map[alt_bases[0]] = ref_bases[0]
+    mut_map[alt_seqs[0]] = ref_seqs[0]
     
     return mut_map
 
 
-def multi_random(p_dist, rnd):
+def multi_random(p_dist: list, rnd):
     """
     Draw index from multinomial probability distribution.
-    :param p_dist: Array of probabilities. When all probabilities are zero, each outcome has equal probability.
+    :param p_dist: Probability distribution. When all probabilities are zero, each outcome has equal probability.
     Each value represents probability of one outcome.
     :param rnd: random number generator
     :return: Always returns index of outcome in p_dist array.
@@ -123,22 +154,33 @@ def multi_random(p_dist, rnd):
         "sum of probability distribution %d must be greater then the probability value %d" % (sum(p_dist), p_value))
 
 
-def count_bases(base_pileup: list):
+def freq_map(values: list):
+    result = {}
+    for value in values:
+        if value not in result:
+            result[value] = 1
+        else:
+            result[value] += 1
+    
+    return result
+
+
+def base_freqs(pileup: list):
     """
     Count allele count in base pileup column.
-    :param base_pileup: list of DNA bases
-    :return: list of DNA base frequencies
+    :param pileup: list of DNA bases: A, T, G, C, N
+    :return: list of DNA base frequencies [A_freq, T_freq, G_freq, C_freq]
     """
-    alt_ac = [0] * 4
-    for base in base_pileup:
+    freqs = [0] * 4
+    for base in pileup:
         # skip unknown base
         if base != UNKNOWN_BASE:
             try:
-                alt_ac[BASES.index(base)] += 1
+                freqs[BASES.index(base)] += 1
             except KeyError:
                 raise ValueError("Illegal DNA base %s" % base)
     
-    return alt_ac
+    return freqs
 
 
 def strip_chr(value):
@@ -213,48 +255,141 @@ def ref_pos2seq_pos(alignment, ref_pos):
     return seq_pos
 
 
-def get_base_pileup(snv_alignments):
+def variant_seqs(variants: list):
+    """
+    :param variants: list of po.AlignedVariant
+    :return: list of bases at specific position
+    """
     pileup_col = []
-    for snv_alignment in snv_alignments:
-        if snv_alignment.pos is not None:
+    for variant in variants:  # type: po.AlignedVariant
+        if variant.is_present():
             # alignment is mapped at snv position
-            snv_base = get_base(snv_alignment.alignment, snv_alignment.pos)
-            pileup_col.append(snv_base)
+            pileup_col.append(variant.seq)
     
     return pileup_col
 
 
-def get_base(alignment, pos):
+def max_match_len(string: str, pos: int, words: list):
     """
-    :param alignment: pysam.AlignedSegment
-    :param pos: position in sequence
-    :return: base at pos
+    :param string:
+    :param pos: position of matching
+    :param words: words to match
+    :return: length of longest matching word in a string at specific position
     """
-    return alignment.query_sequence[pos]
+    max_length = 0
+    for word in words:
+        if word == string[pos:len(word)]:
+            # matching
+            max_length = max(len(word), max_length)
+    
+    return max_length
 
 
-def is_placed_alignment(alignment):
+def diff_aligned_variant(alignment: pysam.AlignedSegment, diff: po.GenomicPosition):
     """
-    :param alignment: pysam.AlignedSegment
+    Factory that creates AlignedVariant from pysam alignment and DIFF record.
+    :param alignment:
+    :param diff:
+    """
+    # TODO optimize, skip when ref_pos is greater than alignment reference end ?
+    pos = ref_pos2seq_pos(alignment, diff.ref_pos)
+    if pos is None:
+        # this should not occur
+        raise ValueError("variant position not found")
+    elif isinstance(diff, po.DiffSnvRecord):
+        variant = po.AlignedVariant(alignment, pos)
+    elif isinstance(diff, po.DiffIndelRecord):
+        end_pos = pos + max_match_len(alignment.query_sequence, pos, diff.mut_map.values())
+        if end_pos > pos:
+            # there was a match
+            variant = po.AlignedVariant(alignment, pos, end_pos)
+        else:
+            # match not found
+            # this sould be rare
+            variant = po.AlignedVariant(alignment)
+    else:
+        raise ValueError("%s is not DIFF record instance" % type(diff).__name__)
+    
+    return variant
+
+
+def vac_aligned_variant(alignment: pysam.AlignedSegment, vac: po.GenomicPosition):
+    """
+    Factory that creates AlignedVariant from pysam alignment and VAC record.
+    :param alignment:
+    :param vac:
+    """
+    # TODO optimize, skip when ref_pos is greater than alignment reference end ?
+    pos = ref_pos2seq_pos(alignment, vac.ref_pos)
+    if pos is None:
+        # this should not occur
+        raise ValueError("variant position not found")
+    elif isinstance(vac, po.VacSnvRecord):
+        variant = po.AlignedVariant(alignment, pos)
+    elif isinstance(vac, po.VacIndelRecord):
+        end_pos = pos + max_match_len(alignment.query_sequence, pos, vac.seqs)
+        if end_pos > pos:
+            # there was a match
+            variant = po.AlignedVariant(alignment, pos, end_pos)
+        else:
+            # match not found
+            # this sould be rare
+            variant = po.AlignedVariant(alignment)
+    else:
+        raise ValueError("%s is not VAC record instance" % type(vac).__name__)
+    
+    return variant
+
+
+# def get_seq(alignment: pysam.AlignedSegment, pos: int, ref_seqs: list):
+#     """
+#     :param alignment:
+#     :param pos: position
+#     :param ref_seqs: reference sequences
+#     :return: longest sequence in alignment at specific position matching reference sequence
+#     """
+#     max_seq = ''
+#     for ref_seq in ref_seqs:
+#         if ref_seq == alignment.query_sequence[pos, len(ref_seq)]:
+#             # matching
+#             if len(ref_seq) > len(max_seq):
+#                 # longest
+#                 max_seq = max_seq
+#
+#     return max_seq
+
+
+# def get_base(alignment: pysam.AlignedSegment, pos: int):
+#     """
+#     :param alignment:
+#     :param pos: position in sequence
+#     :return: base at pos
+#     """
+#     return alignment.query_sequence[pos]
+
+
+def is_placed_alignment(alignment: pysam.AlignedSegment):
+    """
+    :param alignment:
     :return: True if alignment is placed, it still can be unmapped.
     Unplaced alignment has no reference_name and reference_start.
     """
     return alignment.reference_id != -1
 
 
-def set_base(alignment, pos, base):
-    """
-    Replace base at SNV position
-    :param alignment: pysam.AlignedSegment
-    :param pos: position in sequence
-    :param base: mutated base letter
-    :return: mutated sequence string
-    """
-    # TODO query_qualities
-    mut_seq = alignment.query_sequence[:pos]
-    mut_seq += base
-    mut_seq += alignment.query_sequence[pos + 1:]
-    alignment.query_sequence = mut_seq
+# def set_base(alignment, pos: int, base: str):
+#     """
+#     Replace base at SNV position
+#     :param alignment: pysam.AlignedSegment
+#     :param pos: position in sequence
+#     :param base: mutated base letter
+#     :return: mutated sequence string
+#     """
+#     # TODO query_qualities
+#     mut_seq = alignment.query_sequence[:pos]
+#     mut_seq += base
+#     mut_seq += alignment.query_sequence[pos + 1:]
+#     alignment.query_sequence = mut_seq
 
 
 def open_vcf(filename, mode):

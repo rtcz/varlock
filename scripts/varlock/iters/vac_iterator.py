@@ -35,13 +35,13 @@ class VacIterator:
     def _read_snv(self):
         if self._snv_count > 0:
             self._snv_count -= 1
-            snv_index, snv_list = Vac.read_snv_record(self._snv_file)
-            ref_name, ref_pos = self._fai.index2pos(snv_index)
+            index, freqs = Vac.read_snv_record(self._snv_file)
+            ref_name, ref_pos = self._fai.index2pos(index)
             self._snv_record = po.VacSnvRecord(
-                index=snv_index,
+                index=index,
                 ref_name=ref_name,
                 ref_pos=ref_pos,
-                ac=snv_list
+                freqs=freqs
             )
         else:
             self._snv_record = None
@@ -50,13 +50,14 @@ class VacIterator:
     def _read_indel(self):
         if self._indel_count > 0:
             self._indel_count -= 1
-            indel_index, indel_map = Vac.read_snv_record(self._snv_file)
-            ref_name, ref_pos = self._fai.index2pos(indel_index)
+            index, counts, seqs = Vac.read_indel_record(self._snv_file)
+            ref_name, ref_pos = self._fai.index2pos(index)
             self._indel_record = po.VacIndelRecord(
-                index=indel_index,
+                index=index,
                 ref_name=ref_name,
                 ref_pos=ref_pos,
-                indel_map=indel_map
+                freqs=counts,
+                seqs=seqs
             )
         else:
             self._indel_record = None

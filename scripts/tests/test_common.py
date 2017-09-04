@@ -1,13 +1,14 @@
 import unittest
+from random import Random
+
 import pysam
 from bitarray import bitarray
 from bitstring import BitArray
 
-from varlock.cigar import Cigar
 import varlock.common as cmn
-from varlock.po import SnvAlignment
 from tests.random_mockup import RandomMockup
-from random import Random
+from varlock.cigar import Cigar
+from varlock.po import AlignedVariant
 
 
 class TestCommon(unittest.TestCase):
@@ -28,8 +29,8 @@ class TestCommon(unittest.TestCase):
         self.assertEqual(3, cmn.multi_random([1, 0, 0, 1], RandomMockup()))
     
     def test_base_count(self):
-        self.assertListEqual([3, 2, 1, 1], cmn.count_bases(['A', 'A', 'G', 'T', 'C', 'T', 'A']))
-        self.assertListEqual([0, 0, 2, 1], cmn.count_bases(['G', 'C', 'G']))
+        self.assertListEqual([3, 2, 1, 1], cmn.base_freqs(['A', 'A', 'G', 'T', 'C', 'T', 'A']))
+        self.assertListEqual([0, 0, 2, 1], cmn.base_freqs(['G', 'C', 'G']))
     
     @staticmethod
     def build_alignment():
@@ -69,43 +70,6 @@ class TestCommon(unittest.TestCase):
         )
         return alignment
     
-    def test_pileup(self):
-        alignment = self.build_alignment()
-        self.assertListEqual(['A'], cmn.get_base_pileup([SnvAlignment(alignment, 0)]))
-        self.assertListEqual(['C'], cmn.get_base_pileup([SnvAlignment(alignment, 3)]))
-        self.assertListEqual([], cmn.get_base_pileup([SnvAlignment(alignment, None)]))
-        self.assertListEqual(['C'], cmn.get_base_pileup([SnvAlignment(alignment, 39)]))
-        
-        alignment = self.build_flanked_alignment()
-        self.assertListEqual(['A'], cmn.get_base_pileup([SnvAlignment(alignment, 10)]))
-        self.assertListEqual(['C'], cmn.get_base_pileup([SnvAlignment(alignment, 13)]))
-    
-    def test_base_setting(self):
-        # regular alignment
-        alignment = self.build_alignment()
-        cmn.set_base(alignment=alignment, pos=0, base='C')
-        cmn.set_base(alignment=alignment, pos=3, base='A')
-        self.assertEqual('C', alignment.query_alignment_sequence[0])
-        self.assertEqual('A', alignment.query_alignment_sequence[3])
-        
-        # flanked alignment
-        alignment = self.build_flanked_alignment()
-        cmn.set_base(alignment=alignment, pos=10, base='C')
-        cmn.set_base(alignment=alignment, pos=13, base='A')
-        self.assertEqual('C', alignment.query_alignment_sequence[0])
-        self.assertEqual('A', alignment.query_alignment_sequence[3])
-    
-    def test_base_getting(self):
-        # regular alignment
-        alignment = self.build_alignment()
-        self.assertEqual('A', cmn.get_base(alignment=alignment, pos=0))
-        self.assertEqual('C', cmn.get_base(alignment=alignment, pos=3))
-        
-        # flanked alignment
-        alignment = self.build_flanked_alignment()
-        self.assertEqual('A', cmn.get_base(alignment=alignment, pos=10))
-        self.assertEqual('C', cmn.get_base(alignment=alignment, pos=13))
-    
     def test_pos_conversion(self):
         alignment = self.build_alignment()
         self.assertIsNone(cmn.ref_pos2seq_pos(alignment=alignment, ref_pos=1010))
@@ -115,14 +79,15 @@ class TestCommon(unittest.TestCase):
         self.assertIsNone(cmn.ref_pos2seq_pos(alignment=alignment, ref_pos=1010))
         self.assertEqual(19, cmn.ref_pos2seq_pos(alignment=alignment, ref_pos=1009))
     
-    def test_cigar(self):
-        alignment = self.build_alignment()
-        Cigar.validate(alignment=alignment, snv_pos=9)
-        self.assertRaises(ValueError, lambda: Cigar.validate(alignment=alignment, snv_pos=10))
-        self.assertRaises(ValueError, lambda: Cigar.validate(alignment=alignment, snv_pos=11))
+    # def test_cigar(self):
+    #     alignment = self.build_alignment()
+    #     Cigar.validate(alignment=alignment, snv_pos=9)
+    #     self.assertRaises(ValueError, lambda: Cigar.validate(alignment=alignment, snv_pos=10))
+    #     self.assertRaises(ValueError, lambda: Cigar.validate(alignment=alignment, snv_pos=11))
     
     def test_mut_map(self):
-        mut_map = cmn.create_mut_map(alt_ac=[1, 1, 1, 1], ref_ac=[1, 1, 1, 1], rnd=Random(0))
+        # TODO more test, also with tuples
+        mut_map = cmn.snv_mut_map(alt_freqs=[1, 1, 1, 1], ref_freqs=[1, 1, 1, 1], rnd=Random(0))
         self.assertDictEqual({'A': 'G', 'T': 'T', 'G': 'C', 'C': 'A', 'N': 'N'}, mut_map)
     
     @staticmethod

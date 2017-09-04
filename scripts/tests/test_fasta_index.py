@@ -1,7 +1,7 @@
 import unittest
 import pysam
 
-from varlock import FastaIndex
+from varlock.fasta_index import FastaIndex
 
 
 class TestFastaIndex(unittest.TestCase):
@@ -10,11 +10,11 @@ class TestFastaIndex(unittest.TestCase):
     @staticmethod
     def create_fai():
         with pysam.AlignmentFile('tests/resources/common/input.sam', "r") as sam_file:
-            return FastaIndex(sam_file)
+            return FastaIndex(sam_file.header)
     
     def test_fai_parsing(self):
         fai = self.create_fai()
-        ref = fai.list[21]
+        ref = fai[21]
         
         self.assertEqual(ref.name, 'chr22')
         self.assertEqual(ref.start, 2829728720)

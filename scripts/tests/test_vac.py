@@ -39,9 +39,9 @@ class TestVac(unittest.TestCase):
         self.assertTupleEqual((2000000000, (3, 2, 1, 0)), Vac.read_snv_record(vac_file))
         self.assertTupleEqual((2000000002, (0, 1, 2, 3)), Vac.read_snv_record(vac_file))
         self.assertTupleEqual((2000000004, (1, 1, 1, 1)), Vac.read_snv_record(vac_file))
-        self.assertTupleEqual((2000000001, [(10, 'A'), (1, 'ATCG')]), Vac.read_indel_record(vac_file))
-        self.assertTupleEqual((2000000003, [(10, 'AT'), (1, 'ATCGT')]), Vac.read_indel_record(vac_file))
-        self.assertTupleEqual((2000000005, [(10, 'AAAA'), (10, 'ATCG'), (0, 'A')]), Vac.read_indel_record(vac_file))
+        self.assertTupleEqual((2000000001, [10, 1], ['A', 'ATCG']), Vac.read_indel_record(vac_file))
+        self.assertTupleEqual((2000000003, [10, 1], ['AT', 'ATCGT']), Vac.read_indel_record(vac_file))
+        self.assertTupleEqual((2000000005, [10, 10, 0], ['AAAA', 'ATCG', 'A']), Vac.read_indel_record(vac_file))
         self.assertRaises(EOFError, lambda: Vac.read_snv_record(vac_file))
     
     def test_compact_base_count(self):
