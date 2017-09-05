@@ -320,7 +320,7 @@ class Mutator:
             
             if is_mutated:
                 # at least one alignment has been mutated
-                bdiff_io.write_snv(vac.index, (mut_map['A'], mut_map['T'], mut_map['G'], mut_map['C']))
+                bdiff_io.write_snv(vac.index, mut_map)
         
         elif isinstance(vac, po.VacIndelRecord):
             # all present variants should be INDELs

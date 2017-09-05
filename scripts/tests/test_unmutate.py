@@ -3,13 +3,12 @@ import unittest
 
 import pysam
 
-from varlock import bdiff
+from varlock.bdiff import BdiffIO
 from varlock.bam_mutator import BamMutator
 from varlock.common import bam2sam, sam2bam
 from .random_mockup import RandomMockup
 
 
-# TODO use
 class TestUnmutate(unittest.TestCase):
     RESOURCE_PATH = 'tests/resources/unmutate/'
     
@@ -22,7 +21,7 @@ class TestUnmutate(unittest.TestCase):
     
     def test_unmutate_01(self):
         # case 1
-        with bdiff.from_text_file(self.RESOURCE_PATH + 'input.diff.txt') as bdiff_file:
+        with BdiffIO.from_text_file(self.RESOURCE_PATH + 'input.diff.txt') as bdiff_file:
             self.mut.unmutate(
                 bdiff_file=bdiff_file,
                 out_bam_filename=self.RESOURCE_PATH + 'output_01.bam'
@@ -41,7 +40,7 @@ class TestUnmutate(unittest.TestCase):
     
     def test_unmutate_03(self):
         # range supplied
-        with bdiff.from_text_file(self.RESOURCE_PATH + 'input.diff.txt') as bdiff_file:
+        with BdiffIO.from_text_file(self.RESOURCE_PATH + 'input.diff.txt') as bdiff_file:
             self.mut.unmutate(
                 bdiff_file=bdiff_file,
                 out_bam_filename=self.RESOURCE_PATH + 'output_03.bam',
@@ -63,7 +62,7 @@ class TestUnmutate(unittest.TestCase):
     
     def test_unmutate_04(self):
         # range covers unmapped read
-        with bdiff.from_text_file(self.RESOURCE_PATH + 'input.diff.txt') as bdiff_file:
+        with BdiffIO.from_text_file(self.RESOURCE_PATH + 'input.diff.txt') as bdiff_file:
             self.mut.unmutate(
                 bdiff_file=bdiff_file,
                 out_bam_filename=self.RESOURCE_PATH + 'output_04.bam',
@@ -85,7 +84,7 @@ class TestUnmutate(unittest.TestCase):
     
     def test_unmutate_05(self):
         # include unmapped
-        with bdiff.from_text_file(self.RESOURCE_PATH + 'input.diff.txt') as bdiff_file:
+        with BdiffIO.from_text_file(self.RESOURCE_PATH + 'input.diff.txt') as bdiff_file:
             self.mut.unmutate(
                 bdiff_file=bdiff_file,
                 out_bam_filename=self.RESOURCE_PATH + 'output_05.bam',
@@ -104,7 +103,7 @@ class TestUnmutate(unittest.TestCase):
     
     def test_unmutate_06(self):
         # include unmapped with range
-        with bdiff.from_text_file(self.RESOURCE_PATH + 'input.diff.txt') as bdiff_file:
+        with BdiffIO.from_text_file(self.RESOURCE_PATH + 'input.diff.txt') as bdiff_file:
             self.mut.unmutate(
                 bdiff_file=bdiff_file,
                 out_bam_filename=self.RESOURCE_PATH + 'output_06.bam',
@@ -127,7 +126,7 @@ class TestUnmutate(unittest.TestCase):
     
     def test_unmutate_07(self):
         # include unmapped
-        with bdiff.from_text_file(self.RESOURCE_PATH + 'input.diff.txt') as bdiff_file:
+        with BdiffIO.from_text_file(self.RESOURCE_PATH + 'input.diff.txt') as bdiff_file:
             self.mut.unmutate(
                 bdiff_file=bdiff_file,
                 out_bam_filename=self.RESOURCE_PATH + 'output_07.bam',

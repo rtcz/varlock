@@ -37,27 +37,19 @@ class BdiffIterator:
         """
         record = None
         if self._bdiff_io.tell() <= self._end_pos:
-            index, alts = self._bdiff_io.read_record()
+            # index, alts = self._bdiff_io.read_record()
+            index, is_indel, mut_map = self._bdiff_io.read_record()
             ref_name, ref_pos = self._fai.index2pos(index)
-            if isinstance(alts, tuple):
+            
+            if is_indel:
+                # it is assumed that INDEL record was saved as:
+                # sorted(alts) -> permuted(alts)
+                record = DiffIndelRecord(index, ref_name, ref_pos, mut_map)
+            else:
                 # is SNV
                 # it is assumed that SNV record was saved as:
                 # BASES -> permuted(BASES)
-                record = DiffSnvRecord(
-                    index,
-                    ref_name,
-                    ref_pos,
-                    dict(zip(alts, BASES))
-                )
-            else:
-                # it is assumed that INDEL record was saved as:
-                # sorted(alts) -> permuted(alts)
-                record = DiffIndelRecord(
-                    index,
-                    ref_name,
-                    ref_pos,
-                    dict(zip(alts, sorted(alts)))
-                )
+                record = DiffSnvRecord(index, ref_name, ref_pos, mut_map)
         
         self._counter += 1
         return record

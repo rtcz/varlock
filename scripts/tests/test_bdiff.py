@@ -11,13 +11,13 @@ class TestBdiff(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         bdiff = BdiffIO()
-        bdiff.write_snv(1010, ('C', 'A', 'T', 'G'))
-        bdiff.write_snv(1020, ('G', 'A', 'T', 'C'))
-        bdiff.write_indel(1030, ['AT', 'ATT', 'A'])
-        bdiff.write_snv(1040, ('T', 'G', 'A', 'C'))
-        bdiff.write_indel(1050, ['T', 'TT'])
-        bdiff.write_indel(1060, ['GCG', 'G', 'GCGCG'])
-        bdiff.write_snv(1070, ('G', 'C', 'A', 'T'))
+        bdiff._write_snv(1010, ('C', 'A', 'T', 'G'))
+        bdiff._write_snv(1020, ('G', 'A', 'T', 'C'))
+        bdiff._write_indel(1030, ['AT', 'ATT', 'A'])
+        bdiff._write_snv(1040, ('T', 'G', 'A', 'C'))
+        bdiff._write_indel(1050, ['T', 'TT'])
+        bdiff._write_indel(1060, ['GCG', 'G', 'GCGCG'])
+        bdiff._write_snv(1070, ('G', 'C', 'A', 'T'))
         cls._bdiff_file = bdiff.file()
     
     def test_from_text_file(self):
@@ -28,20 +28,24 @@ class TestBdiff(unittest.TestCase):
         # TODO
         pass
     
+    def test_seq_perm(self):
+        # TODO
+        pass
+    
     def test_io(self):
         bdiff = BdiffIO(self._bdiff_file)
         self.assertTrue(bdiff.is_read_mode)
         self.assertDictEqual({}, bdiff.header)
         self.assertEqual(4, bdiff.snv_count)
         self.assertEqual(3, bdiff.indel_count)
-        self.assertTupleEqual((1010, ('C', 'A', 'T', 'G')), bdiff.read_record())
-        self.assertTupleEqual((1020, ('G', 'A', 'T', 'C')), bdiff.read_record())
-        self.assertTupleEqual((1030, ['AT', 'ATT', 'A']), bdiff.read_record())
-        self.assertTupleEqual((1040, ('T', 'G', 'A', 'C')), bdiff.read_record())
-        self.assertTupleEqual((1050, ['T', 'TT']), bdiff.read_record())
-        self.assertTupleEqual((1060, ['GCG', 'G', 'GCGCG']), bdiff.read_record())
-        self.assertTupleEqual((1070, ('G', 'C', 'A', 'T')), bdiff.read_record())
-        self.assertRaises(EOFError, lambda: bdiff.read_record())
+        self.assertTupleEqual((1010, ('C', 'A', 'T', 'G')), bdiff._read_record())
+        self.assertTupleEqual((1020, ('G', 'A', 'T', 'C')), bdiff._read_record())
+        self.assertTupleEqual((1030, ['AT', 'ATT', 'A']), bdiff._read_record())
+        self.assertTupleEqual((1040, ('T', 'G', 'A', 'C')), bdiff._read_record())
+        self.assertTupleEqual((1050, ['T', 'TT']), bdiff._read_record())
+        self.assertTupleEqual((1060, ['GCG', 'G', 'GCGCG']), bdiff._read_record())
+        self.assertTupleEqual((1070, ('G', 'C', 'A', 'T')), bdiff._read_record())
+        self.assertRaises(EOFError, lambda: bdiff._read_record())
     
     def _record2pos(self, record_id: int):
         """
@@ -53,7 +57,7 @@ class TestBdiff(unittest.TestCase):
         
         curr_id = 1
         while curr_id < record_id:
-            bdiff.read_record()
+            bdiff._read_record()
             curr_id += 1
         
         record_pos = self._bdiff_file.tell()
@@ -76,7 +80,7 @@ class TestBdiff(unittest.TestCase):
     
     def test_single_file(self):
         wbdiff = BdiffIO()
-        wbdiff.write_snv(1010, ('C', 'A', 'T', 'G'))
+        wbdiff._write_snv(1010, ('C', 'A', 'T', 'G'))
         rbdiff = wbdiff.readcopy()
         self.assertFalse(rbdiff.is_empty())
         

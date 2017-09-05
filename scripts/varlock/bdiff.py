@@ -138,7 +138,7 @@ class BdiffIO:
     
     def __next__(self):
         try:
-            return self.read_record()
+            return self._read_record()
         except EOFError:
             raise StopIteration
     
@@ -207,7 +207,7 @@ class BdiffIO:
         """
         return None if self.is_empty() else self._last_index
     
-    def read_record(self):
+    def _read_record(self):
         """
         Reads next SNV or INDEL record
         :return: index, is_snv, alternatives
@@ -226,6 +226,18 @@ class BdiffIO:
         else:
             # INDEL record
             return index, self._read_indel_alts(length)
+    
+    def read_record(self):
+        """
+        :return: genomic_index, is_indel, mutation_map
+        """
+        index, alts = self._read_record()
+        if isinstance(alts, tuple):
+            # is SNV
+            return index, False, dict(zip(alts, cmn.BASES))
+        else:
+            # is INDEL
+            return index, True, dict(zip(alts, sorted(alts)))
     
     def _read_snv_alts(self):
         """
@@ -249,11 +261,17 @@ class BdiffIO:
         
         return alt_list
     
-    def write_snv(self, index: int, perm_tuple: tuple):
+    def _write_snv(self, index: int, base_perm: tuple):
+        """
+        :param index: genomic index
+        :param base_perm: permutation of bases
+        permutation represent values of map with keys A,T,G,C in this order
+        :return:
+        """
         assert not self.is_read_mode
         assert index > self._last_index
         
-        record = struct.pack('<IBB', index, 0, self.PERM_2_INDEX[perm_tuple])
+        record = struct.pack('<IBB', index, 0, self.PERM_2_INDEX[base_perm])
         self._record_file.write(record)
         
         self._last_index = index
@@ -261,21 +279,22 @@ class BdiffIO:
         if self._snv_count % self._index_resolution == 0:
             self._file_index.append((index, self._record_file.tell() - len(record)))
     
-    def write_indel(self, index: int, mut_map: dict):
+    def write_snv(self, index: int, mut_map: dict):
+        self._write_snv(index, (mut_map['A'], mut_map['T'], mut_map['G'], mut_map['C']))
+    
+    def _write_indel(self, index: int, seq_perm: list):
         """
-        :param index: genomic index
-        :param mut_map: original sequences -> permuted sequences
+        :param index:
+        :param seq_perm: permutation of sequences
+        :return:
         """
         assert not self.is_read_mode
         assert index > self._last_index
-        assert 1 < len(mut_map) < 256
+        assert 1 < len(seq_perm) < 256
         
-        record = struct.pack('<IB', index, len(mut_map))
-        # create pseudo map sorted by its keys
-        tuple_map = sorted(mut_map.items(), key=lambda x: x[0])
-        
-        for item in tuple_map:
-            record += struct.pack('<H', len(item[1])) + cmn.seq2bytes(item[1])
+        record = struct.pack('<IB', index, len(seq_perm))
+        for alt in seq_perm:
+            record += struct.pack('<H', len(alt)) + cmn.seq2bytes(alt)
         
         self._record_file.write(record)
         
@@ -283,6 +302,26 @@ class BdiffIO:
         self._indel_count += 1
         if self._indel_count % self._index_resolution == 0:
             self._file_index.append((index, self._record_file.tell() - len(record)))
+    
+    def write_indel(self, index: int, mut_map: dict):
+        """
+        :param index: genomic index
+        :param mut_map: original sequences -> permuted sequences
+        """
+        self._write_indel(index, self.seq_perm(mut_map))
+    
+    @staticmethod
+    def seq_perm(mut_map: dict):
+        """
+        :param mut_map:
+        :return: sequence permutation list
+        """
+        alts = [None] * len(mut_map)
+        i = 0
+        for key, value in sorted(mut_map.items(), key=lambda x: x[0]):
+            alts[i] = value
+            i += 1
+        return alts
     
     def readcopy(self):
         return BdiffIO(self.file())
@@ -388,10 +427,10 @@ class BdiffIO:
             curr_pos = self.__indexed_pos(pivot_index)
             self._diff_file.seek(curr_pos)
             
-            curr_index = self.read_record()[0]  # type: int
+            curr_index = self._read_record()[0]  # type: int
             while curr_index < pivot_index:
                 curr_pos = self._diff_file.tell()
-                curr_index = self.read_record()[0]  # type: int
+                curr_index = self._read_record()[0]  # type: int
             
             self._diff_file.seek(saved_pos)
             return curr_pos
@@ -415,7 +454,7 @@ class BdiffIO:
             while True:
                 next_pos = self._diff_file.tell()
                 try:
-                    next_index = self.read_record()[0]  # type: int
+                    next_index = self._read_record()[0]  # type: int
                 except EOFError:
                     break
                 if next_index <= pivot_index:
@@ -441,77 +480,77 @@ class BdiffIO:
                 break
         
         return indexed_pos + self._header_size
-
-
-def to_text_file(bytes_io: io.BytesIO(), filename: str):
-    """
-    Convert Bdiff file from BytesIO to text file.
-    Indices are converted from 0-based to 1-based.
-    :param filename:
-    :param bytes_io:
-    :return:
-    """
-    bdiff = BdiffIO(bytes_io)
-    with open(filename, 'wt') as text_file:
-        header = json.dumps(bdiff.header, sort_keys=True, indent=4)
-        text_file.write('%s\n' % header)
-        text_file.write('snvs\t%d\n' % bdiff.snv_count)
-        text_file.write('indels\t%d\n' % bdiff.indel_count)
-        text_file.write('last_index\t%d\n' % (bdiff.last_index + 1))
-        
-        text_file.write('index_res\t%d\n' % bdiff.index_resolution)
-        text_file.write('index_size\t%d\n' % len(bdiff.file_index))
-        for index, pos in bdiff.file_index:
-            text_file.write('%d\t%d' % (index + 1, pos))
-        
-        for index, alts in bdiff:
-            is_indel = isinstance(alts, list)
-            text_file.write('%d\t%d\t%s\n' % (index + 1, is_indel, ','.join(alts)))
-
-
-def from_text_file(filename: str):
-    """
-    Convert Bdiff text file to BytesIO.
-    Indices are converted from 1-based to 0-based.
-    :param filename:
-    :return:
-    """
-    with open(filename, 'rt') as text_file:
-        # header
-        header_str = ''
-        line = text_file.readline()
-        header_str += line
-        while line != '}\n':
+    
+    @staticmethod
+    def to_text_file(bytes_io: io.BytesIO(), filename: str):
+        """
+        Convert Bdiff file from BytesIO to text file.
+        Indices are converted from 0-based to 1-based.
+        :param filename:
+        :param bytes_io:
+        :return:
+        """
+        bdiff = BdiffIO(bytes_io)
+        with open(filename, 'wt') as text_file:
+            header = json.dumps(bdiff.header, sort_keys=True, indent=4)
+            text_file.write('%s\n' % header)
+            text_file.write('snvs\t%d\n' % bdiff.snv_count)
+            text_file.write('indels\t%d\n' % bdiff.indel_count)
+            text_file.write('last_index\t%d\n' % (bdiff.last_index + 1))
+            
+            text_file.write('index_res\t%d\n' % bdiff.index_resolution)
+            text_file.write('index_size\t%d\n' % len(bdiff.file_index))
+            for index, pos in bdiff.file_index:
+                text_file.write('%d\t%d' % (index + 1, pos))
+            
+            for index, alts in bdiff:
+                is_indel = isinstance(alts, list)
+                text_file.write('%d\t%d\t%s\n' % (index + 1, is_indel, ','.join(alts)))
+    
+    @staticmethod
+    def from_text_file(filename: str):
+        """
+        Convert Bdiff text file to BytesIO.
+        Indices are converted from 1-based to 0-based.
+        :param filename:
+        :return:
+        """
+        with open(filename, 'rt') as text_file:
+            # header
+            header_str = ''
             line = text_file.readline()
             header_str += line
-        header = json.loads(header_str)
-        # snvs
-        text_file.readline()
-        # indels
-        text_file.readline()
-        # last index
-        text_file.readline()
-        # index resolution
-        index_res = int(text_file.readline().rstrip().split('\t')[1])
-        # index size
-        index_size = int(text_file.readline().rstrip().split('\t')[1])
-        for i in range(index_size):
+            while line != '}\n':
+                line = text_file.readline()
+                header_str += line
+            header = json.loads(header_str)
+            # snvs
             text_file.readline()
-        
-        bdiff = BdiffIO(index_resolution=index_res)
-        line = text_file.readline().rstrip()
-        while line != '':
-            raw_index, raw_is_indel, raw_alts = line.split('\t')
-            index = int(raw_index) - 1
-            is_snv = raw_is_indel == '0'
-            alts = raw_alts.split(',')
-            if is_snv:
-                # snvs
-                bdiff.write_snv(index, tuple(alts))
-            else:
-                # indel
-                bdiff.write_indel(index, dict(zip(sorted(alts), alts)))
+            # indels
+            text_file.readline()
+            # last index
+            text_file.readline()
+            # index resolution
+            index_res = int(text_file.readline().rstrip().split('\t')[1])
+            # index size
+            index_size = int(text_file.readline().rstrip().split('\t')[1])
+            for i in range(index_size):
+                text_file.readline()
             
+            bdiff = BdiffIO(index_resolution=index_res)
             line = text_file.readline().rstrip()
-    
-    return bdiff.file(header)
+            while line != '':
+                raw_index, raw_is_indel, raw_alts = line.split('\t')
+                index = int(raw_index) - 1
+                is_snv = raw_is_indel == '0'
+                alts = raw_alts.split(',')
+                if is_snv:
+                    # snvs
+                    bdiff._write_snv(index, tuple(alts))
+                else:
+                    # indel
+                    bdiff._write_indel(index, alts)
+                
+                line = text_file.readline().rstrip()
+        
+        return bdiff.file(header)

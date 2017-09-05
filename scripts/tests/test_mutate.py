@@ -3,7 +3,7 @@ import unittest
 
 import pysam
 
-import varlock.bdiff as bdiff
+from varlock.bdiff import BdiffIO
 import varlock.common as cmn
 from varlock.bam_mutator import BamMutator
 from varlock.vac import Vac
@@ -45,7 +45,7 @@ class TestMutate(unittest.TestCase):
         is_equal = filecmp.cmp(self.RESOURCE_PATH + 'desired_01.sam', self.RESOURCE_PATH + 'output_01.sam')
         self.assertTrue(is_equal)
         
-        bdiff.to_text_file(bdiff_file, self.RESOURCE_PATH + 'output_01.diff.txt')
+        BdiffIO.to_text_file(bdiff_file, self.RESOURCE_PATH + 'output_01.diff.txt')
         is_equal = filecmp.cmp(self.RESOURCE_PATH + 'desired_01.diff.txt', self.RESOURCE_PATH + 'output_01.diff.txt')
         self.assertTrue(is_equal)
     
@@ -69,7 +69,7 @@ class TestMutate(unittest.TestCase):
         is_equal = filecmp.cmp(self.RESOURCE_PATH + 'desired_02.sam', self.RESOURCE_PATH + 'output_02.sam')
         self.assertTrue(is_equal)
         
-        bdiff.to_text_file(bdiff_file, self.RESOURCE_PATH + 'output_02.diff.txt')
+        BdiffIO.to_text_file(bdiff_file, self.RESOURCE_PATH + 'output_02.diff.txt')
         is_equal = filecmp.cmp(self.RESOURCE_PATH + 'desired_02.diff.txt', self.RESOURCE_PATH + 'output_02.diff.txt')
         self.assertTrue(is_equal)
 
