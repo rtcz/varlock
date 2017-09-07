@@ -480,7 +480,7 @@ class BdiffIO:
                 break
         
         return indexed_pos + self._header_size
-    
+
     @staticmethod
     def to_text_file(bytes_io: io.BytesIO(), filename: str):
         """

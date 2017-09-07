@@ -26,7 +26,7 @@ def stream_cipher(seq: str, key: bytes):
     DNA base encryption using stream cipher.
     Input sequence of DNA bases is encrypted as another sequence of the same length.
     Each 2 bits of the key stream are used to encrypt one base from the sequence.
-    If there is not enough bits of the key stream to encrypt whole sequence, key stream is repeated.
+    If there is not enough bits of the key stream to encrypt whole sequence, key stream is repeats.
     """
     mut_seq = ''
     for i in range(len(seq)):
