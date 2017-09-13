@@ -34,7 +34,7 @@ A single BDIFF record represents a difference at a single position in the genome
 
 BDIFF file acts as the secret key in the context of Varlock encryption, thus it is actually never stored on a medium in plain form. BDIFF file is encrypted symmetrically with the AES encryption using a randomly generated key. Only the AES key is then encrypted asymmetrically by the public key of a user and stored in the BDIFF header. 
 
-### Encrypt
+### Encryption
 Depersonalization of a BAM file is called _encryption_. User must provide the original BAM file, a VAC file of the closest population, and his public key for encryption. Both VAC and BAM files are iterated at the same time to write a new depersonalized BAM together with BDIFF tracking all the changes. Every time a genomic position of VAC record intersects with one or more alignments from the BAM file, a pseudo random permutation of DNA base letters (in case of SNV) or INDEL sequences is generated. Alignments that do not overlap with any VAC records are written to the depersonalized BAM unchanged. Encryption always involves the whole content of the supplied BAM, meaning that all alignments from it are present in the depersonalized BAM either altered or unaltered.
 
 #### Encryption of mapped alignments
@@ -59,9 +59,9 @@ The actual encryption of BDIFF file is explained in the BDIFF file format specif
 
 Furthermore, the plain BDIFF file is signed with a supplied private key to validate its authenticity and integrity. The signature is stored in the start of the encrypted BDIFF file and is verified using associated public key in the decryption process.
  
-### Decrypt
+### Decryption
 
-Decrypt is the inverse operation to encryption where secured parts of a depersonalized BAM file are restored to the original form. A user must provide depersonalized BAM and associated encrypted BDIFF file along with the RSA private key whose public counterpart was used in the BDIFF encryption. Whole depersonalized BAM or its part can be restored to their original form when a BDIFF file and a corresponding private key is provided. Unmapped reads are handled separately and the user can decide whether to include them into decryption or not (provided he has granted access to them).
+Decryption is the inverse operation to encryption where secured parts of a depersonalized BAM file are restored to the original form. A user must provide depersonalized BAM and an associated, encrypted BDIFF file along with the RSA private key whose public counterpart was used in the BDIFF encryption. Whole depersonalized BAM or its part can be restored to their original form according to user privileges specified in the BDIFF file. Unmapped reads are handled separately and the user can decide whether to include them into decryption or not (provided he has granted access to them).
 
 The algorithm first reads the encrypted AES key and the file signature both stored before the actual encrypted BDIFF file. The AES key is decrypted with the owner's private key and the BDIFF file is subsequently decrypted with it. The decrypted file is verified with owner's public key against the signature to prove its origin.
 
@@ -69,7 +69,7 @@ The original BAM is then restored in a same way it was depersonalized, only the 
 
 When the effective range of decryption is supplied, only alignments that are within or intersecting with this range are written to the output BAM file. Moreover, the depersonalization process covers exactly this range, so boundary alignments may be only partially restored. 
 
-Implemented stream cipher encryption method is symmetric thus unmapped alignments are decrypted using the very same method. Secret key for decryption is obtained from BDIFF header, where it was previously stored.
+Unmapped alignments are decrypted with symmetric stream cipher decryption using secret key obtained from the BDIFF header.
 
 ### Grant access (reencrypt)
 
@@ -81,17 +81,17 @@ The depersonalized BAM file is also needed for reencryption, since it contains t
 
 ### VAC file creation
 
-User must convert his VCF file to VAC file to use it in encryption. Since VCF records are dynamically typed, the variant type (SNV/INDEL/other) must be inferred from alleles in the record. Only SNVs and INDELs are converted to VAC file. Each record, where each of reference and alternative alleles is only one DNA base, is categorized as SNV record. Records that either reference or alternative alleles contain longer sequences are categorized as INDELs. VAC creation process furthermore needs information about the genomic index (chromosome lengths of reference genome), included in each BAM file. Thus a target BAM file is needed for VAC creation. The generated VAC file then can be used to encrypt multiple BAM files, provided that they used the same reference genome. 
+VAC file is derived from a VCF file with the variant frequencies of the closest population. Since VCF records are dynamically typed, the variant type (SNV/INDEL/other) must be inferred from alleles in the record. Only SNVs and INDELs are converted to VAC file. Each record, where each of reference and alternative alleles is only one DNA base, is categorized as SNV record. Records that either reference or alternative alleles contain longer sequences are categorized as INDELs. VAC creation process furthermore needs information about the genomic index (chromosome lengths of reference genome), included in each BAM file. Thus a target BAM file is needed for VAC creation. The generated VAC file then can be used to encrypt all BAM files for the population, provided that they used the same reference genome. 
 
 ## Discussion
 
-The quality of depersonalisation is directly linked with the quality and quantity of variants in the provided VCF file, since variants not present in the VCF file are not encrypted. Therefore, the biggest security question lies in a comprehensiveness of supplied VCF file, since it is assumed that the VCF file contains all variants that could be exploited in the person identification. For the purpose of depersonalization, a VCF with large population sample is needed, where the allele counts represent general distribution in population. In the Varlock concept, the user is responsible to provide a good quality VCF file for his population of interest.
+The quality of depersonalisation is directly linked with the quality and quantity of variants in the provided VCF file, since variants not present in the VCF file are not encrypted. Therefore, the biggest security question lies in a comprehensiveness of supplied VCF file, since it is assumed that the VCF file contains all variants that could be exploited in the person identification. For the purpose of depersonalization, a VCF with large population sample is needed, where the allele counts represent general distribution in population. If the frequencies are not available, the concept of the encryption may be extended with a random mutations of positions that are not specified in the VCF file.  
  
 Permutations of bases and sequences in encryption operation are generated by a random draw from the alternative variants according to multinomial distribution of their abundances. Therefore, they should represent the variant distribution among the general population. However, the reference variant is chosen in a deterministic way (the most common one from the remaining set). It is a matter of question, whether the reference variant should be chosen randomly in the same way as alternative variant. Probability properties of permutation generation with both (and possibly more) approaches should be evaluated to agree upon a final decision.  
 
  A secure pseudo-random number generator or a true random number generator must be used to generate cryptographic keys and in the multinomial drawing to ensure security.
  
- The size of the encrypted BAM file should not change significantly, since the symmetric cipher is used. However, the size of a BDIFF file is dependent on the number of covered variations from the VCF file, thus an attacker can guess the number of changes made, but this is not considered a security threat.
+ The size of the encrypted BAM file should not change significantly, since the symmetric cipher is used. However, the size of a BDIFF file is dependent on the number of covered variations from the VCF file, thus an attacker can guess the number of changes made. This potential threat may be overcomed by including additional special records, that would change the size of the file, but otherwise do not change depersonalised BAM file.  
  
 ### Random mutations
 
@@ -103,9 +103,9 @@ The number of the new variants should be high enough to disallow attacks in-betw
 
 ### Cigar strings and sequencing quality
 
-The BAM file does not contain only sequence alignments, but other data, that should be taken care of in the depersonalization process. For example, cigar string is a compressed representation of an alignment, that can change when the alignment sequence changes. Therefore, cigar strings should be adjusted to corresponding new alignments, otherwise it would be easy (in some cases) to guess where a change was made. 
+BAM files does not contain only sequence alignments, but other data, that should be taken care of in the depersonalization process. For example, cigar string is a compressed representation of an alignment, that can change when the alignment sequence changes. Therefore, cigar strings should be adjusted to corresponding new alignments, otherwise it would be easy (in some cases) to guess where a change was made. 
 
-The mapping quality is other type of data that is available for every alignment in the BAM file. While it is not needed to do anything with the qualities in case of a SNV, in case of an INDEL the length of the sequence changes, so it is necessary to adjust the length of the mapping quality in this case. When the length of the depersonalized BAM is greater, thus we introduce an insertion, we can provide any qualities as long as these qualities will not betray the position of the change. However, when we introduce a deletion, the number of qualities fall and we need to store the remaining ones into the BDIFF file for each of the alignments. This brings another component into the BDIFF file, since until now, it contained only data about particular positions or variants and not about single alignments. This can potentially make problems in case of high coverage BAM files.           
+The base quality is other type of data that is available for every alignment in the BAM file. While it is not needed to do anything with the qualities in case of a SNV, in case of an INDEL the length of the sequence changes, so it is necessary to adjust the length of the mapping quality in this case. When the length of the depersonalized BAM is greater, thus we introduce an insertion, we can provide any qualities as long as these qualities will correspond to surrounding qualities of the changed position. However, when we introduce a deletion, the number of qualities fall and we need to store the remaining ones into the BDIFF file for each of the alignments. This brings another component into the BDIFF file, since until now, it contained only data about particular positions or variants and not about single alignments. This can potentially make problems in case of high coverage BAM files.           
 
 It is possible, that also other (meta-)data in the BAM files are able to reveal the introduced change and the algorithm should be adjusted to include them.    
 
