@@ -1,4 +1,4 @@
-from pysam.calignmentfile import VALID_HEADER_TYPES, KNOWN_HEADER_FIELDS, AlignmentFile
+from pysam.libcalignmentfile import VALID_HEADER_TYPES, KNOWN_HEADER_FIELDS, AlignmentFile
 
 MUT_TAG = 'mt'
 MUT_BAM_TAG = 'bm'

@@ -16,8 +16,8 @@ class TestUnmutate(unittest.TestCase):
     def setUpClass(cls):
         # TODO
         # sam2bam(cls.RESOURCE_PATH + 'input.sam', cls.RESOURCE_PATH + 'input.bam')
-        # pysam.index(cls.RESOURCE_PATH + 'input.bam')
         cls.mut = BamMutator(cls.RESOURCE_PATH + 'input.bam', RandomMockup())
+        pysam.index(cls.RESOURCE_PATH + 'input.bam')
     
     def test_unmutate_01(self):
         # case 1
