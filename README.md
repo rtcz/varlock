@@ -15,10 +15,11 @@ Most variant studies require limited access to short regions of specific genes o
 
 Due to this potential threat to privacy, BAM files need to be stored in a secure form while preserving general information about alignments. These depersonalized BAM files can be then made available to general public without fear of personal data leakage. Moreover, the authority managing genomic data must be able to provide access to unaltered regions of BAM on a valid request from an authorized user. These requirements are not easy to fulfill effectively, since the common size of BAM is in order of gigabytes. 
 
-To overcome this challenge we developed Varlock - a command line interface utility for securing BAM files that enables distributing access privileges to specific BAM regions among users.
+To overcome this challenge we developed Varlock - a command line interface utility for securing BAM files that enables distributing access privileges to specific BAM regions among users. Varlock also includes separate command line interface utility called Anonymer for one-way securing of FASTQ file paired-end reads.
+
 
 ## Varlock
-Varlock is a command line interface utility for reversible depersonalization of BAM files by altering SNVs and INDELs based on supplied VCF file. This method works with mapped alignments only, thus unmapped alignments are handled separately using stream cipher encryption.
+Varlock is a command line interface utility for reversible depersonalization of BAM file by altering contained SNVs and INDELs based on supplied VCF file. This method works with mapped alignments only, thus unmapped alignments are handled separately using stream cipher encryption.
 
 The differences between the original and the depersonalized BAM are stored in encrypted form, so only authorized users can recover their permitted parts of the original BAM. Varlock uses RSA asymmetric encryption, with pairs of public and private keys for encryption and decryption, respectively.
 
@@ -82,6 +83,16 @@ The depersonalized BAM file is also needed for reencryption, since it contains t
 ### VAC file creation
 
 VAC file is derived from a VCF file with the variant frequencies of the closest population. Since VCF records are dynamically typed, the variant type (SNV/INDEL/other) must be inferred from alleles in the record. Only SNVs and INDELs are converted to VAC file. Each record, where each of reference and alternative alleles is only one DNA base, is categorized as SNV record. Records that either reference or alternative alleles contain longer sequences are categorized as INDELs. VAC creation process furthermore needs information about the genomic index (chromosome lengths of reference genome), included in each BAM file. Thus a target BAM file is needed for VAC creation. The generated VAC file then can be used to encrypt all BAM files for the population, provided that they used the same reference genome. 
+
+
+## Anonymer
+Along with varlock we provide another command line interface utility for irreversible depersonalization of paired-end reads in FASTQ file pair by substituting sequences of uniquely mapped reads by correspondng parts of reference sequence. Only one command is available which accepts FASTQ files pair, reference genome and it's index.
+
+The method maps paired-end reads twice. During the first mapping the original FASTQ pair is used and primary SAM file is being written together with primary FASTQ file pair. Each SAM file read is being converted back to FASTQ file read. If read was mapped, it's sequence is replaced with corresponding part of reference sequence, otherwise the original sequence is keeped. The second mapping maps primary FASTQ file pair and creates secondary SAM file.
+
+ In the last step secondary FASTQ file pair is produced by using both primary and secondary SAM files together with orignal FASTQ file pair in the following manner. Both primary and secondary SAM files are iterated in paralel while mapped read positions between them are compared. If mapped positions between primary and secondary SAM read pair match, they are considered as uniquely mapped. In this case sequence pair from secondary SAM file (originating from the reference sequence) is used to write secondary FASTQ pair. When sequence pair is not uniquely mapped, sequence pair from original FASTQ file pair is used as output. Secondary FASTQ file pair is the final output and is considered as depersonalized.
+ 
+Bowtie 2 mapper is used to map alignments. Anonymer issues bowtie2 command in subprocess and then reads it's output trough pipe.
 
 ## Discussion
 
