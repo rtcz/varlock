@@ -17,6 +17,10 @@ from varlock.vac import Vac
 
 
 class Varlocker:
+    """
+    Main class of varlock package for reversible depersonalization of BAM file
+    by altering contained SNVs and INDELs based on supplied VAC (VCF based) file.
+    """
     AES_KEY_LENGTH = 32
     
     @staticmethod

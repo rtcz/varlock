@@ -10,7 +10,7 @@
 import argparse
 import os
 import re
-from anonymer import Anonymer
+from varlock.anonymer import Anonymer
 
 # TODO
 GENOME_FILE = "/data/genome/human/hg38/hg38.fa"
