@@ -85,10 +85,28 @@ class TestCommon(unittest.TestCase):
     #     self.assertRaises(ValueError, lambda: Cigar.validate(alignment=alignment, snv_pos=10))
     #     self.assertRaises(ValueError, lambda: Cigar.validate(alignment=alignment, snv_pos=11))
     
-    def test_mut_map(self):
+    def test_snv_mut_map(self):
         # TODO more test, also with tuples
         mut_map = cmn.snv_mut_map(alt_freqs=[1, 1, 1, 1], ref_freqs=[1, 1, 1, 1], rnd=Random(0))
         self.assertDictEqual({'A': 'G', 'T': 'T', 'G': 'C', 'C': 'A', 'N': 'N'}, mut_map)
+        
+        mut_map = cmn.snv_mut_map(alt_freqs=[3, 0, 1, 0], ref_freqs=[2, 1, 4, 0], rnd=RandomMockup())
+        self.assertDictEqual({'A': 'G', 'T': 'T', 'G': 'A', 'C': 'C', 'N': 'N'}, mut_map)
+    
+    def test_indel_mut_map(self):
+        mut_map = cmn.indel_mut_map(
+            alt_freq_map={'G': 2},
+            ref_freq_map={'GCG': 1, 'G': 0},
+            rnd=RandomMockup()
+        )
+        self.assertDictEqual({'G': 'GCG', 'GCG': 'G'}, mut_map)
+        
+        mut_map = cmn.indel_mut_map(
+            alt_freq_map={'AGT': 2, 'A': 1},
+            ref_freq_map={'AG': 2, 'A': 1, 'AGT': 0},
+            rnd=RandomMockup()
+        )
+        self.assertDictEqual({'A': 'A', 'AG': 'AGT', 'AGT': 'AG'}, mut_map)
     
     @staticmethod
     def bits2bytes(bit_str: str):

@@ -5,11 +5,13 @@
     "to_index": 3095693982
 }
 snvs	4
-indels	0
-last_index	2830728807
+indels	2
+last_index	11038
 index_res	1000
 index_size	0
-2830728742	0	C,A,T,G
-2830728782	0	G,A,T,C
-2830728787	0	T,G,A,C
-2830728807	0	G,C,A,T
+11012	0	A,G,T,C
+11016	0	C,A,T,G
+11021	0	G,T,A,C
+11028	1	A,AGT,AG
+11032	0	G,A,T,C
+11038	1	GCG,G

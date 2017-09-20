@@ -6,7 +6,6 @@ from varlock.bdiff import BdiffIO
 class TestBdiff(unittest.TestCase):
     # SECRET = bytes([255] * Diff.SECRET_SIZE)
     # CHECKSUM = b'0123456789ABCDEF'
-    RESOURCE_PATH = 'tests/resources/bdiff/'
     
     @classmethod
     def setUpClass(cls):

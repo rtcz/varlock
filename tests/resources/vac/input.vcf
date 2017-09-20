@@ -1,38 +1,24 @@
 ##fileformat=VCFv4.2
-##fileDate=20090805
-##source=myImputationProgramV3.1
-##reference=file:///seq/references/1000GenomesPilot-NCBI36.fasta
-##contig=<ID=20,length=62435964,assembly=B36,md5=f126cdf8a6e0c7f379d618ff66beb2da,species="Homo sapiens",taxonomy=x>
-##phasing=partial
-##INFO=<ID=NS,Number=1,Type=Integer,Description="Number of Samples With Data">
-##INFO=<ID=DP,Number=1,Type=Integer,Description="Total Depth">
-##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">
-##INFO=<ID=AA,Number=1,Type=String,Description="Ancestral Allele">
-##INFO=<ID=DB,Number=0,Type=Flag,Description="dbSNP membership, build 129">
-##INFO=<ID=H2,Number=0,Type=Flag,Description="HapMap2 membership">
-##FILTER=<ID=q10,Description="Quality below 10">
-##FILTER=<ID=s50,Description="Less than 50% of samples have data">
-##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
-##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">
-##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read Depth">
-##FORMAT=<ID=HQ,Number=2,Type=Integer,Description="Haplotype Quality">
-#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT
-chr2	1011	.	G	A	29	PASS	AC=10;AN=100
-chr2	1021	.	T	A	3	q10	AC=5;AN=100
-chr2	1031	.	A	G,T	67	PASS	AC=10,5;AN=100
-chr2	1042	.	TCG	TG,T,TCAG	47	PASS	AC=5,10,15;AN=100
-chr2	1052	.	A	AGG,AGT	47	PASS	AC=1,1;AN=100
-chr2	1061	.	C	G	47	PASS	AC=10;AN=100
-chr2	1072	.	GTC	G,GTCT	50	PASS	AC=5,3;AN=100
-chr2	1081	.	A	T	47	PASS	AC=10;AN=100
-chr2	1090	.	T	*	47	PASS	AC=5;AN=100
-chr2	1100	.	T	.	47	PASS	AC=5;AN=100
-chr2	1111	.	T	C	47	PASS	AC=10;AN=100
-chr2	1120	.	N	T,C	47	PASS	AC=1,1;AN=100
-chr2	1130	.	C	N	47	PASS	AC=1;AN=100
-chr2	1142	.	TC	TCA	47	PASS	AC=5;AN=100
-chr2	1150	.	C	A,N	47	PASS	AC=10,1;AN=100
-chr2	1160	.	A	<INS:ME:ALU>	47	PASS	AC=1;AN=100
-chr2	1170	.	A	<CN1>,<CN2>	47	PASS	AC=1,2;AN=100
-chr2	1182	.	GCG	G,GCGCG	47	PASS	AC=10,5;AN=100
-chr2	1191	.	G	C	47	PASS	AC=10;AN=100
+##fileDate=20171909
+##INFO=<ID=AC,Number=A,Type=Integer,Description="Allele count in genotypes, for each ALT allele">
+##INFO=<ID=AN,Number=A,Type=Integer,Description="Total number of alleles in called genotypes">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+chr2	1011	.	G	A	29	.	AC=10;AN=100
+chr2	1021	.	T	A	3	.	AC=5;AN=100
+chr2	1031	.	A	G,T	67	.	AC=10,5;AN=100
+chr2	1042	.	TCG	TG,T,TCAG	47	.	AC=5,10,15;AN=100
+chr2	1052	.	A	AGG,AGT	47	.	AC=1,1;AN=100
+chr2	1061	.	C	G	47	.	AC=10;AN=100
+chr2	1072	.	GTC	G,GTCT	50	.	AC=5,3;AN=100
+chr2	1081	.	A	T	47	.	AC=10;AN=100
+chr2	1090	.	T	*	47	.	AC=5;AN=100
+chr2	1100	.	T	.	47	.	AC=5;AN=100
+chr2	1111	.	T	C	47	.	AC=10;AN=100
+chr2	1120	.	N	T,C	47	.	AC=1,1;AN=100
+chr2	1130	.	C	N	47	.	AC=1;AN=100
+chr2	1142	.	TC	TCA	47	.	AC=5;AN=100
+chr2	1150	.	C	A,N	47	.	AC=10,1;AN=100
+chr2	1160	.	A	<INS:ME:ALU>	47	.	AC=1;AN=100
+chr2	1170	.	A	<CN1>,<CN2>	47	.	AC=1,2;AN=100
+chr2	1182	.	GCG	G,GCGCG	47	.	AC=10,5;AN=100
+chr2	1191	.	G	C	47	.	AC=10;AN=100

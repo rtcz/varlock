@@ -10,7 +10,7 @@ class Vac:
     """
     Class for handling VAC file. VAC stands for Variant Allele Count.
     VAC is binary file, consisting of two blocks.
-    The first block contains SNV records, the second INDEL records.
+    The first block contains SNV records, the second one INDEL records.
     VAC uses two temporary files when writing. These files are deleted after writing is finished.
     
     VAC header:

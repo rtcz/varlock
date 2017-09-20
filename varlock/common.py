@@ -67,22 +67,21 @@ def snv_mut_map(alt_freqs: list, ref_freqs: list, rnd):
 
 def indel_mut_map(alt_freq_map: dict, ref_freq_map: dict, rnd):
     """
-    Create indel mutation mapping from intersection
-    of alternative indels with reference indels.
+    Create indel mutation mapping of reference sequences.
     :param alt_freq_map: {seq:count, ...}
     :param ref_freq_map: {seq:count, ...}
     :param rnd: random number generator
     :return: Map as bijection between indels and permuted indels.
     """
-    # find intersection of indels
-    seqs = list(set(alt_freq_map) & set(ref_freq_map))
-    
-    alt_freqs = [0] * len(seqs)
-    ref_freqs = [0] * len(seqs)
-    for i in range(len(seqs)):
-        # add random value to distinguish tied values
-        alt_freqs[i] = alt_freq_map[seqs[i]] + rnd.random()
-        ref_freqs[i] = ref_freq_map[seqs[i]]
+    seqs = [None] * len(ref_freq_map)
+    alt_freqs = [0] * len(ref_freq_map)
+    ref_freqs = [0] * len(ref_freq_map)
+    i = 0
+    for seq, freq in ref_freq_map.items():
+        seqs[i] = seq
+        alt_freqs[i] = alt_freq_map.get(seq, 0) + rnd.random()
+        ref_freqs[i] = freq
+        i += 1
     
     return _mut_map(seqs, alt_freqs, ref_freqs, rnd)
 
