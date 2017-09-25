@@ -9,6 +9,8 @@
 .idea/**/workspace.xml
 .idea/**/tasks.xml
 .idea/dictionaries
+.idea/deployment.xml
+.idea/webServers.xml
 
 # Sensitive or high-churn files:
 .idea/**/dataSources/
@@ -39,7 +41,6 @@ cmake-build-debug/
 
 # mpeltonen/sbt-idea plugin
 .idea_modules/
-.idea/
 
 # JIRA plugin
 atlassian-ide-plugin.xml
