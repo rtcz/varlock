@@ -42,6 +42,10 @@ class Vac:
     VCF_COL_SEP = "\t"
     VCF_LIST_SEP = ","
     VCF_INFO_SEP = ";"
+
+    VAC_COL_SEP = "\t"
+    VAC_KEYVAL_SEP = ":"
+    VAC_ITEM_SEP = ","
     
     SHORT_SIZE = 2
     INT_SIZE = 4
@@ -196,6 +200,8 @@ class Vac:
         if len(byte_str) == 0:
             raise EOFError()
         index, a_ac, t_ac, c_ac, g_ac = struct.unpack(cls.SNV_FORMAT, byte_str)
+
+        # print('rs', index, (a_ac, t_ac, c_ac, g_ac))
         return index, (a_ac, t_ac, c_ac, g_ac)
     
     @classmethod
@@ -206,7 +212,7 @@ class Vac:
         :param ac_tuple: counts of bases in format (A,T,G,C)
         :return:
         """
-        # if sum(ac_tuple) > 0:
+        # print('ws', index, ac_tuple)
         vac_file.write(struct.pack(cls.SNV_FORMAT, index, *ac_tuple))
     
     @classmethod
@@ -230,7 +236,8 @@ class Vac:
             seq = bytes2seq(vac_file.read(seq_byte_size), base_length)
             counts[i] = count
             seqs[i] = seq
-        
+
+        # print('ri', index, counts, seqs)
         return index, counts, seqs
     
     # TODO parameters: index, counts, seqs
@@ -252,7 +259,8 @@ class Vac:
         for allele_count, sequence in indel_map:
             record += struct.pack('<HH', allele_count, len(sequence))
             record += seq2bytes(sequence)
-        
+
+        # print('wi', index, indel_map)
         indel_file.write(record)
     
     def vcf2vac(self, vcf_file, vac_file):
@@ -367,17 +375,24 @@ class Vac:
             
             # write SNVs
             for i in range(snv_count):
-                index_str, ac_str = text_file.readline().rstrip().split(cls.VCF_COL_SEP)
-                ac_tuple = tuple(map(int, ac_str.split(',')))
+                index_str, ac_str = text_file.readline().rstrip().split(cls.VAC_COL_SEP)
+                
+                try:
+                    ac_tuple = tuple(map(int, ac_str.split(Vac.VAC_ITEM_SEP)))
+                except ValueError:
+                    message = "SNV records has invalid format - "
+                    message += "probably INDEL record at SNV position"
+                    raise ValueError(message)
+                
                 cls.write_snv_record(vac_file, int(index_str) - 1, ac_tuple)
             
             # write INDELs
             for line in text_file:
                 index_str, indel_str = line.rstrip().split('\t')
                 indel_map = []
-                for segment in indel_str.split(','):
-                    allele_count, sequence = segment.split(':')
-                    indel_map.append((allele_count, sequence))
+                for item in indel_str.split(Vac.VAC_ITEM_SEP):
+                    allele_count_str, sequence = item.split(Vac.VAC_KEYVAL_SEP)
+                    indel_map.append((int(allele_count_str), sequence))
                 
                 cls.write_indel_record(vac_file, int(index_str) - 1, indel_map)
     

@@ -152,7 +152,7 @@ class Mutator:
                 vac = next(vac_iter)
                 if vac is not None:
                     # not the end of VAC file
-                    self.__write_done(mut_bam_file, alignment_queue, vac.index)
+                    self.__write_before_index(mut_bam_file, alignment_queue, vac.index)
                     # update alignment queue
                     for i in range(len(alignment_queue)):
                         alignment_queue[i] = cmn.vac_aligned_variant(alignment_queue[i].alignment, vac)
@@ -163,11 +163,7 @@ class Mutator:
             else:  # alignment is covering vac position
                 alignment_queue.append(cmn.vac_aligned_variant(alignment, vac))
                 alignment = next(bam_iter)
-                
                 self.covering_counter += 1
-                # noinspection PyAttributeOutsideInit
-                # TODO this is not the real coverage
-                self.max_coverage = max(len(alignment_queue), self.max_coverage)
         
         # noinspection PyAttributeOutsideInit
         self.vac_counter = vac_iter.counter
@@ -240,7 +236,7 @@ class Mutator:
                 diff = next(bdiff_iter)
                 if diff is not None:
                     # not the end of DIFF file
-                    self.__write_done(out_bam_file, alignment_queue, diff.index)
+                    self.__write_before_index(out_bam_file, alignment_queue, diff.index)
                     # update alignment queue
                     for i in range(len(alignment_queue)):
                         alignment_queue[i] = cmn.diff_aligned_variant(alignment_queue[i].alignment, diff)
@@ -250,11 +246,7 @@ class Mutator:
             else:  # alignment is covering diff position
                 alignment_queue.append(cmn.diff_aligned_variant(alignment, diff))
                 alignment = next(bam_iter)
-                
                 self.covering_counter += 1
-                # noinspection PyAttributeOutsideInit
-                # TODO this is not the real coverage
-                self.max_coverage = max(len(alignment_queue), self.max_coverage)
         
         # noinspection PyAttributeOutsideInit
         self.diff_counter = bdiff_iter.counter
@@ -277,7 +269,7 @@ class Mutator:
             return alignment.query_sequence
     
     @staticmethod
-    def __encrypt_unmapped(alignment, secret: bytes):
+    def __encrypt_unmapped(alignment: pysam.AlignedSegment, secret: bytes):
         """
         Stream cipher encryption / decryption.
         alignment + secret => encrypted_alignment
@@ -292,6 +284,7 @@ class Mutator:
             # TODO maybe include query quality?
             sha512.update(secret + alignment.query_name.encode())
             
+            # TODO what about soft clipped bases?
             mut_seq = cmn.stream_cipher(alignment.query_sequence, sha512.digest())
             alignment.query_sequence = mut_seq
     
@@ -302,43 +295,52 @@ class Mutator:
         :param vac: variant allele count list
         :return: True if NS mutation has occured
         """
-        is_mutated = False
-        variant_seqs = cmn.variant_seqs(variant_queue)
-        
         if isinstance(vac, po.VacSnvRecord):
-            # all present variants should be SNVs
-            # get pileup of bases from alignments at vac mapping position
-            alt_freqs = cmn.base_freqs(variant_seqs)
-            mut_map = cmn.snv_mut_map(alt_freqs=alt_freqs, ref_freqs=vac.freqs, rnd=self._rnd)
-            
-            for variant in variant_queue:  # type: po.AlignedVariant
-                if variant.is_present():
-                    # alignment has vac to mutate
-                    is_mutated |= self._mutate_variant(variant, mut_map)
-                    # done with current vac
-                    variant.clear()
-            
-            if is_mutated:
-                # at least one alignment has been mutated
-                bdiff_io.write_snv(vac.index, mut_map)
-        
+            is_mutated = self._mutate_snv_pos(bdiff_io, variant_queue, vac)
         elif isinstance(vac, po.VacIndelRecord):
-            # all present variants should be INDELs
-            alt_freq_map = cmn.freq_map(variant_seqs)
-            mut_map = cmn.indel_mut_map(alt_freq_map, dict(zip(vac.seqs, vac.freqs)), rnd=self._rnd)
-            
-            for variant in variant_queue:  # type: po.AlignedVariant
-                if variant.is_present():
-                    # alignment has vac to mutate
-                    is_mutated |= self._mutate_variant(variant, mut_map)
-                    # done with current vac
-                    variant.clear()
-            
-            if is_mutated:
-                bdiff_io.write_indel(vac.index, mut_map)
+            is_mutated = self._mutate_indel_pos(bdiff_io, variant_queue, vac)
         else:
             raise ValueError("%s is not VAC record instance" % type(vac).__name__)
         
+        return is_mutated
+    
+    def _mutate_snv_pos(self, bdiff_io: bdiff.BdiffIO, variant_queue: list, vac: po.VacSnvRecord):
+        is_mutated = False
+        variant_seqs = cmn.variant_seqs(variant_queue)
+        
+        alt_freqs = cmn.base_freqs(variant_seqs)
+        mut_map = cmn.snv_mut_map(alt_freqs=alt_freqs, ref_freqs=vac.freqs, rnd=self._rnd)
+        
+        for variant in variant_queue:  # type: po.AlignedVariant
+            if variant.is_present():
+                # alignment has vac to mutate
+                is_mutated |= self._mutate_variant(variant, mut_map)
+                # done with current vac
+                variant.clear()
+        
+        if is_mutated:
+            # at least one alignment has been mutated
+            bdiff_io.write_snv(vac.index, mut_map)
+            
+        return is_mutated
+    
+    def _mutate_indel_pos(self, bdiff_io: bdiff.BdiffIO, variant_queue: list, vac: po.VacIndelRecord):
+        is_mutated = False
+        variant_seqs = cmn.variant_seqs(variant_queue)
+        
+        alt_freq_map = cmn.freq_map(variant_seqs)
+        mut_map = cmn.indel_mut_map(alt_freq_map, dict(zip(vac.seqs, vac.freqs)), rnd=self._rnd)
+        
+        for variant in variant_queue:  # type: po.AlignedVariant
+            if variant.is_present():
+                # alignment has vac to mutate
+                is_mutated |= self._mutate_variant(variant, mut_map)
+                # done with current vac
+                variant.clear()
+        
+        if is_mutated:
+            bdiff_io.write_indel(vac.index, mut_map)
+            
         return is_mutated
     
     def _mutate_variant(self, variant: po.AlignedVariant, mut_map: dict):
@@ -346,15 +348,15 @@ class Mutator:
         Mutate alignment by mutation map at SNV position.
         :param variant:
         :param mut_map: mutation map
-        :return: True if base has been mutated
+        :return: True if variant mutation is non-synonymous
         """
         is_mutated = False
         
-        # alignment is mapped at snv position
+        # alignment is mapped at variant position
         mut_seq = mut_map[variant.seq]
         
         if variant.seq != mut_seq:
-            # base has been mutated to another base
+            # non-synonymous mutation
             self.mut_counter += 1
             is_mutated = True
             variant.seq = mut_seq
@@ -362,7 +364,7 @@ class Mutator:
         
         return is_mutated
     
-    def __write_done(self, out_bam_file, variant_queue, index):
+    def __write_before_index(self, out_bam_file, variant_queue, index):
         """
         Write snv alignments while their end reference position is before index.
         :param out_bam_file:

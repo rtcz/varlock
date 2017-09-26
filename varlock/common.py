@@ -233,17 +233,18 @@ def checksum(filename: str):
     return hasher.digest()
 
 
-def ref_pos2seq_pos(alignment, ref_pos):
+def ref_pos2seq_pos(alignment: pysam.AlignedSegment, ref_pos: int):
     """
     Retrieve base position in sequence string at refence position.
-    It is assumed that alignment and reference position are on the same reference.
+    Alignment and ref_pos are assumed to be of the same reference.
     :param alignment: pysam.AlignedSegment
     :param ref_pos: reference position of base
-    :return: 0-based position of base with specified reference position in sequence string
+    :return: 0-based position of base mapped to reference position
+    in AlignedSegment.query_sequence.
     None if alignment is not mapped at ref_pos (deletion)
     """
-    # TODO check reference name, dont assume that reference position and alignment are on same reference
-    # TODO optimalize (matches_only=True is possible)
+    # TODO optimalize: (try matches_only=True)
+    # TODO optimalize: case when alignment is full matched based on CIGAR (e.g. 30M)
     seq_pos = None
     for current_seq_pos, current_ref_pos in alignment.get_aligned_pairs(matches_only=False, with_seq=False):
         # search for base in snv position
@@ -268,46 +269,61 @@ def variant_seqs(variants: list):
     return pileup_col
 
 
-def max_match_len(string: str, pos: int, words: list):
+def max_match_len(sequence: str, pos: int, words: list):
     """
-    :param string:
+    :param sequence:
     :param pos: position of matching
     :param words: words to match
-    :return: length of longest matching word in a string at specific position
+    :return: Length of longest matching word in a string starting
+    at specified position.
+    When at least one word exceeds sequence length, zero is returned.
     """
     max_length = 0
     for word in words:
-        if word == string[pos:len(word)]:
+        end_pos = pos + len(word)
+        if pos + len(word) > len(sequence):
+            max_length = 0
+            break
+        
+        if word == sequence[pos:end_pos]:
             # matching
             max_length = max(len(word), max_length)
     
     return max_length
 
 
+# TODO refactor - merge with vac_aligned_variant
 def diff_aligned_variant(alignment: pysam.AlignedSegment, diff: po.GenomicPosition):
     """
     Factory that creates AlignedVariant from pysam alignment and DIFF record.
+    Alignment and DIFF are assumed to be of the same reference.
     :param alignment:
     :param diff:
     """
-    # TODO optimize, skip when ref_pos is greater than alignment reference end ?
-    pos = ref_pos2seq_pos(alignment, diff.ref_pos)
-    if pos is None:
-        # this should not occur
-        raise ValueError("variant position not found")
-    elif isinstance(diff, po.DiffSnvRecord):
-        variant = po.AlignedVariant(alignment, pos)
-    elif isinstance(diff, po.DiffIndelRecord):
-        end_pos = pos + max_match_len(alignment.query_sequence, pos, diff.mut_map.values())
-        if end_pos > pos:
-            # there was a match
-            variant = po.AlignedVariant(alignment, pos, end_pos)
-        else:
-            # match not found
-            # this sould be rare
-            variant = po.AlignedVariant(alignment)
+    assert alignment.reference_name == diff.ref_name
+    
+    # reference_end is position after the last base
+    if diff.ref_pos >= alignment.reference_end or diff.ref_pos < alignment.reference_start:
+        # variant is after or before the alignment
+        variant = po.AlignedVariant(alignment)
     else:
-        raise ValueError("%s is not DIFF record instance" % type(diff).__name__)
+        # obtain query_sequence position
+        pos = ref_pos2seq_pos(alignment, diff.ref_pos)
+        if pos is None:
+            message = "reference position %d on alignment with range <%d,%d> not found"
+            raise ValueError(message % (diff.ref_pos, alignment.reference_start, alignment.reference_end - 1))
+        elif isinstance(diff, po.DiffSnvRecord):
+            variant = po.AlignedVariant(alignment, pos)
+        elif isinstance(diff, po.DiffIndelRecord):
+            end_pos = pos + max_match_len(alignment.query_sequence, pos, diff.mut_map.values())
+            if end_pos > pos:
+                # indel was found
+                variant = po.AlignedVariant(alignment, pos, end_pos)
+            else:
+                # match not found - this sould not occur
+                variant = po.AlignedVariant(alignment)
+        else:
+            raise ValueError("%s is not DIFF record instance" % type(diff).__name__)
     
     return variant
 
@@ -315,56 +331,35 @@ def diff_aligned_variant(alignment: pysam.AlignedSegment, diff: po.GenomicPositi
 def vac_aligned_variant(alignment: pysam.AlignedSegment, vac: po.GenomicPosition):
     """
     Factory that creates AlignedVariant from pysam alignment and VAC record.
+    Alignment and VAC are assumed to be of the same reference.
     :param alignment:
     :param vac:
     """
-    # TODO optimize, skip when ref_pos is greater than alignment reference end ?
-    pos = ref_pos2seq_pos(alignment, vac.ref_pos)
-    if pos is None:
-        # this should not occur
-        raise ValueError("variant position not found")
-    elif isinstance(vac, po.VacSnvRecord):
-        variant = po.AlignedVariant(alignment, pos)
-    elif isinstance(vac, po.VacIndelRecord):
-        end_pos = pos + max_match_len(alignment.query_sequence, pos, vac.seqs)
-        if end_pos > pos:
-            # there was a match
-            variant = po.AlignedVariant(alignment, pos, end_pos)
-        else:
-            # match not found
-            # this sould be rare
-            variant = po.AlignedVariant(alignment)
+    assert alignment.reference_name == vac.ref_name
+    
+    # reference_end is position after the last base
+    if vac.ref_pos >= alignment.reference_end or vac.ref_pos < alignment.reference_start:
+        # variant is after or before the alignment
+        variant = po.AlignedVariant(alignment)
     else:
-        raise ValueError("%s is not VAC record instance" % type(vac).__name__)
+        pos = ref_pos2seq_pos(alignment, vac.ref_pos)
+        if pos is None:
+            message = "reference position %d on alignment with range <%d,%d> not found"
+            raise ValueError(message % (vac.ref_pos, alignment.reference_start, alignment.reference_end - 1))
+        elif isinstance(vac, po.VacSnvRecord):
+            variant = po.AlignedVariant(alignment, pos)
+        elif isinstance(vac, po.VacIndelRecord):
+            end_pos = pos + max_match_len(alignment.query_sequence, pos, vac.seqs)
+            if end_pos > pos:
+                # indel was found
+                variant = po.AlignedVariant(alignment, pos, end_pos)
+            else:
+                # match not found or at least one variant exceeded alignment length
+                variant = po.AlignedVariant(alignment)
+        else:
+            raise ValueError("%s is not VAC record instance" % type(vac).__name__)
     
     return variant
-
-
-# def get_seq(alignment: pysam.AlignedSegment, pos: int, ref_seqs: list):
-#     """
-#     :param alignment:
-#     :param pos: position
-#     :param ref_seqs: reference sequences
-#     :return: longest sequence in alignment at specific position matching reference sequence
-#     """
-#     max_seq = ''
-#     for ref_seq in ref_seqs:
-#         if ref_seq == alignment.query_sequence[pos, len(ref_seq)]:
-#             # matching
-#             if len(ref_seq) > len(max_seq):
-#                 # longest
-#                 max_seq = max_seq
-#
-#     return max_seq
-
-
-# def get_base(alignment: pysam.AlignedSegment, pos: int):
-#     """
-#     :param alignment:
-#     :param pos: position in sequence
-#     :return: base at pos
-#     """
-#     return alignment.query_sequence[pos]
 
 
 def is_placed_alignment(alignment: pysam.AlignedSegment):
@@ -374,21 +369,6 @@ def is_placed_alignment(alignment: pysam.AlignedSegment):
     Unplaced alignment has no reference_name and reference_start.
     """
     return alignment.reference_id != -1
-
-
-# def set_base(alignment, pos: int, base: str):
-#     """
-#     Replace base at SNV position
-#     :param alignment: pysam.AlignedSegment
-#     :param pos: position in sequence
-#     :param base: mutated base letter
-#     :return: mutated sequence string
-#     """
-#     # TODO query_qualities
-#     mut_seq = alignment.query_sequence[:pos]
-#     mut_seq += base
-#     mut_seq += alignment.query_sequence[pos + 1:]
-#     alignment.query_sequence = mut_seq
 
 
 def open_vcf(filename, mode):

@@ -8,7 +8,6 @@ from bitstring import BitArray
 import varlock.common as cmn
 from tests.random_mockup import RandomMockup
 from varlock.cigar import Cigar
-from varlock.po import AlignedVariant
 
 
 class TestCommon(unittest.TestCase):
@@ -38,12 +37,12 @@ class TestCommon(unittest.TestCase):
         alignment.query_sequence = "ATGC" * 10
         alignment.reference_start = 1000
         alignment.cigartuples = (
-            (Cigar.CIGAR_MATCH, 10),
-            (Cigar.CIGAR_DEL, 1),
-            (Cigar.CIGAR_EQUAL, 3),
-            (Cigar.CIGAR_DIFF, 3),
-            (Cigar.CIGAR_INS, 1),
-            (Cigar.CIGAR_MATCH, 20)
+            (Cigar.OP_MATCH, 10),
+            (Cigar.OP_DEL, 1),
+            (Cigar.OP_EQUAL, 3),
+            (Cigar.OP_DIFF, 3),
+            (Cigar.OP_INS, 1),
+            (Cigar.OP_MATCH, 20)
         )
         return alignment
     
@@ -60,13 +59,13 @@ class TestCommon(unittest.TestCase):
         alignment.query_sequence = "X" * 10 + "ATGC" * 10 + "X" * 10
         alignment.reference_start = 1000
         alignment.cigartuples = (
-            (Cigar.CIGAR_SOFT_CLIP, 10),
-            (Cigar.CIGAR_MATCH, 10),
-            (Cigar.CIGAR_DEL, 1),
-            (Cigar.CIGAR_MATCH, 9),
-            (Cigar.CIGAR_INS, 1),
-            (Cigar.CIGAR_MATCH, 20),
-            (Cigar.CIGAR_SOFT_CLIP, 10)
+            (Cigar.OP_SOFT_CLIP, 10),
+            (Cigar.OP_MATCH, 10),
+            (Cigar.OP_DEL, 1),
+            (Cigar.OP_MATCH, 9),
+            (Cigar.OP_INS, 1),
+            (Cigar.OP_MATCH, 20),
+            (Cigar.OP_SOFT_CLIP, 10)
         )
         return alignment
     

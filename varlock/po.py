@@ -42,8 +42,8 @@ class AlignedVariant:
     def __init__(self, alignment: pysam.AlignedSegment, pos: int = None, end_pos: int = None):
         """
         :param alignment:
-        :param pos: position of variation in alignment sequence
-        :param end_pos: position after variation in alignment sequence
+        :param pos: position of variation in AlignedSegment.query_sequence
+        :param end_pos: position one base after variation in AlignedSegment.query_sequence
         """
         self.alignment = alignment
         self._pos = pos
@@ -79,6 +79,25 @@ class AlignedVariant:
         mut_seq += seq
         mut_seq += self.alignment.query_sequence[self._end_pos:]
         self.alignment.query_sequence = mut_seq
+        
+        # TODO do something about MD string
+        
+        # TODO update quality string
+        
+        # TODO update CIGAR string
+
+        
+        
+        
+        if self._end_pos - self._pos < len(seq):
+            pass
+        elif self._end_pos - self._pos > len(seq):
+            pass
+        else:
+            pass
+            
+        
+        Cigar.place_op(self.alignment.cigartuples, self._pos, None, len(seq))
 
 
 class FaiRecord:

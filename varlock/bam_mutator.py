@@ -15,19 +15,17 @@ class BamMutator:
     # written alignments
     STAT_ALIGNMENT_COUNT = 'alignment_count'
     
-    # number of alignments covering vac / diff position
+    # number of alignments covering VAC / DIFF position
     STAT_COVERING_COUNT = 'covering_count'
-    
-    # maximum alignments overlapping single SNV
-    STAT_MAX_COVERAGE = 'max_coverage'
     
     # number of vac records read (variants)
     STAT_VAC_COUNT = 'vac_count'
     
-    # sum of bases mutated per alignment
+    # total number of non-synonymously mutated variants -
+    # (not alignments) overlapping mutations do also count
     STAT_MUT_COUNT = 'mut_count'
     
-    # number of diff records written / read
+    # number of DIFF records written / read
     STAT_DIFF_COUNT = 'diff_count'
     
     FROM_INDEX = 'from_index'
@@ -99,7 +97,6 @@ class BamMutator:
         self._stats = {
             self.STAT_ALIGNMENT_COUNT: mut.alignment_counter,
             self.STAT_COVERING_COUNT: mut.covering_counter,
-            self.STAT_MAX_COVERAGE: mut.max_coverage,
             self.STAT_VAC_COUNT: mut.vac_counter,
             self.STAT_MUT_COUNT: mut.mut_counter,
             self.STAT_DIFF_COUNT: mut.diff_counter

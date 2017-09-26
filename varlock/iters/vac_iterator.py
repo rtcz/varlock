@@ -18,8 +18,7 @@ class VacIterator:
         self._snv_file.seek(Vac.HEADER_SIZE)
         
         self._indel_file = open(vac_filename, 'rb')
-        self._indel_file.seek(Vac.HEADER_SIZE)
-        self._indel_file.seek(self._snv_count * Vac.SNV_RECORD_SIZE)
+        self._indel_file.seek(Vac.HEADER_SIZE + self._snv_count * Vac.SNV_RECORD_SIZE)
         
         self._fai = fai
         self._counter = 0
@@ -50,7 +49,7 @@ class VacIterator:
     def _read_indel(self):
         if self._indel_count > 0:
             self._indel_count -= 1
-            index, counts, seqs = Vac.read_indel_record(self._snv_file)
+            index, counts, seqs = Vac.read_indel_record(self._indel_file)
             ref_name, ref_pos = self._fai.index2pos(index)
             self._indel_record = po.VacIndelRecord(
                 index=index,
