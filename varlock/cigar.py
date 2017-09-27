@@ -13,31 +13,35 @@ class Cigar:
     OP_DIFF = 8  # X, type of M
     
     @classmethod
-    def _safe_append(cls, cigar_tuples: list, op_type: int, op_length: int):
+    def _safe_append(cls, cigar: list, op_type: int, op_length: int):
         """
-        Merging new OP with last OP from cigar_tuples
+        Merging new OP with last OP from cigar
         when OPs are of the same type.
-        Otherwise new OP is appended to cigar_tuples.
-        :param cigar_tuples:
-        :return:
+        Otherwise new OP is appended to cigar.
+        :param cigar: [<op_type, op_length>, ...]
         """
-        if len(cigar_tuples):
-            prev_type, prev_length = cigar_tuples[-1]
+        if len(cigar):
+            prev_type, prev_length = cigar[-1]
             if prev_type == op_type:
                 # merge OPs
-                cigar_tuples[-1] = (op_type, op_length + prev_length)
+                cigar[-1] = (op_type, op_length + prev_length)
             else:
-                cigar_tuples.append((op_type, op_length))
+                cigar.append((op_type, op_length))
         else:
-            cigar_tuples.append((op_type, op_length))
+            cigar.append((op_type, op_length))
     
     @classmethod
-    def del_subrange(cls, cigar_tuples: list, start_pos: int, end_pos: int):
+    def del_subrange(cls, cigar: list, start_pos: int, end_pos: int):
+        # TODO refactor ???
         """
-        :param cigar_tuples: [<op_type, op_length>, ...]
+        Removes range from CIGAR tuples, starting with start_pos
+        and ending right before end_pos.
+        CIGAR tuples inside the range are deleted and lengths
+        of intersecting tuples are lowered respectively.
+        :param cigar: [<op_type, op_length>, ...]
         :param start_pos: position in AlignedSegment.query_sequence
         :param end_pos: position in AlignedSegment.query_sequence
-        :return:
+        :return: new CIGAR tuples
         """
         assert end_pos > start_pos >= 0
         new_cigar = []
@@ -45,8 +49,8 @@ class Cigar:
         started = None
         ended = None
         normalize = False
-        for i in range(len(cigar_tuples)):
-            curr_type, curr_length = cigar_tuples[i]
+        for i in range(len(cigar)):
+            curr_type, curr_length = cigar[i]
             prev_pos = curr_pos
             if curr_type not in [cls.OP_DEL, cls.OP_HARD_CLIP, cls.OP_REF_SKIP]:
                 curr_pos += curr_length
@@ -93,71 +97,54 @@ class Cigar:
         return new_cigar
     
     @classmethod
-    def place_op(cls, cigar_tuples: list, op_pos: int, op_type: int, op_length: int):
+    def place_op(cls, cigar: list, op_pos: int, op_type: int, op_length: int):
         """
         Place CIGAR operation into existing CIGAR string (in form of list of tuples).
         Function does not support placing hard and soft clip operations
         since they can appear only at CIGAR ends. Moreover HARD clipped bases
         are not part of AlignedSegment.query_sequence.
-        :param cigar_tuples: [<op_type, op_length>, ...]
+        :param cigar: [<op_type, op_length>, ...]
         :param op_pos: position in AlignedSegment.query_sequence
         :param op_type: CIGAR operation type id
         :param op_length: CIGAR operation length
-        :return: New CIGAR in form of tuples.
+        :return: new CIGAR tuples
         """
         assert op_type in [cls.OP_MATCH, cls.OP_EQUAL, cls.OP_DIFF, cls.OP_INS, cls.OP_PAD, cls.OP_DEL]
         assert op_length > 0
         assert op_pos >= 0
         curr_pos = 0
         new_cigar = []
-        is_placed = False
         
-        for i in range(len(cigar_tuples)):
-            curr_type, curr_length = cigar_tuples[i]
+        for i in range(len(cigar)):
+            curr_type, curr_length = cigar[i]
             # OP_HARD_CLIP is not contained in cigar_tuples nor query_sequence
-            if not is_placed and curr_type != cls.OP_DEL:
-                # OP_MATCH, OP_EQUAL, OP_DIFF, OP_INS, OP_PAD
-                if op_pos >= curr_pos + curr_length:
-                    new_cigar.append((curr_type, curr_length))
-                elif op_type == curr_type:
-                    new_cigar.append((op_type, curr_length + op_length))
-                else:
-                    new_cigar.append((curr_type, curr_pos - op_length))
-                    new_cigar.append((op_type, op_length))
-                    new_cigar.append((curr_type, curr_pos - curr_length + op_length))
-                
-                if curr_pos == op_pos:
-                    # place the OP before a current OP
-                    if curr_type == op_type:
-                        # current OP is equal to the OP, merge them
-                        new_cigar.append((op_type, curr_length + op_length))
-                    elif len(new_cigar) and new_cigar[-1][0] == op_type:
-                        # previous OP is equal to the OP, merge them
-                        new_cigar[-1] = (new_cigar[-1][0], new_cigar[-1][1] + op_length)
-                    else:
-                        # place the OP in begining of CIGAR
-                        new_cigar.append((op_type, op_length))
-                        new_cigar.append((curr_type, curr_length))
-                    
-                    # place a current OP after the OP
-                    is_placed = True
-                elif op_pos < curr_pos < curr_pos + curr_length:
-                    # place the OP inside a current OP
-                    new_cigar.append((curr_type, curr_pos - op_length))
-                    new_cigar.append((op_type, op_length))
-                    new_cigar.append((curr_type, curr_pos - curr_length + op_length))
-                    
-                    is_placed = True
-                
+            prev_pos = curr_pos
+            if curr_type not in [cls.OP_DEL, cls.OP_HARD_CLIP, cls.OP_REF_SKIP]:
                 curr_pos += curr_length
+            
+            if prev_pos == op_pos:
+                # place the OP before current OP
+                if op_type == curr_type:
+                    # merge the OP
+                    new_cigar.append((curr_type, curr_length + op_length))
+                else:
+                    cls._safe_append(new_cigar, op_type, op_length)
+                    new_cigar.append((curr_type, curr_length))
+            
+            elif prev_pos < op_pos < curr_pos:
+                # place the OP inside current OP
+                if op_type == curr_type:
+                    # merge the OP
+                    new_cigar.append((curr_type, curr_length + op_length))
+                else:
+                    new_cigar.append((curr_type, op_pos - prev_pos))
+                    new_cigar.append((op_type, op_length))
+                    new_cigar.append((curr_type, curr_pos - op_pos))
             else:
                 new_cigar.append((curr_type, curr_length))
         
-        if not is_placed and curr_pos == op_pos:
-            # place OP
-            if new_cigar[-1][0] == op_type:
-                new_cigar[-1] = (new_cigar[-1][0], new_cigar[-1][1] + op_length)
-            else:
-                new_cigar.append((op_type, op_length))
+        if op_pos == curr_pos:
+            # place the OP at the end of CIGAR
+            cls._safe_append(new_cigar, op_type, op_length)
         
         return new_cigar

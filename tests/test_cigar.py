@@ -73,7 +73,15 @@ class TestCigar(unittest.TestCase):
             Cigar.place_op([(Cigar.OP_MATCH, 2)], 2, Cigar.OP_MATCH, 1)
         )
         
-        # self.assertListEqual(
-        #     [(Cigar.OP_INS, 2), (Cigar.OP_INS, 2)],
-        #     Cigar.place_op([(Cigar.OP_MATCH, 1)], 0, Cigar.OP_INS, 1)
-        # )
+        self.assertListEqual(
+            [(Cigar.OP_INS, 1), (Cigar.OP_MATCH, 2)],
+            Cigar.place_op([(Cigar.OP_MATCH, 2)], 0, Cigar.OP_INS, 1)
+        )
+        self.assertListEqual(
+            [(Cigar.OP_MATCH, 1), (Cigar.OP_INS, 1), (Cigar.OP_MATCH, 1)],
+            Cigar.place_op([(Cigar.OP_MATCH, 2)], 1, Cigar.OP_INS, 1)
+        )
+        self.assertListEqual(
+            [(Cigar.OP_MATCH, 2), (Cigar.OP_INS, 1)],
+            Cigar.place_op([(Cigar.OP_MATCH, 2)], 2, Cigar.OP_INS, 1)
+        )
