@@ -1,6 +1,7 @@
 import pysam
 import numpy as np
 
+
 class GenomicPosition(object):
     def __init__(self, index, ref_name, ref_pos):
         self.index = index
@@ -21,8 +22,9 @@ class DiffIndelRecord(GenomicPosition):
     def __init__(self, index: int, ref_name: str, ref_pos: int, mut_map: dict):
         super().__init__(index, ref_name, ref_pos)
         self.mut_map = mut_map
-        
+    
     def ref_seq(self):
+        # TODO
         return
 
 
@@ -34,14 +36,19 @@ class VacSnvRecord(GenomicPosition):
 
 class VacIndelRecord(GenomicPosition):
     def __init__(self, index: int, ref_name: str, ref_pos: int, freqs: list, seqs: list):
+        """
+        :param index: genomic index
+        :param ref_name:
+        :param ref_pos:
+        :param freqs: alleles frequencies, the first item is reference frequency
+        :param seqs: alleles sequences, the first item is reference sequence
+        """
         super().__init__(index, ref_name, ref_pos)
         self.freqs = freqs
         self.seqs = seqs
-        
+    
     def ref_seq(self):
-        # TODO embed reference id into VAC file
-        # noinspection PyTypeChecker
-        return self.seqs[np.argmax(self.freqs)]
+        return self.seqs[0]
 
 
 # TODO separate file, tests ?
@@ -55,7 +62,6 @@ class AlignedVariant:
             ref_seq: str = None
     ):
         """
-        
         :param alignment:
         :param pos: position of variation in AlignedSegment.query_sequence
         :param end_pos: position one base after INDEL variation in AlignedSegment.query_sequence

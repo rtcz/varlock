@@ -19,6 +19,7 @@ class Vac:
     
     VAC SNV record:
     index 4B, 0-based absolute genomic position
+    reference index 1B, index of reference allele
     A allele count 2B
     T allele count 2B
     C allele count 2B
@@ -27,11 +28,13 @@ class Vac:
     VAC INDEL record:
     index 4B, 0-based absolute genomic position
     length 1B, number of alternatives
-    list:, sorted by allele count and sequence (descending)
+    list:, of tuples in format (allele_count, allele_sequence)
+        reference allele is in the first tuple, alternative alleles are ordered as in VCF
+        
         INDEL allele count 2B
         INDEL base length 2B, length of INDEL sequence
         list:
-            INDEL 4 base sequence, 1B
+            INDEL base sequence, 1B
     """
     VCF_CHROM_ID = 0
     VCF_POS_ID = 1
@@ -42,7 +45,7 @@ class Vac:
     VCF_COL_SEP = "\t"
     VCF_LIST_SEP = ","
     VCF_INFO_SEP = ";"
-
+    
     VAC_COL_SEP = "\t"
     VAC_KEYVAL_SEP = ":"
     VAC_ITEM_SEP = ","
@@ -58,10 +61,8 @@ class Vac:
     Max value of 2 bytes
     """
     
-    SNV_FORMAT = "<IHHHH"  # int, short, short, short
-    SNV_RECORD_SIZE = 12  # bytes
-    
-    # INDEL_FORMAT = "<IH"  # int, short
+    SNV_FORMAT = "<IBHHHH"  # int, byte, short, short, short, short
+    SNV_RECORD_SIZE = 13  # bytes
     
     SNV_TEMP_EXT = '.snv.temp'
     INDEL_TEMP_EXT = '.indel.temp'
@@ -75,10 +76,6 @@ class Vac:
         self.current_pos = None
         self.current_chrom = None
         self.verbose = verbose
-    
-    @classmethod
-    def snvs_size(cls, count: int):
-        return cls.SNV_RECORD_SIZE * count
     
     @staticmethod
     def is_snv(allele_list: list):
@@ -171,16 +168,18 @@ class Vac:
         
         return count_map
     
-    def indel_count_map(self, allele_list: list, count_list: list):
+    @staticmethod
+    def _indel_count_map(allele_list: list, count_list: list):
         """
-        :return: sorted INDEL count map as list of tuples
+        :return: INDEL count map as list of tuples
         """
+        # return sorted(
+        #     zip(self.compact_base_count(count_list), allele_list),
+        #     key=lambda x: (x[0], x[1]),
+        #     reverse=True
+        # )
         assert len(allele_list) == len(count_list)
-        return sorted(
-            zip(self.compact_base_count(count_list), allele_list),
-            key=lambda x: (x[0], x[1]),
-            reverse=True
-        )
+        return list(zip(count_list, allele_list))
     
     @classmethod
     def read_header(cls, vac_file):
@@ -191,75 +190,73 @@ class Vac:
         vac_file.write(struct.pack('<II', snv_count, indel_count))
     
     @classmethod
-    def read_snv_record(cls, vac_file):
+    def read_snv_record(cls, snv_file):
         """
-        :param vac_file:
+        :param snv_file:
         :return: index, allele count tuple
         """
-        byte_str = vac_file.read(cls.SNV_RECORD_SIZE)
+        byte_str = snv_file.read(cls.SNV_RECORD_SIZE)
         if len(byte_str) == 0:
             raise EOFError()
-        index, a_ac, t_ac, c_ac, g_ac = struct.unpack(cls.SNV_FORMAT, byte_str)
-
+        index, ref_id, a_ac, t_ac, c_ac, g_ac = struct.unpack(cls.SNV_FORMAT, byte_str)
+        
         # print('rs', index, (a_ac, t_ac, c_ac, g_ac))
-        return index, (a_ac, t_ac, c_ac, g_ac)
+        return index, ref_id, (a_ac, t_ac, c_ac, g_ac)
     
     @classmethod
-    def write_snv_record(cls, vac_file, index: int, ac_tuple: tuple):
+    def _write_snv_record(cls, snv_file, index: int, ref_id: int, ac_tuple: tuple):
         """
-        :param vac_file:
+        :param snv_file:
         :param index: genomic index
+        :param ref_id: reference base id in ac_tuple
         :param ac_tuple: counts of bases in format (A,T,G,C)
         :return:
         """
         # print('ws', index, ac_tuple)
-        vac_file.write(struct.pack(cls.SNV_FORMAT, index, *ac_tuple))
+        # assert 0 <= ref_id < len(BASES)
+        snv_file.write(struct.pack(cls.SNV_FORMAT, index, ref_id, *ac_tuple))
     
     @classmethod
-    def read_indel_record(cls, vac_file):
+    def read_indel_record(cls, indel_file):
         """
-        :param vac_file:
-        :return:
+        :param indel_file:
+        :return: genomic index, allele frequencies, allele sequences
+        Reference allele is represented by the first item of returned lists.
         """
-        byte_str = vac_file.read(cls.INT_SIZE)
+        byte_str = indel_file.read(cls.INT_SIZE + 1)
         if len(byte_str) == 0:
             raise EOFError()
         
-        index = struct.unpack('<I', byte_str)[0]
-        length = int.from_bytes(vac_file.read(1), byteorder='little')
-        
-        counts = [0] * length
+        # index = struct.unpack('<I', byte_str)[0]
+        # length = int.from_bytes(indel_file.read(1), byteorder='little')
+        index, length = struct.unpack('<IB', byte_str)
+        freqs = [0] * length
         seqs = [''] * length
         for i in range(length):
-            count, base_length = struct.unpack('<HH', vac_file.read(cls.SHORT_SIZE * 2))
+            freq, base_length = struct.unpack('<HH', indel_file.read(cls.SHORT_SIZE * 2))
             seq_byte_size = math.ceil(base_length / 4)
-            seq = bytes2seq(vac_file.read(seq_byte_size), base_length)
-            counts[i] = count
+            seq = bytes2seq(indel_file.read(seq_byte_size), base_length)
+            freqs[i] = freq
             seqs[i] = seq
-
-        # print('ri', index, counts, seqs)
-        return index, counts, seqs
+        
+        # print('ri', index, freqs, seqs)
+        return index, freqs, seqs
     
     # TODO parameters: index, counts, seqs
     @staticmethod
-    def write_indel_record(indel_file, index: int, indel_map: list):
+    def _write_indel_record(indel_file, index: int, indel_map: list):
         """
         :param indel_file:
         :param index: genomic index
-        :param indel_map: sorted list of tuples [(SEQ_A,COUNT_A), (SEQ_B:COUNT_B), ...]
+        :param indel_map: descending sorted list of tuples [(SEQ_A,COUNT_A), (SEQ_B:COUNT_B), ...]
         """
         assert 1 < len(indel_map) < 256
-        # single allele can be replaced only by itself
-        # if len(indel_map) > 1 and sum(indel_map.values()) > 0:
-        # noinspection PyTypeChecker
-        record = struct.pack('<I', index) + bytes([len(indel_map)])
         
-        # sort indel_map by count and sequence
-        # for sequence, count in sorted(indel_map.items(), key=lambda x: (x[1], x[0])):
+        record = struct.pack('<IB', index, len(indel_map))
         for allele_count, sequence in indel_map:
             record += struct.pack('<HH', allele_count, len(sequence))
             record += seq2bytes(sequence)
-
+        
         # print('wi', index, indel_map)
         indel_file.write(record)
     
@@ -290,10 +287,11 @@ class Vac:
                 data = line.split(self.VCF_COL_SEP, maxsplit=8)
                 allele_list = [data[self.VCF_REF_ID]] + data[self.VCF_ALT_ID].split(self.VCF_LIST_SEP)
                 
+                # TODO consider unknown bases
+                
                 is_snv = self.is_snv(allele_list)
                 if is_snv or self.is_indel(allele_list):
                     chrom = data[self.VCF_CHROM_ID]
-                    
                     pos = int(data[self.VCF_POS_ID]) - 1  # vcf has 1-based index, convert it to 0-based index
                     index = self.fai.pos2index(chrom, pos)
                     
@@ -303,12 +301,20 @@ class Vac:
                         # allele count map
                         count_map = self.snv_count_map(allele_list, count_list)
                         count_tuple = (count_map['A'], count_map['T'], count_map['G'], count_map['C'])
-                        self.write_snv_record(snv_file, index, count_tuple)
-                    
+                        self._write_snv_record(
+                            snv_file=snv_file,
+                            index=index,
+                            ref_id=BASES.index(data[self.VCF_REF_ID]),
+                            ac_tuple=count_tuple
+                        )
                     else:  # is indel
                         indel_count += 1
-                        indel_map = self.indel_count_map(allele_list, count_list)
-                        self.write_indel_record(indel_file, index, indel_map)
+                        indel_map = self._indel_count_map(allele_list, count_list)
+                        self._write_indel_record(
+                            indel_file=indel_file,
+                            index=index,
+                            indel_map=indel_map
+                        )
                 
                 if self.verbose and variant_cnt % 10000 == 0:
                     print("variant %d" % variant_cnt)
@@ -375,8 +381,7 @@ class Vac:
             
             # write SNVs
             for i in range(snv_count):
-                index_str, ac_str = text_file.readline().rstrip().split(cls.VAC_COL_SEP)
-                
+                index_str, ref_id_str, ac_str = text_file.readline().rstrip().split(cls.VAC_COL_SEP)
                 try:
                     ac_tuple = tuple(map(int, ac_str.split(Vac.VAC_ITEM_SEP)))
                 except ValueError:
@@ -384,7 +389,12 @@ class Vac:
                     message += "probably INDEL record at SNV position"
                     raise ValueError(message)
                 
-                cls.write_snv_record(vac_file, int(index_str) - 1, ac_tuple)
+                cls._write_snv_record(
+                    snv_file=vac_file,
+                    index=int(index_str) - 1,
+                    ref_id=int(ref_id_str),
+                    ac_tuple=ac_tuple
+                )
             
             # write INDELs
             for line in text_file:
@@ -394,7 +404,11 @@ class Vac:
                     allele_count_str, sequence = item.split(Vac.VAC_KEYVAL_SEP)
                     indel_map.append((int(allele_count_str), sequence))
                 
-                cls.write_indel_record(vac_file, int(index_str) - 1, indel_map)
+                cls._write_indel_record(
+                    indel_file=vac_file,
+                    index=int(index_str) - 1,
+                    indel_map=indel_map
+                )
     
     @classmethod
     def vac2text(cls, vac_filepath, text_filepath):
@@ -411,9 +425,9 @@ class Vac:
             text_file.write('%d\n' % snv_count)
             text_file.write('%d\n' % indel_count)
             for i in range(snv_count):
-                index, count_list = cls.read_snv_record(vac_file)
+                index, ref_id, count_list = cls.read_snv_record(vac_file)
                 ac_string = ','.join(map(str, count_list))
-                text_file.write('%d\t%s\n' % (index + 1, ac_string))
+                text_file.write('%d\t%d\t%s\n' % (index + 1, ref_id, ac_string))
             
             for i in range(indel_count):
                 index, counts, seqs = cls.read_indel_record(vac_file)
