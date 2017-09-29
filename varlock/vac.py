@@ -248,7 +248,7 @@ class Vac:
         :param index: genomic index
         :param indel_map: sorted list of tuples [(SEQ_A,COUNT_A), (SEQ_B:COUNT_B), ...]
         """
-        assert len(indel_map) < 256
+        assert 1 < len(indel_map) < 256
         # single allele can be replaced only by itself
         # if len(indel_map) > 1 and sum(indel_map.values()) > 0:
         # noinspection PyTypeChecker

@@ -1,5 +1,5 @@
 import pysam
-
+import numpy as np
 
 class GenomicPosition(object):
     def __init__(self, index, ref_name, ref_pos):
@@ -21,6 +21,9 @@ class DiffIndelRecord(GenomicPosition):
     def __init__(self, index: int, ref_name: str, ref_pos: int, mut_map: dict):
         super().__init__(index, ref_name, ref_pos)
         self.mut_map = mut_map
+        
+    def ref_seq(self):
+        return
 
 
 class VacSnvRecord(GenomicPosition):
@@ -34,29 +37,52 @@ class VacIndelRecord(GenomicPosition):
         super().__init__(index, ref_name, ref_pos)
         self.freqs = freqs
         self.seqs = seqs
+        
+    def ref_seq(self):
+        # TODO embed reference id into VAC file
+        # noinspection PyTypeChecker
+        return self.seqs[np.argmax(self.freqs)]
 
 
 # TODO separate file, tests ?
 # noinspection PyUnresolvedReferences
 class AlignedVariant:
-    def __init__(self, alignment: pysam.AlignedSegment, pos: int = None, end_pos: int = None):
+    def __init__(
+            self,
+            alignment: pysam.AlignedSegment,
+            pos: int = None,
+            end_pos: int = None,
+            ref_seq: str = None
+    ):
         """
+        
         :param alignment:
         :param pos: position of variation in AlignedSegment.query_sequence
-        :param end_pos: position one base after variation in AlignedSegment.query_sequence
+        :param end_pos: position one base after INDEL variation in AlignedSegment.query_sequence
         """
         self.alignment = alignment
         self._pos = pos
         self._end_pos = end_pos
+        self._is_snv = False
+        self._is_indel = False
+        self._ref_seq = ref_seq
         
-        if self._pos is not None and self._end_pos is None:
-            # SNV
-            self._end_pos = self._pos + 1
+        if self._pos is not None:
+            if self._end_pos is not None:
+                assert self._pos < self._end_pos
+                assert ref_seq is not None
+                self._is_indel = True
+            else:
+                self._is_snv = True
+                self._end_pos = self._pos + 1
     
     def is_present(self):
-        return self._pos is not None and self._end_pos is not None
+        return self._is_snv or self._is_indel
     
+    # TODO try to remove, pos and end_pos should be immutable (so as variant presence)
     def clear(self):
+        self._is_snv = False
+        self._is_indel = False
         self._pos = None
         self._end_pos = None
     
@@ -65,8 +91,10 @@ class AlignedVariant:
         """
         Get variant sequence.
         """
-        assert self._pos < self._end_pos
-        return self.alignment.query_sequence[self._pos:self._end_pos]
+        if self.is_present():
+            return self.alignment.query_sequence[self._pos:self._end_pos]
+        else:
+            return None
     
     @seq.setter
     def seq(self, seq):
@@ -74,30 +102,47 @@ class AlignedVariant:
         Set variant sequence.
         :param value: new sequence
         """
-        assert len(seq) > 0
-        mut_seq = self.alignment.query_sequence[:self._pos]
-        mut_seq += seq
-        mut_seq += self.alignment.query_sequence[self._end_pos:]
-        self.alignment.query_sequence = mut_seq
-        
-        # TODO do something about MD string
-        
+        # TODO do something about MD string if present
         # TODO update quality string
-        
-        # TODO update CIGAR string
-
-        
-        
-        
-        if self._end_pos - self._pos < len(seq):
-            pass
-        elif self._end_pos - self._pos > len(seq):
-            pass
-        else:
-            pass
+        assert len(seq) > 0
+        if self._is_snv:
+            # TODO treat [X, =] OP cases
+            # expecting only M OP now
+            mut_seq = self.alignment.query_sequence[:self._pos]
+            mut_seq += seq
+            mut_seq += self.alignment.query_sequence[self._end_pos:]
+        elif self._is_indel:
+            if self._first_bases_match(self._seqs):
+                # VCF indels should always have single matched base preffix
+                tmp_end_pos = self._end_pos + 1
+            else:
+                tmp_end_pos = self._end_pos
             
+            tmp_cigar = Cigar.del_subrange(
+                self.alignment.cigartuples,
+                self._pos,
+                tmp_end_pos
+            )
+            # assuming that first seq is the reference seq
+            variant_cigar = Cigar.variant(self._ref_seq, seq)
+            for tpl in variant_cigar:
+                tmp_cigar = Cigar.place_op(
+                    tmp_cigar,
+                    self._pos,
+                    tpl[0],
+                    tpl[1]
+                )
+            
+            self.alignment.cigartuples = tmp_cigar
+    
+    @staticmethod
+    def _first_bases_match(seqs: list):
+        assert len(seqs) > 0
+        for i in range(len(seqs) - 1):
+            if seq[i] != seq[i + 1]:
+                return False
         
-        Cigar.place_op(self.alignment.cigartuples, self._pos, None, len(seq))
+        return True
 
 
 class FaiRecord:

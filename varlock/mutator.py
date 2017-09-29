@@ -360,7 +360,6 @@ class Mutator:
             self.mut_counter += 1
             is_mutated = True
             variant.seq = mut_seq
-            Cigar.validate(variant)
         
         return is_mutated
     

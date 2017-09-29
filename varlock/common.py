@@ -352,7 +352,8 @@ def vac_aligned_variant(alignment: pysam.AlignedSegment, vac: po.GenomicPosition
             end_pos = pos + max_match_len(alignment.query_sequence, pos, vac.seqs)
             if end_pos > pos:
                 # indel was found
-                variant = po.AlignedVariant(alignment, pos, end_pos)
+                assert len(vac.seqs)
+                variant = po.AlignedVariant(alignment, pos, end_pos, vac.seqs[0])
             else:
                 # match not found or at least one variant exceeded alignment length
                 variant = po.AlignedVariant(alignment)

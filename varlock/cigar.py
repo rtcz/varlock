@@ -12,6 +12,9 @@ class Cigar:
     OP_EQUAL = 7  # =, type of M
     OP_DIFF = 8  # X, type of M
     
+    # custom OPs, not part of CIGAR specification
+    OP_DEL_INS = 9  # deletion and insertion at one place
+    
     @classmethod
     def _safe_append(cls, cigar: list, op_type: int, op_length: int):
         """
@@ -148,3 +151,72 @@ class Cigar:
             cls._safe_append(new_cigar, op_type, op_length)
         
         return new_cigar
+    
+    @classmethod
+    def variant(cls, ref_seq: str, var_seq: str):
+        """
+        Computes variant CIGAR with respect to the reference.
+        Cigar can contain only insert, delete and match operations.
+        :param ref_seq:
+        :param var_seq:
+        :return: [<op_type, op_length>, ...]
+        """
+        assert len(var_seq) > 0 or len(ref_seq) > 0
+        cigar = []
+        match_len = ins_len = del_len = 0
+        
+        if ref_seq == var_seq:
+            # reference variant
+            cigar.append((Cigar.OP_MATCH, len(var_seq)))
+        else:
+            for i in range(max(len(ref_seq), len(var_seq))):
+                match_op = ins_op = del_op = False
+                if i >= len(ref_seq):
+                    # seq is longer
+                    ins_op = True
+                
+                elif i >= len(var_seq):
+                    # ref_seq is longer
+                    del_op = True
+                
+                else:
+                    # TODO treat [X, =] OP cases
+                    if ref_seq[i] == var_seq[i]:
+                        match_op = True
+                    else:
+                        del_op = True
+                        ins_op = True
+                
+                match_len += match_op
+                ins_len += ins_op
+                del_len += del_op
+                
+                if match_op:
+                    if del_len == ins_len == 1:
+                        # treat as a match
+                        cls._safe_append(cigar, cls.OP_MATCH, 1)
+                    else:
+                        if ins_len:
+                            cigar.append((cls.OP_INS, ins_len))
+                        if del_len:
+                            cigar.append((cls.OP_DEL, del_len))
+                    
+                    ins_len = del_len = 0
+                
+                if ins_op or del_op:
+                    if match_len:
+                        cls._safe_append(cigar, cls.OP_MATCH, match_len)
+                    
+                    match_len = 0
+            
+            if match_len:
+                cls._safe_append(cigar, cls.OP_MATCH, match_len)
+            elif del_len == ins_len == 1:
+                cls._safe_append(cigar, cls.OP_MATCH, 1)
+            else:
+                if del_len:
+                    cigar.append((cls.OP_DEL, del_len))
+                if ins_len:
+                    cigar.append((cls.OP_INS, ins_len))
+        
+        return cigar

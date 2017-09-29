@@ -85,3 +85,20 @@ class TestCigar(unittest.TestCase):
             [(Cigar.OP_MATCH, 2), (Cigar.OP_INS, 1)],
             Cigar.place_op([(Cigar.OP_MATCH, 2)], 2, Cigar.OP_INS, 1)
         )
+    
+    def test_variant(self):
+        self.assertRaises(AssertionError, lambda: Cigar.variant('', ''))
+        
+        self.assertListEqual([(Cigar.OP_MATCH, 1)], Cigar.variant('G', 'G'))
+        self.assertListEqual([(Cigar.OP_DEL, 1)], Cigar.variant('G', ''))
+        self.assertListEqual([(Cigar.OP_MATCH, 1), (Cigar.OP_INS, 1)], Cigar.variant('G', 'GG'))
+        self.assertListEqual([(Cigar.OP_MATCH, 1), (Cigar.OP_INS, 2)], Cigar.variant('G', 'GGG'))
+        
+        self.assertListEqual([(Cigar.OP_MATCH, 1)], Cigar.variant('G', 'T'))
+        self.assertListEqual([(Cigar.OP_DEL, 1), (Cigar.OP_INS, 2)], Cigar.variant('G', 'TT'))
+        self.assertListEqual([(Cigar.OP_DEL, 2), (Cigar.OP_INS, 1)], Cigar.variant('GG', 'T'))
+        self.assertListEqual([(Cigar.OP_DEL, 2), (Cigar.OP_INS, 2)], Cigar.variant('GG', 'TT'))
+        
+        self.assertListEqual([(Cigar.OP_MATCH, 3)], Cigar.variant('GGG', 'GTG'))
+        self.assertListEqual([(Cigar.OP_MATCH, 3)], Cigar.variant('GGG', 'GTG'))
+        self.assertListEqual([(Cigar.OP_MATCH, 6)], Cigar.variant('GGGGGG', 'GTGTGT'))
