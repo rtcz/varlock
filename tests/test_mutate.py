@@ -57,11 +57,11 @@ class TestMutate(unittest.TestCase):
             secret=self.SECRET
         )
         
-        self.assertEqual(19, self.mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
-        self.assertEqual(7, self.mut.stat(BamMutator.STAT_COVERING_COUNT))
-        self.assertEqual(4, self.mut.stat(BamMutator.STAT_VAC_COUNT))
-        self.assertEqual(7, self.mut.stat(BamMutator.STAT_MUT_COUNT))
-        self.assertEqual(3, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
+        self.assertEqual(21, self.mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
+        self.assertEqual(13, self.mut.stat(BamMutator.STAT_COVERING_COUNT))
+        self.assertEqual(7, self.mut.stat(BamMutator.STAT_VAC_COUNT))
+        self.assertEqual(14, self.mut.stat(BamMutator.STAT_MUT_COUNT))
+        self.assertEqual(5, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
         
         cmn.bam2sam(self.RESOURCE_PATH + 'output_02.bam', self.RESOURCE_PATH + 'output_02.sam')
         is_equal = filecmp.cmp(self.RESOURCE_PATH + 'desired_02.sam', self.RESOURCE_PATH + 'output_02.sam')

@@ -47,13 +47,21 @@ class TestCigar(unittest.TestCase):
             Cigar.del_subrange([(Cigar.OP_MATCH, 3), (Cigar.OP_INS, 2), (Cigar.OP_MATCH, 3)], 3, 5)
         )
         self.assertListEqual(
-            [(Cigar.OP_MATCH, 3), (Cigar.OP_DEL, 2), (Cigar.OP_INS, 2)],
-            Cigar.del_subrange([(Cigar.OP_MATCH, 3), (Cigar.OP_DEL, 2), (Cigar.OP_INS, 3)], 3, 4)
+            [(Cigar.OP_MATCH, 4)],
+            Cigar.del_subrange([(Cigar.OP_MATCH, 3), (Cigar.OP_INS, 3), (Cigar.OP_MATCH, 3)], 1, 6)
         )
         
         self.assertListEqual(
-            [(Cigar.OP_MATCH, 4)],
-            Cigar.del_subrange([(Cigar.OP_MATCH, 3), (Cigar.OP_INS, 3), (Cigar.OP_MATCH, 3)], 1, 6)
+            [(Cigar.OP_MATCH, 3)],
+            Cigar.del_subrange([(Cigar.OP_MATCH, 2), (Cigar.OP_DEL, 2), (Cigar.OP_MATCH, 2)], 1, 2)
+        )
+        self.assertListEqual(
+            [(Cigar.OP_MATCH, 2)],
+            Cigar.del_subrange([(Cigar.OP_MATCH, 2), (Cigar.OP_DEL, 2), (Cigar.OP_MATCH, 2)], 0, 2)
+        )
+        self.assertListEqual(
+            [(Cigar.OP_MATCH, 3), (Cigar.OP_DEL, 2), (Cigar.OP_MATCH, 2)],
+            Cigar.del_subrange([(Cigar.OP_MATCH, 3), (Cigar.OP_DEL, 2), (Cigar.OP_MATCH, 3)], 3, 4)
         )
     
     def test_place_op(self):

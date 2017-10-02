@@ -1,6 +1,3 @@
-from varlock import po
-
-
 class Cigar:
     OP_MATCH = 0  # M, match (does not have to be equal to the refrence)
     OP_INS = 1  # I, insertion
@@ -91,6 +88,9 @@ class Cigar:
                 else:
                     # current OP is omitted
                     normalize = True
+            elif curr_type == cls.OP_DEL and curr_pos == end_pos:
+                # deletion OP after the OP, skip it
+                normalize = True
             elif normalize:
                 normalize = False
                 cls._safe_append(new_cigar, curr_type, curr_length)

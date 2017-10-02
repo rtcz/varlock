@@ -21,8 +21,7 @@ class BamMutator:
     # number of vac records read (variants)
     STAT_VAC_COUNT = 'vac_count'
     
-    # total number of non-synonymously mutated variants -
-    # (not alignments) overlapping mutations do also count
+    # total number of non-synonymously mutated variants (for each alignment)
     STAT_MUT_COUNT = 'mut_count'
     
     # number of DIFF records written / read

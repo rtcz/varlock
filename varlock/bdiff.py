@@ -26,14 +26,16 @@ class BdiffIO:
         index of a thousandth record, 4B
         file position of a thousandth record, 4B
 
-    Diff SNV record: permutation of bases (A,T,G,C)
+    Diff SNV record: permutation of DNA bases (A,T,G,C)
     index 4B, 0-based absolute genomic position
     length 1B, always zero to indicate SNV record (SNV has always 4 alternatives)
+    reference index 1B, index of reference allele in the A,T,G,C list
     mapping, 1B, index of base permutation
 
     DIFF INDEL record: permutation of sequences
     index 4B, 0-based absolute genomic position
     length 1B, number of alternatives
+    reference index 1B, index of the reference allele in the sorted list
     list:, of length, permutation of sorted (ascending) alternative sequences
         INDEL base length 2B, length of INDEL sequence
         list:
@@ -215,29 +217,29 @@ class BdiffIO:
         INDEL alternatives is a list
         """
         assert self.is_read_mode
-        byte_str = self._diff_file.read(self.INT_SIZE + self.BYTE_SIZE)
+        byte_str = self._diff_file.read(self.INT_SIZE + self.BYTE_SIZE * 2)
         if byte_str == b'':
             raise EOFError
         
-        index, length = struct.unpack('<IB', byte_str)
+        index, length, ref_id = struct.unpack('<IBB', byte_str)
         if length == 0:
             # SNV record
-            return index, self._read_snv_alts()
+            return index, ref_id, self._read_snv_alts()
         else:
             # INDEL record
-            return index, self._read_indel_alts(length)
+            return index, ref_id, self._read_indel_alts(length)
     
     def read_record(self):
         """
-        :return: genomic_index, is_indel, mutation_map
+        :return: genomic_index, is_indel, reference_sequence, mutation_map
         """
-        index, alts = self._read_record()
+        index, ref_id, alts = self._read_record()
         if isinstance(alts, tuple):
             # is SNV
-            return index, False, dict(zip(alts, cmn.BASES))
+            return index, False, cmn.BASES[ref_id], dict(zip(alts, cmn.BASES))
         else:
             # is INDEL
-            return index, True, dict(zip(alts, sorted(alts)))
+            return index, True, alts[ref_id], dict(zip(alts, sorted(alts)))
     
     def _read_snv_alts(self):
         """
@@ -261,7 +263,7 @@ class BdiffIO:
         
         return alt_list
     
-    def _write_snv(self, index: int, base_perm: tuple):
+    def _write_snv(self, index: int, ref_id: int, base_perm: tuple):
         """
         :param index: genomic index
         :param base_perm: permutation of bases
@@ -269,9 +271,10 @@ class BdiffIO:
         :return:
         """
         assert not self.is_read_mode
+        # assert ref_id >= 0 < len(cmn.BASES)
         assert index > self._last_index
         
-        record = struct.pack('<IBB', index, 0, self.PERM_2_INDEX[base_perm])
+        record = struct.pack('<IBBB', index, 0, ref_id, self.PERM_2_INDEX[base_perm])
         self._record_file.write(record)
         
         self._last_index = index
@@ -279,20 +282,26 @@ class BdiffIO:
         if self._snv_count % self._index_resolution == 0:
             self._file_index.append((index, self._record_file.tell() - len(record)))
     
-    def write_snv(self, index: int, mut_map: dict):
-        self._write_snv(index, (mut_map['A'], mut_map['T'], mut_map['G'], mut_map['C']))
-    
-    def _write_indel(self, index: int, seq_perm: list):
+    def write_snv(self, index: int, ref_id: int, mut_map: dict):
         """
         :param index:
-        :param seq_perm: permutation of sequences
+        :param ref_id: index of reference allele in the A,T,G,C list
+        :param mut_map:
+        :return:
+        """
+        self._write_snv(index, ref_id, (mut_map['A'], mut_map['T'], mut_map['G'], mut_map['C']))
+    
+    def _write_indel(self, index: int, ref_id: int, seq_perm: list):
+        """
+        :param index:
+        :param seq_perm:
         :return:
         """
         assert not self.is_read_mode
         assert index > self._last_index
         assert 1 < len(seq_perm) < 256
         
-        record = struct.pack('<IB', index, len(seq_perm))
+        record = struct.pack('<IBB', index, len(seq_perm), ref_id)
         for alt in seq_perm:
             record += struct.pack('<H', len(alt)) + cmn.seq2bytes(alt)
         
@@ -303,12 +312,15 @@ class BdiffIO:
         if self._indel_count % self._index_resolution == 0:
             self._file_index.append((index, self._record_file.tell() - len(record)))
     
-    def write_indel(self, index: int, mut_map: dict):
+    def write_indel(self, index: int, ref_seq: str, mut_map: dict):
         """
         :param index: genomic index
+        :param ref_seq:
         :param mut_map: original sequences -> permuted sequences
         """
-        self._write_indel(index, self.seq_perm(mut_map))
+        seq_perm = self.seq_perm(mut_map)
+        # noinspection PyTypeChecker
+        self._write_indel(index, seq_perm.index(ref_seq), seq_perm)
     
     @staticmethod
     def seq_perm(mut_map: dict):
@@ -480,7 +492,7 @@ class BdiffIO:
                 break
         
         return indexed_pos + self._header_size
-
+    
     @staticmethod
     def to_text_file(bytes_io: io.BytesIO(), filename: str):
         """
@@ -501,11 +513,11 @@ class BdiffIO:
             text_file.write('index_res\t%d\n' % bdiff.index_resolution)
             text_file.write('index_size\t%d\n' % len(bdiff.file_index))
             for index, pos in bdiff.file_index:
-                text_file.write('%d\t%d' % (index + 1, pos))
+                text_file.write('%d\t%d\n' % (index + 1, pos))
             
-            for index, alts in bdiff:
+            for index, ref_id, alts in bdiff:
                 is_indel = isinstance(alts, list)
-                text_file.write('%d\t%d\t%s\n' % (index + 1, is_indel, ','.join(alts)))
+                text_file.write('%d\t%d\t%d\t%s\n' % (index + 1, is_indel, ref_id, ','.join(alts)))
     
     @staticmethod
     def from_text_file(filename: str):
@@ -538,19 +550,21 @@ class BdiffIO:
                 text_file.readline()
             
             bdiff = BdiffIO(index_resolution=index_res)
-            line = text_file.readline().rstrip()
-            while line != '':
-                raw_index, raw_is_indel, raw_alts = line.split('\t')
+            
+            while True:
+                line = text_file.readline().rstrip()
+                if not line:
+                    break
+                raw_index, raw_is_indel, raw_ref_id, raw_alts = line.split('\t')
                 index = int(raw_index) - 1
                 is_snv = raw_is_indel == '0'
+                ref_id = int(raw_ref_id)
                 alts = raw_alts.split(',')
                 if is_snv:
                     # snvs
-                    bdiff._write_snv(index, tuple(alts))
+                    bdiff._write_snv(index, ref_id, tuple(alts))
                 else:
                     # indel
-                    bdiff._write_indel(index, alts)
-                
-                line = text_file.readline().rstrip()
+                    bdiff._write_indel(index, ref_id, alts)
         
         return bdiff.file(header)

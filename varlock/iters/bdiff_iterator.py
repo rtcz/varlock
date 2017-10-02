@@ -38,18 +38,18 @@ class BdiffIterator:
         record = None
         if self._bdiff_io.tell() <= self._end_pos:
             # index, alts = self._bdiff_io.read_record()
-            index, is_indel, mut_map = self._bdiff_io.read_record()
+            index, is_indel, ref_seq, mut_map = self._bdiff_io.read_record()
             ref_name, ref_pos = self._fai.index2pos(index)
             
             if is_indel:
                 # it is assumed that INDEL record was saved as:
                 # sorted(alts) -> permuted(alts)
-                record = DiffIndelRecord(index, ref_name, ref_pos, mut_map)
+                record = DiffIndelRecord(index, ref_name, ref_pos, mut_map, ref_seq)
             else:
                 # is SNV
                 # it is assumed that SNV record was saved as:
                 # BASES -> permuted(BASES)
-                record = DiffSnvRecord(index, ref_name, ref_pos, mut_map)
+                record = DiffSnvRecord(index, ref_name, ref_pos, mut_map, ref_seq)
         
         self._counter += 1
         return record

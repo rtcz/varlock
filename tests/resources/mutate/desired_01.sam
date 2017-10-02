@@ -1,7 +1,7 @@
 @HD	VN:1.0	SO:coordinate
 @SQ	SN:chr1	LN:10000
 @SQ	SN:chr2	LN:10000
-@mt	bm:3d9976872cafa3c28c6e829a2a2eaae2	vc:e8c9e987110a2f3d4eebfbb5903f36a6
+@mt	bm:3d9976872cafa3c28c6e829a2a2eaae2	vc:a58cd7b14aed64da5ae986d2a009ed7f
 *	2	chr2	1002	6	6M	=	1	0	GAAGCA	*
 *	2	chr2	1005	6	4M	=	1	0	GCAC	*
 *	2	chr2	1010	6	9M	=	1	0	CCGCATCGC	*
@@ -13,13 +13,13 @@
 *	2	chr2	1021	30	3M	=	1	0	GTC	*
 *	4	chr2	1025	255	*	=	1	0	GGG	*
 *	2	chr2	1027	30	2M1D3M	=	1	0	TACTG	*
-*	2	chr2	1027	30	3M1I4M	=	1	0	TAGCTGT	*
-*	2	chr2	1028	30	2M1I2M	=	1	0	AGCT	*
+*	2	chr2	1027	30	7M	=	1	0	TAGCTGT	*
+*	2	chr2	1028	30	4M	=	1	0	AGCT	*
 *	2	chr2	1029	30	1M1I6M	=	1	0	GTCTATCG	*
 *	2	chr2	1030	30	1I5M	=	1	0	TCTGTC	*
 *	2	chr2	1034	6	6M	=	1	0	CGCAGC	*
-*	2	chr2	1037	6	2M2D2M	=	1	0	AGCGAC	*
-*	2	chr2	1038	6	1M2D3M	=	1	0	GCGACT	*
+*	2	chr2	1037	6	6M	=	1	0	AGCGAC	*
+*	2	chr2	1038	6	6M	=	1	0	GCGACT	*
 *	4	*	0	255	*	*	1	0	GGCTT	*
 *	4	*	0	255	*	*	1	0	TACC	*
 *	4	*	0	255	*	*	1	0	CGGACA	*

@@ -1,9 +1,9 @@
 import pysam
-import numpy as np
+from varlock.cigar import Cigar
 
 
-class GenomicPosition(object):
-    def __init__(self, index, ref_name, ref_pos):
+class VariantPosition(object):
+    def __init__(self, index: int, ref_name: str, ref_pos: int):
         self.index = index
         self.ref_name = ref_name
         self.ref_pos = ref_pos
@@ -12,47 +12,84 @@ class GenomicPosition(object):
         return '#%d %s:%d' % (self.index, self.ref_name, self.ref_pos)
 
 
-class DiffSnvRecord(GenomicPosition):
-    def __init__(self, index: int, ref_name: str, ref_pos: int, mut_map: dict):
+class DiffRecord(VariantPosition):
+    def __init__(self, index: int, ref_name: str, ref_pos: int, mut_map: dict, ref_seq: str):
         super().__init__(index, ref_name, ref_pos)
         self.mut_map = mut_map
+        self.ref_seq = ref_seq
 
 
-class DiffIndelRecord(GenomicPosition):
-    def __init__(self, index: int, ref_name: str, ref_pos: int, mut_map: dict):
-        super().__init__(index, ref_name, ref_pos)
-        self.mut_map = mut_map
-    
-    def ref_seq(self):
-        # TODO
-        return
+class DiffSnvRecord(DiffRecord):
+    # def __init__(self, index: int, ref_name: str, ref_pos: int, mut_map: dict, ref_base: str):
+    #     super().__init__(index, ref_name, ref_pos)
+    #     self.mut_map = mut_map
+    #     self._ref_base = ref_base
+    #
+    # def ref_seq(self):
+    #     return self._ref_base
+    pass
 
 
-class VacSnvRecord(GenomicPosition):
-    def __init__(self, index: int, ref_name: str, ref_pos: int, freqs: tuple):
-        super().__init__(index, ref_name, ref_pos)
-        self.freqs = freqs
+class DiffIndelRecord(DiffRecord):
+    # def __init__(self, index: int, ref_name: str, ref_pos: int, mut_map: dict, ref_seq: str):
+    #     super().__init__(index, ref_name, ref_pos)
+    #     self.mut_map = mut_map
+    #     self._ref_seq = ref_seq
+    #
+    # def ref_seq(self):
+    #     return self._ref_seq
+    pass
 
 
-class VacIndelRecord(GenomicPosition):
-    def __init__(self, index: int, ref_name: str, ref_pos: int, freqs: list, seqs: list):
-        """
-        :param index: genomic index
-        :param ref_name:
-        :param ref_pos:
-        :param freqs: alleles frequencies, the first item is reference frequency
-        :param seqs: alleles sequences, the first item is reference sequence
-        """
+class VacRecord(VariantPosition):
+    def __init__(self, index: int, ref_name: str, ref_pos: int, freqs: list, seqs: list, ref_id: int):
         super().__init__(index, ref_name, ref_pos)
         self.freqs = freqs
         self.seqs = seqs
+        self.ref_id = ref_id
     
+    @property
+    def ref_freq(self):
+        return self.freqs[self.ref_id]
+    
+    @property
     def ref_seq(self):
-        return self.seqs[0]
+        return self.seqs[self.ref_id]
+
+
+class VacSnvRecord(VacRecord):
+    # def __init__(self, index: int, ref_name: str, ref_pos: int, freqs: tuple, ref_id: int):
+    #     super().__init__(index, ref_name, ref_pos)
+    #     self.freqs = freqs
+    #     self.ref_id = ref_id
+    #
+    # def ref_seq(self):
+    #     return self.freqs[self.ref_id]
+    pass
+
+
+class VacIndelRecord(VacRecord):
+    # """
+    #     :param index: genomic index
+    #     :param ref_name:
+    #     :param ref_pos:
+    #     :param freqs: alleles frequencies, the first item is reference frequency
+    #     :param seqs: alleles sequences, the first item is reference sequence
+    #     """
+    #     super().__init__(index, ref_name, ref_pos)
+    #     self.freqs = freqs
+    #     self.seqs = seqs
+    #     self._ref_id = ref_id
+    #
+    # def ref_freq(self):
+    #     return self.freqs[self._ref_id]
+    #
+    # def ref_seq(self):
+    #     return self.seqs[self._ref_id]
+    pass
 
 
 # TODO separate file, tests ?
-# noinspection PyUnresolvedReferences
 class AlignedVariant:
     def __init__(
             self,
@@ -106,31 +143,54 @@ class AlignedVariant:
     def seq(self, seq):
         """
         Set variant sequence.
-        :param value: new sequence
+        :param seq: new sequence
         """
+        mut_seq = self.alignment.query_sequence[:self._pos]
+        mut_seq += seq
+        mut_seq += self.alignment.query_sequence[self._end_pos:]
+        self.alignment.query_sequence = mut_seq
+        
+        # print(self.alignment.query_alignment_sequence)
+        # print(self._pos)
+        # print(self._ref_seq)
+        # print()
+        
         # TODO do something about MD string if present
         # TODO update quality string
         assert len(seq) > 0
         if self._is_snv:
             # TODO treat [X, =] OP cases
-            # expecting only M OP now
-            mut_seq = self.alignment.query_sequence[:self._pos]
-            mut_seq += seq
-            mut_seq += self.alignment.query_sequence[self._end_pos:]
+            # expecting only M OP now - it does not change with different SNV
+            pass
         elif self._is_indel:
-            if self._first_bases_match(self._seqs):
-                # VCF indels should always have single matched base preffix
-                tmp_end_pos = self._end_pos + 1
-            else:
-                tmp_end_pos = self._end_pos
+            # if self._first_bases_match(self._seqs):
+            #     # VCF indels should always have single matched base preffix
+            #     tmp_end_pos = self._end_pos + 1
+            # else:
+            #     tmp_end_pos = self._end_pos
+            
+            # print()
+            # print(self.alignment.reference_start + 1)
+            # print(self.alignment.query_alignment_sequence)
+            # print(self.alignment.cigarstring)
+            # print(self.alignment.cigartuples)
+            # print(self._pos, self._end_pos)
             
             tmp_cigar = Cigar.del_subrange(
                 self.alignment.cigartuples,
                 self._pos,
-                tmp_end_pos
+                # tmp_end_pos
+                self._end_pos
             )
-            # assuming that first seq is the reference seq
+            
+            # print(tmp_cigar)
+            # print(self._pos)
+            
+            
             variant_cigar = Cigar.variant(self._ref_seq, seq)
+            
+            # print(variant_cigar)
+            
             for tpl in variant_cigar:
                 tmp_cigar = Cigar.place_op(
                     tmp_cigar,
@@ -139,13 +199,15 @@ class AlignedVariant:
                     tpl[1]
                 )
             
+            # print(tmp_cigar)
+            
             self.alignment.cigartuples = tmp_cigar
     
     @staticmethod
     def _first_bases_match(seqs: list):
         assert len(seqs) > 0
         for i in range(len(seqs) - 1):
-            if seq[i] != seq[i + 1]:
+            if seqs[i] != seqs[i + 1]:
                 return False
         
         return True

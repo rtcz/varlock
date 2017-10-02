@@ -1,17 +1,16 @@
 {
     "from_index": 0,
-    "mb_checksum": "e4ce96635e70ec48ea5e8f46a0e057f2",
+    "mb_checksum": "ace8d8689a6d5ab91955830a5fdca2e6",
     "secret": "ffffffffffffffffffffffffffffffff",
-    "to_index": 3095693982
+    "to_index": 19999
 }
 snvs	4
-indels	2
-last_index	11038
+indels	1
+last_index	11032
 index_res	1000
 index_size	0
-11012	0	A,G,T,C
-11016	0	C,A,T,G
-11021	0	G,T,A,C
-11028	1	A,AGT,AG
-11032	0	G,A,T,C
-11038	1	GCG,G
+11012	0	2	A,G,T,C
+11016	0	3	C,A,T,G
+11021	0	2	G,T,A,C
+11028	1	2	A,AGT,AG
+11032	0	2	G,A,T,C

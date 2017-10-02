@@ -293,7 +293,7 @@ def max_match_len(sequence: str, pos: int, words: list):
 
 
 # TODO refactor - merge with vac_aligned_variant
-def diff_aligned_variant(alignment: pysam.AlignedSegment, diff: po.GenomicPosition):
+def diff_aligned_variant(alignment: pysam.AlignedSegment, diff: po.VariantPosition):
     """
     Factory that creates AlignedVariant from pysam alignment and DIFF record.
     Alignment and DIFF are assumed to be of the same reference.
@@ -328,7 +328,7 @@ def diff_aligned_variant(alignment: pysam.AlignedSegment, diff: po.GenomicPositi
     return variant
 
 
-def vac_aligned_variant(alignment: pysam.AlignedSegment, vac: po.GenomicPosition):
+def vac_aligned_variant(alignment: pysam.AlignedSegment, vac: po.VariantPosition):
     """
     Factory that creates AlignedVariant from pysam alignment and VAC record.
     Alignment and VAC are assumed to be of the same reference.

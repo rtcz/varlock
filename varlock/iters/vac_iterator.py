@@ -1,4 +1,5 @@
 import varlock.po as po
+from varlock.common import BASES
 
 from varlock.fasta_index import FastaIndex
 from varlock.vac import Vac
@@ -34,13 +35,15 @@ class VacIterator:
     def _read_snv(self):
         if self._snv_count > 0:
             self._snv_count -= 1
-            index, freqs = Vac.read_snv_record(self._snv_file)
+            index, ref_id, freqs = Vac.read_snv_record(self._snv_file)
             ref_name, ref_pos = self._fai.index2pos(index)
             self._snv_record = po.VacSnvRecord(
                 index=index,
                 ref_name=ref_name,
                 ref_pos=ref_pos,
-                freqs=freqs
+                freqs=freqs,
+                seqs=BASES,
+                ref_id=ref_id
             )
         else:
             self._snv_record = None
@@ -56,7 +59,8 @@ class VacIterator:
                 ref_name=ref_name,
                 ref_pos=ref_pos,
                 freqs=counts,
-                seqs=seqs
+                seqs=seqs,
+                ref_id=0
             )
         else:
             self._indel_record = None

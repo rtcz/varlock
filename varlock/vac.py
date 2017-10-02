@@ -19,7 +19,7 @@ class Vac:
     
     VAC SNV record:
     index 4B, 0-based absolute genomic position
-    reference index 1B, index of reference allele
+    reference index 1B, index of reference allele in the A,T,G,C list
     A allele count 2B
     T allele count 2B
     C allele count 2B
@@ -29,7 +29,7 @@ class Vac:
     index 4B, 0-based absolute genomic position
     length 1B, number of alternatives
     list:, of tuples in format (allele_count, allele_sequence)
-        reference allele is in the first tuple, alternative alleles are ordered as in VCF
+        reference allele is the first tuple, alternative alleles are ordered as in VCF
         
         INDEL allele count 2B
         INDEL base length 2B, length of INDEL sequence
@@ -193,7 +193,7 @@ class Vac:
     def read_snv_record(cls, snv_file):
         """
         :param snv_file:
-        :return: index, allele count tuple
+        :return: index, ref_id, allele count tuple
         """
         byte_str = snv_file.read(cls.SNV_RECORD_SIZE)
         if len(byte_str) == 0:
@@ -381,7 +381,10 @@ class Vac:
             
             # write SNVs
             for i in range(snv_count):
-                index_str, ref_id_str, ac_str = text_file.readline().rstrip().split(cls.VAC_COL_SEP)
+                line = text_file.readline().rstrip()
+                if not line:
+                    break
+                index_str, ref_id_str, ac_str = line.split(cls.VAC_COL_SEP)
                 try:
                     ac_tuple = tuple(map(int, ac_str.split(Vac.VAC_ITEM_SEP)))
                 except ValueError:
@@ -397,8 +400,11 @@ class Vac:
                 )
             
             # write INDELs
-            for line in text_file:
-                index_str, indel_str = line.rstrip().split('\t')
+            for i in range(indel_count):
+                line = text_file.readline().rstrip()
+                if not line:
+                    break
+                index_str, indel_str = line.split('\t')
                 indel_map = []
                 for item in indel_str.split(Vac.VAC_ITEM_SEP):
                     allele_count_str, sequence = item.split(Vac.VAC_KEYVAL_SEP)

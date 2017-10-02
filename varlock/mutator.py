@@ -288,7 +288,7 @@ class Mutator:
             mut_seq = cmn.stream_cipher(alignment.query_sequence, sha512.digest())
             alignment.query_sequence = mut_seq
     
-    def __mutate_pos(self, bdiff_io: bdiff.BdiffIO, variant_queue: list, vac: po.GenomicPosition):
+    def __mutate_pos(self, bdiff_io: bdiff.BdiffIO, variant_queue: list, vac: po.VariantPosition):
         """
         Mutate alignments at the variant allele count position.
         :param variant_queue: list of SnvAlignment
@@ -320,8 +320,8 @@ class Mutator:
         
         if is_mutated:
             # at least one alignment has been mutated
-            bdiff_io.write_snv(vac.index, mut_map)
-            
+            bdiff_io.write_snv(vac.index, vac.ref_id, mut_map)
+        
         return is_mutated
     
     def _mutate_indel_pos(self, bdiff_io: bdiff.BdiffIO, variant_queue: list, vac: po.VacIndelRecord):
@@ -339,8 +339,8 @@ class Mutator:
                 variant.clear()
         
         if is_mutated:
-            bdiff_io.write_indel(vac.index, mut_map)
-            
+            bdiff_io.write_indel(vac.index, vac.ref_seq, mut_map)
+        
         return is_mutated
     
     def _mutate_variant(self, variant: po.AlignedVariant, mut_map: dict):
