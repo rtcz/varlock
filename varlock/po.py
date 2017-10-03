@@ -184,20 +184,23 @@ class AlignedVariant:
             )
             
             # print(tmp_cigar)
-            # print(self._pos)
-            
+            # print(self._ref_seq)
+            # print(seq)
             
             variant_cigar = Cigar.variant(self._ref_seq, seq)
             
             # print(variant_cigar)
             
+            pos = self._pos
             for tpl in variant_cigar:
                 tmp_cigar = Cigar.place_op(
                     tmp_cigar,
-                    self._pos,
+                    pos,
                     tpl[0],
                     tpl[1]
                 )
+                if tpl[0] not in [Cigar.OP_DEL, Cigar.OP_REF_SKIP]:
+                    pos += tpl[1]
             
             # print(tmp_cigar)
             

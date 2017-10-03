@@ -38,6 +38,11 @@ class BamMutator:
             rnd=random.SystemRandom(),
             verbose: bool = False
     ):
+        """
+        :param filename: BAM filename
+        :param rnd:  random number generator
+        :param verbose:
+        """
         self._verbose = verbose
         self._rnd = rnd
         self._stats = {}
@@ -78,7 +83,6 @@ class BamMutator:
         self._stats = {}
         
         vac_checksum = cmn.bytes2hex(cmn.checksum(vac_filename))
-        # noinspection PyTypeChecker
         bam_checksum = cmn.bytes2hex(self._bam_checksum)
         header = bam.mut_header(self._bam_header, bam_checksum, vac_checksum)
         
@@ -101,7 +105,7 @@ class BamMutator:
             self.STAT_DIFF_COUNT: mut.diff_counter
         }
         
-        # TODO resolve difference between mutated and converted (bam->sam->bam) bam
+        # TODO resolve difference between mutated and converted (bam->sam->bam) and bam
         # print('before bam ' + bytes2hex(checksum(out_bam_file._filename)))
         # bam2sam(out_bam_file._filename, out_bam_file._filename + b'.sam')
         # print('before sam ' + bytes2hex(checksum(out_bam_file._filename + b'.sam')))
@@ -112,7 +116,6 @@ class BamMutator:
         # print('after sam ' + bytes2hex(checksum(out_bam_file._filename + b'.sam')))
         # exit(0)
         
-        # rewrite checksum placeholder with mutated BAM checksum
         return bdiff_io.file(header={
             self.FROM_INDEX: self._fai.first_index(),
             self.TO_INDEX: self._fai.last_index(),
@@ -144,7 +147,7 @@ class BamMutator:
          Overrides other parameters.
         
         When range is supplied partialy covered reads are also included,
-        but only snv's within range are unmutated.
+        but only variants within range are unmutated.
         """
         self._stats = {}
         
@@ -155,6 +158,7 @@ class BamMutator:
             with bam.open_bam(out_bam_filename, 'wb', header=header) as out_bam_file:
                 bdiff_io = bdiff.BdiffIO(bdiff_file)
                 # validate checksum
+                # TODO refactor
                 if self._bam_checksum != cmn.hex2bytes(bdiff_io.header[self.MB_CHECKSUM]):
                     raise ValueError('BDIFF does not refer to this BAM')
                 # TODO user friendly exception on missing bdiff_io header value
@@ -188,7 +192,6 @@ class BamMutator:
             self._stats = {
                 self.STAT_ALIGNMENT_COUNT: mut.alignment_counter,
                 self.STAT_COVERING_COUNT: mut.covering_counter,
-                self.STAT_MAX_COVERAGE: mut.max_coverage,
                 self.STAT_MUT_COUNT: mut.mut_counter,
                 self.STAT_DIFF_COUNT: mut.diff_counter
             }

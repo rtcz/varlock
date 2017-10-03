@@ -12,7 +12,7 @@ class BamIterator:
 
 
 def bam_iterator(
-        bam_file: pysam.AlignmentFile,
+        filename: str,
         start_index: int,
         end_index: int,
         unmapped_only: bool,
@@ -20,7 +20,7 @@ def bam_iterator(
 ):
     """
     Factory for selection of proper iterator. FullBamIterator is excluded.
-    :param bam_file:
+    :param filename: BAM filename
     :param start_index:
     :param end_index:
     :param unmapped_only:
@@ -28,12 +28,12 @@ def bam_iterator(
     :return:
     """
     if unmapped_only:
-        bam_iter = UnmappedBamIterator(bam_file)
+        bam_iter = UnmappedBamIterator(filename)
     elif include_unmapped:
-        bam_iter = RangedBamIterator(bam_file, start_index, end_index)
+        bam_iter = RangedBamIterator(filename, start_index, end_index)
     else:
         # mapped only
-        bam_iter = MappedBamIterator(bam_file, start_index, end_index)
+        bam_iter = MappedBamIterator(filename, start_index, end_index)
     return bam_iter
 
 

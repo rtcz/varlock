@@ -318,7 +318,7 @@ def diff_aligned_variant(alignment: pysam.AlignedSegment, diff: po.VariantPositi
             end_pos = pos + max_match_len(alignment.query_sequence, pos, diff.mut_map.values())
             if end_pos > pos:
                 # indel was found
-                variant = po.AlignedVariant(alignment, pos, end_pos)
+                variant = po.AlignedVariant(alignment, pos, end_pos, diff.ref_seq)
             else:
                 # match not found - this sould not occur
                 variant = po.AlignedVariant(alignment)
@@ -353,9 +353,9 @@ def vac_aligned_variant(alignment: pysam.AlignedSegment, vac: po.VariantPosition
             if end_pos > pos:
                 # indel was found
                 assert len(vac.seqs)
-                variant = po.AlignedVariant(alignment, pos, end_pos, vac.seqs[0])
+                variant = po.AlignedVariant(alignment, pos, end_pos, vac.ref_seq)
             else:
-                # match not found or at least one variant exceeded alignment length
+                # match not found or at least one variant exceeds alignment end
                 variant = po.AlignedVariant(alignment)
         else:
             raise ValueError("%s is not VAC record instance" % type(vac).__name__)

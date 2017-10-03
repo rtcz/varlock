@@ -112,7 +112,8 @@ class Cigar:
         :param op_length: CIGAR operation length
         :return: new CIGAR tuples
         """
-        assert op_type in [cls.OP_MATCH, cls.OP_EQUAL, cls.OP_DIFF, cls.OP_INS, cls.OP_PAD, cls.OP_DEL]
+        # TODO OP_PAD
+        assert op_type in [cls.OP_MATCH, cls.OP_EQUAL, cls.OP_DIFF, cls.OP_INS, cls.OP_DEL, cls.OP_REF_SKIP]
         assert op_length > 0
         assert op_pos >= 0
         curr_pos = 0
@@ -122,7 +123,7 @@ class Cigar:
             curr_type, curr_length = cigar[i]
             # OP_HARD_CLIP is not contained in cigar_tuples nor query_sequence
             prev_pos = curr_pos
-            if curr_type not in [cls.OP_DEL, cls.OP_HARD_CLIP, cls.OP_REF_SKIP]:
+            if curr_type not in [cls.OP_DEL, cls.OP_REF_SKIP]:
                 curr_pos += curr_length
             
             if prev_pos == op_pos:
