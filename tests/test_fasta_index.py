@@ -9,31 +9,29 @@ class TestFastaIndex(unittest.TestCase):
     
     @staticmethod
     def create_fai():
-        with pysam.AlignmentFile('tests/resources/common/input.sam', "r") as sam_file:
+        with pysam.AlignmentFile('tests/resources/fasta_index/input.sam', "r") as sam_file:
             return FastaIndex(sam_file.header)
     
     def test_fai_parsing(self):
         fai = self.create_fai()
-        ref = fai[21]
+        ref = fai[1]
         
-        self.assertEqual(ref.name, 'chr22')
-        self.assertEqual(ref.start, 2829728720)
-        self.assertEqual(ref.length, 51304566)
+        self.assertEqual(ref.name, 'chr2')
+        self.assertEqual(ref.start, 10000)
+        self.assertEqual(ref.length, 10000)
     
     def test_index(self):
         fai = self.create_fai()
         
         self.assertEqual(0, fai.pos2index('chr1', 0))
-        self.assertEqual(249250620, fai.pos2index('chr1', 249250620))
-        self.assertEqual(249250621, fai.pos2index('chr2', 0))
-        self.assertEqual(492449993, fai.pos2index('chr2', 243199372))
-        self.assertEqual(492449994, fai.pos2index('chr3', 0))
+        self.assertEqual(1000, fai.pos2index('chr1', 1000))
+        self.assertEqual(10000, fai.pos2index('chr2', 0))
+        self.assertEqual(11000, fai.pos2index('chr2', 1000))
         
         self.assertTupleEqual(('chr1', 0), fai.index2pos(0))
-        self.assertTupleEqual(('chr1', 249250620), fai.index2pos(249250620))
-        self.assertTupleEqual(('chr2', 0), fai.index2pos(249250621))
-        self.assertTupleEqual(('chr2', 243199372), fai.index2pos(492449993))
-        self.assertTupleEqual(('chr3', 0), fai.index2pos(492449994))
+        self.assertTupleEqual(('chr1', 1000), fai.index2pos(1000))
+        self.assertTupleEqual(('chr2', 0), fai.index2pos(10000))
+        self.assertTupleEqual(('chr2', 1000), fai.index2pos(11000))
 
 
 if __name__ == '__main__':
