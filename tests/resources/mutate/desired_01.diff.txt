@@ -1,8 +1,8 @@
 {
-    "from_index": 0,
+    "_from_index": 0,
+    "_to_index": 19999,
     "mb_checksum": "f05027eaa1923a6aab76bf7ead4fe976",
-    "secret": "ffffffffffffffffffffffffffffffff",
-    "to_index": 19999
+    "secret": "ffffffffffffffffffffffffffffffff"
 }
 snvs	4
 indels	2

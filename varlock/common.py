@@ -224,13 +224,22 @@ def file_size(file_obj):
     return size
 
 
-def checksum(filename: str):
+def checksum(filename: str, as_bytes=False):
+    """
+    :param filename:
+    :param as_bytes: when true, function returns bytes instead of hex string
+    :return: checksum in hex string or byte format
+    """
     hasher = hashlib.md5()
     with open(filename, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
             hasher.update(chunk)
     
-    return hasher.digest()
+    checksum_bytes = hasher.digest()
+    if as_bytes:
+        return checksum_bytes
+    else:
+        return bytes2hex(checksum_bytes)
 
 
 def ref_pos2seq_pos(alignment: pysam.AlignedSegment, ref_pos: int):

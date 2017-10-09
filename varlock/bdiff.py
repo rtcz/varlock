@@ -12,9 +12,11 @@ class BdiffIO:
     """
     Bdiff is binary file containing SNV and INDEL difference records.
 
-    Bdiff header:
+    Bdiff meta header:
     header_size, 4B
     header, <header_size>B
+    
+    Bdiff counts:
     number of SNV records, 4B
     number of INDEL records, 4B
     
@@ -24,7 +26,7 @@ class BdiffIO:
     index resolution 4B, distance between indexed values as number of records
     list: of index length
         index of a thousandth record, 4B
-        file position of a thousandth record, 4B
+        file content position of N-th record, 4B
 
     Diff SNV record: permutation of DNA bases (A,T,G,C)
     index 4B, 0-based absolute genomic position
@@ -41,6 +43,15 @@ class BdiffIO:
         list:
             INDEL 4 base sequence, 1B
     """
+    # reserved header field, start of BAM's effective range, inclusive
+    FROM_INDEX = '_from_index'
+    
+    # reserved header field, end of BAM's effective range, inclusive
+    TO_INDEX = '_to_index'
+    
+    # # reserver header field
+    # EFFECTIVE_RANGE = '_effective_range'
+    
     INT_SIZE = 4
     SHORT_SIZE = 2
     BYTE_SIZE = 1
@@ -108,16 +119,17 @@ class BdiffIO:
         self._header = {}
         self._snv_count = self._indel_count = 0
         self._last_index = 0
+        self._data_offset = 0
         self._header_size = 0
         self._index_resolution = index_resolution
-        self._diff_file = None
+        self._bdiff_file = None
         self._record_file = None
         
         if diff_file is not None:
             # read mode
             diff_file.seek(0)
-            meta_size = struct.unpack('<I', diff_file.read(self.INT_SIZE))[0]
-            self._header = cmn.bytes2dict(diff_file.read(meta_size))
+            self._header_size = struct.unpack('<I', diff_file.read(self.INT_SIZE))[0]
+            self._header = cmn.bytes2dict(diff_file.read(self._header_size))
             self._snv_count, self._indel_count = struct.unpack('<II', diff_file.read(self.INT_SIZE * 2))
             
             # read_record index
@@ -129,8 +141,9 @@ class BdiffIO:
                 index, pos = struct.unpack('<II', diff_file.read(self.INT_SIZE * 2))
                 self._file_index.append((index, pos))
             
-            self._header_size = diff_file.tell()
-            self._diff_file = diff_file
+            self._data_offset = diff_file.tell()
+            # file pointer is at start of the content
+            self._bdiff_file = diff_file
         else:
             # write mode
             self._record_file = io.BytesIO()
@@ -157,14 +170,14 @@ class BdiffIO:
     
     @property
     def is_read_mode(self):
-        return self._diff_file is not None
+        return self._bdiff_file is not None
     
     @property
-    def header_size(self):
+    def data_offset(self):
         """
         :return: header size in bytes
         """
-        return self._header_size
+        return self._data_offset
     
     @property
     def header(self):
@@ -184,16 +197,16 @@ class BdiffIO:
     @property
     def first_index(self):
         """
-        :return: genomic index of first record
+        :return: genomic index of the first record
         """
         if self.is_empty():
             return None
         
         if self.is_read_mode:
-            curr_pos = self._diff_file.tell()
-            self._diff_file.seek(self._header_size)
-            first_index = struct.unpack('<I', self._diff_file.read(self.INT_SIZE))[0]
-            self._diff_file.seek(curr_pos)
+            curr_pos = self._bdiff_file.tell()
+            self._bdiff_file.seek(self._data_offset)
+            first_index = struct.unpack('<I', self._bdiff_file.read(self.INT_SIZE))[0]
+            self._bdiff_file.seek(curr_pos)
         else:
             curr_pos = self._record_file.tell()
             self._record_file.seek(0)
@@ -205,7 +218,7 @@ class BdiffIO:
     @property
     def last_index(self):
         """
-        :return: genomic index of last record
+        :return: genomic index of the last record
         """
         return None if self.is_empty() else self._last_index
     
@@ -217,7 +230,7 @@ class BdiffIO:
         INDEL alternatives is a list
         """
         assert self.is_read_mode
-        byte_str = self._diff_file.read(self.INT_SIZE + self.BYTE_SIZE * 2)
+        byte_str = self._bdiff_file.read(self.INT_SIZE + self.BYTE_SIZE * 2)
         if byte_str == b'':
             raise EOFError
         
@@ -246,7 +259,7 @@ class BdiffIO:
         Read SNV alternatives from rest of the record
         :return: (base_1, base_2, base_3, base_4)
         """
-        mut_index = struct.unpack('<B', self._diff_file.read(self.BYTE_SIZE))[0]
+        mut_index = struct.unpack('<B', self._bdiff_file.read(self.BYTE_SIZE))[0]
         return self.INDEX_2_PERM[mut_index]
     
     def _read_indel_alts(self, length):
@@ -256,9 +269,9 @@ class BdiffIO:
         """
         alt_list = [None] * length
         for i in range(length):
-            base_length = struct.unpack('<H', self._diff_file.read(self.SHORT_SIZE))[0]
+            base_length = struct.unpack('<H', self._bdiff_file.read(self.SHORT_SIZE))[0]
             seq_byte_size = math.ceil(base_length / 4)
-            seq = cmn.bytes2seq(self._diff_file.read(seq_byte_size), base_length)
+            seq = cmn.bytes2seq(self._bdiff_file.read(seq_byte_size), base_length)
             alt_list[i] = seq
         
         return alt_list
@@ -279,7 +292,7 @@ class BdiffIO:
         
         self._last_index = index
         self._snv_count += 1
-        if self._snv_count % self._index_resolution == 0:
+        if (self._snv_count + self._indel_count) % self._index_resolution == 0:
             self._file_index.append((index, self._record_file.tell() - len(record)))
     
     def write_snv(self, index: int, ref_id: int, mut_map: dict):
@@ -309,7 +322,7 @@ class BdiffIO:
         
         self._last_index = index
         self._indel_count += 1
-        if self._indel_count % self._index_resolution == 0:
+        if (self._snv_count + self._indel_count) % self._index_resolution == 0:
             self._file_index.append((index, self._record_file.tell() - len(record)))
     
     def write_indel(self, index: int, ref_seq: str, mut_map: dict):
@@ -338,88 +351,167 @@ class BdiffIO:
     def readcopy(self):
         return BdiffIO(self.file())
     
+    @classmethod
+    def _write_header(cls, diff_file: io.BytesIO, header: dict):
+        meta_bytes = cmn.dict2bytes(header)
+        diff_file.write(struct.pack('<I', len(meta_bytes)))
+        diff_file.write(meta_bytes)
+    
+    @classmethod
+    def _write_counts(cls, diff_file: io.BytesIO, snv_count: int, indel_count: int):
+        diff_file.write(struct.pack('<II', snv_count, indel_count))
+    
+    @classmethod
+    def _write_index(cls, diff_file: io.BytesIO(), file_index: list, last_index: int, index_resolution: int):
+        # file index header
+        diff_file.write(struct.pack(
+            '<III',
+            last_index,
+            len(file_index),
+            index_resolution
+        ))
+        # file index content
+        for index, pos in file_index:
+            diff_file.write(struct.pack('<II', index, pos))
+    
+    def _file_from_write(self, header: dict):
+        assert not self.is_read_mode
+        
+        bdiff_file = io.BytesIO()
+        self._write_header(bdiff_file, header)
+        self._write_counts(bdiff_file, self._snv_count, self._indel_count)
+        self._write_index(bdiff_file, self._file_index, self._last_index, self._index_resolution)
+        
+        self._record_file.seek(0)
+        # TODO optimalize writing
+        bdiff_file.write(self._record_file.read())
+        
+        return bdiff_file
+    
+    def _file_from_copy(self):
+        assert self.is_read_mode
+        
+        bdiff_file = io.BytesIO()
+        self._bdiff_file.seek(0)
+        # TODO optimalize writing
+        bdiff_file.write(self._bdiff_file.read())
+        
+        return bdiff_file
+    
+    def _file_from_slice(self, header: dict):
+        assert self.is_read_mode
+        
+        bdiff_file = io.BytesIO()
+        self._write_header(bdiff_file, header)
+        
+        if self.FROM_INDEX in header and self.TO_INDEX in header:
+            start_pos, end_pos = self.tell_range(header[self.FROM_INDEX], header[self.TO_INDEX])
+            
+            bdiff_file.seek(start_pos)
+            snv_count = 0
+            indel_count = 0
+            file_index = []
+
+            # build index
+            while True:
+                index, ref_id, alts = self._read_record()
+                if index > header[self.TO_INDEX]:
+                    break
+                
+                if isinstance(alts, tuple):
+                    # SNV
+                    snv_count += 1
+                else:
+                    # INDEL
+                    indel_count += 1
+                
+                if (snv_count + indel_count) % self._index_resolution == 0:
+                    file_index.append((index, self._bdiff_file.tell()))
+            
+            self._bdiff_file.seek(end_pos)
+            last_index, ref_id, alts = self._read_record()
+            last_pos = self._bdiff_file.tell()
+            
+            self._write_counts(bdiff_file, snv_count, indel_count)
+            self._write_index(bdiff_file, file_index, last_index, self._index_resolution)
+            
+            # TODO optimalize writing
+            bdiff_file.write(self._bdiff_file.read(last_pos - start_pos))
+        else:
+            # unmapped only
+            self._write_counts(bdiff_file, 0, 0)
+            self._write_index(bdiff_file, [], 0, self._index_resolution)
+        
+        return bdiff_file
+    
     def file(self, header: dict = None, close=True):
         """
         Creates Bdiff file using internal data.
-        :param header: meta header dict, only in write mode
+        :param header: meta header dict
         :param close: closes internal stream in write mode or input stream in read mode
         :return: Bdiff file as BytesIO
         """
-        # TODO is_closed ?
-        diff_file = io.BytesIO()
         if self.is_read_mode:
-            # copy of file content supplied in constructor
-            diff_file.write(self._diff_file.read())
+            prev_pos = self._bdiff_file.tell()
+            if header is None:
+                # exact copy
+                diff_file = self._file_from_copy()
+            else:
+                # header does affect the final content
+                diff_file = self._file_from_slice(header)
+            
             if close:
-                self._diff_file.close()
-        else:
-            # new stream from underlying record_file
-            # meta
-            meta_bytes = cmn.dict2bytes({} if header is None else header)
-            diff_file.write(struct.pack('<I', len(meta_bytes)))
-            diff_file.write(meta_bytes)
+                self._bdiff_file.close()
+            else:
+                self._bdiff_file.seek(prev_pos, os.SEEK_SET)
+        
+        else:  # write mode
+            prev_pos = self._record_file.tell()
+            if header is None:
+                diff_file = self._file_from_write({})
+            else:
+                # header does not affect the final content
+                diff_file = self._file_from_write(header)
             
-            # counts
-            diff_file.write(struct.pack('<II', self._snv_count, self._indel_count))
-            
-            # index
-            diff_file.write(struct.pack(
-                '<III',
-                self._last_index,
-                len(self._file_index),
-                self._index_resolution)
-            )
-            for index, pos in self._file_index:
-                diff_file.write(struct.pack('<II', index, pos))
-            
-            # records
-            self._record_file.seek(0)
-            diff_file.write(self._record_file.read())
             if close:
                 self._record_file.close()
             else:
-                self._record_file.seek(0, os.SEEK_END)
+                self._record_file.seek(prev_pos, os.SEEK_SET)
         
         diff_file.seek(0)
         return diff_file
     
     def tell(self):
         if self.is_read_mode:
-            return self._diff_file.tell()
+            return self._bdiff_file.tell()
         else:
             return self._record_file.tell()
     
     def seek(self, pos: int, mode: int = os.SEEK_SET):
         assert self.is_read_mode
-        self._diff_file.seek(pos, mode)
+        self._bdiff_file.seek(pos, mode)
     
-    def tell_range(self, lower_index, upper_index):
+    def tell_range(self, from_index, to_index):
         """
-        From file position of first record with index greater than or equal to lower_index
-        to file position of last record with index lower than or equal to upper_index.
-        :param lower_index: from index inclusive
-        :param upper_index: to index inclusive
-        :return: range tuple
+        Genomic index range of file records between lower_index and upper_index.
+        :param from_index: from index inclusive
+        :param to_index: to index inclusive
+        :return: (start_pos, end_pos)
+            start_pos is file position of first record with index greater than or equal to from_index
+            end_pos is position of last record with index lower than or equal to to_index
         :raises: IndexError
         """
         assert self.is_read_mode
-        assert lower_index <= upper_index
+        assert from_index <= to_index
         
-        start_pos = self.tell_index_gte(lower_index)
-        end_pos = self.tell_index_lte(upper_index)
+        start_pos = self.tell_index_gte(from_index)
+        end_pos = self.tell_index_lte(to_index)
         
         if start_pos is None:
             raise IndexError("Empty range")
         
         if end_pos is None:
             raise IndexError("Empty range")
-        
-        # make end_pos inclusive
-        # saved_pos = self._diff_file.tell()
-        # self._diff_file.seek(end_pos)
-        # self.read_record()
-        # end_pos_inc = self._diff_file.tell()
-        # self._diff_file.seek(saved_pos)
         
         return start_pos, end_pos
     
@@ -435,16 +527,16 @@ class BdiffIO:
             # file is empty or desired index does not exists
             return None
         else:
-            saved_pos = self._diff_file.tell()
-            curr_pos = self.__indexed_pos(pivot_index)
-            self._diff_file.seek(curr_pos)
+            saved_pos = self._bdiff_file.tell()
+            curr_pos = self._indexed_pos(pivot_index)
+            self._bdiff_file.seek(curr_pos)
             
             curr_index = self._read_record()[0]  # type: int
             while curr_index < pivot_index:
-                curr_pos = self._diff_file.tell()
+                curr_pos = self._bdiff_file.tell()
                 curr_index = self._read_record()[0]  # type: int
             
-            self._diff_file.seek(saved_pos)
+            self._bdiff_file.seek(saved_pos)
             return curr_pos
     
     def tell_index_lte(self, pivot_index: int):
@@ -459,12 +551,12 @@ class BdiffIO:
             # desired index does not exists
             return None
         else:
-            saved_pos = self._diff_file.tell()
-            curr_pos = self.__indexed_pos(pivot_index)
-            self._diff_file.seek(curr_pos)
+            saved_pos = self._bdiff_file.tell()
+            curr_pos = self._indexed_pos(pivot_index)
+            self._bdiff_file.seek(curr_pos)
             
             while True:
-                next_pos = self._diff_file.tell()
+                next_pos = self._bdiff_file.tell()
                 try:
                     next_index = self._read_record()[0]  # type: int
                 except EOFError:
@@ -474,10 +566,10 @@ class BdiffIO:
                 else:
                     break
             
-            self._diff_file.seek(saved_pos)
+            self._bdiff_file.seek(saved_pos)
             return curr_pos
     
-    def __indexed_pos(self, pivot_index: int):
+    def _indexed_pos(self, pivot_index: int):
         """
         :param pivot_index:
         :return: indexed position of record with index lower than or equal to pivot_index.
@@ -491,7 +583,7 @@ class BdiffIO:
             else:
                 break
         
-        return indexed_pos + self._header_size
+        return indexed_pos + self._data_offset
     
     @staticmethod
     def to_text_file(bytes_io: io.BytesIO(), filename: str):

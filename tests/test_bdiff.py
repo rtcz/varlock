@@ -86,11 +86,11 @@ class TestBdiff(unittest.TestCase):
         self.assertEqual(1010, rbdiff.first_index)
         self.assertEqual(1010, rbdiff.last_index)
         
-        self.assertEqual(rbdiff.header_size, rbdiff.tell_index_gte(1000))
+        self.assertEqual(rbdiff.data_offset, rbdiff.tell_index_gte(1000))
         self.assertIsNone(rbdiff.tell_index_gte(2000))
         
         self.assertIsNone(rbdiff.tell_index_lte(1000))
-        self.assertEqual(rbdiff.header_size, rbdiff.tell_index_lte(2000))
+        self.assertEqual(rbdiff.data_offset, rbdiff.tell_index_lte(2000))
     
     def test_tell_index_gte(self):
         bdiff = BdiffIO(self._bdiff_file)

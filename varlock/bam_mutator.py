@@ -3,11 +3,11 @@ import io
 
 from varlock.fasta_index import FastaIndex
 from varlock.mutator import Mutator
+from varlock.bdiff import BdiffIO
 
 import varlock.common as cmn
 import varlock.iters as iters
 import varlock.bam as bam
-import varlock.bdiff as bdiff
 
 
 # TODO rename MutatorWrapper ?
@@ -27,10 +27,11 @@ class BamMutator:
     # number of DIFF records written / read
     STAT_DIFF_COUNT = 'diff_count'
     
-    FROM_INDEX = 'from_index'
-    TO_INDEX = 'to_index'
-    SECRET = 'secret'
-    MB_CHECKSUM = 'mb_checksum'
+    # secret key used in unmapped alignment encryption
+    BDIFF_SECRET_TAG = 'secret'
+    
+    # mutated BAM's checksum
+    BDIFF_CHECKSUM_TAG = 'mb_checksum'
     
     def __init__(
             self,
@@ -50,12 +51,10 @@ class BamMutator:
         
         with bam.open_bam(self._bam_filename, 'rb') as bam_file:
             self._bam_header = bam_file.header
+        
         self._fai = FastaIndex(self._bam_header)
         
-        if self._verbose:
-            print("Calculating VAC's checksum")
-        
-        self._bam_checksum = cmn.checksum(self._bam_filename)
+        self._checksum = None
     
     def stat(self, stat_id):
         if stat_id in self._stats:
@@ -63,9 +62,25 @@ class BamMutator:
         else:
             raise ValueError('Stat not found.')
     
+    # @property
+    # def fai(self):
+    #     return self._fai
+    
     @property
     def stats(self):
         return self._stats
+    
+    @property
+    def checksum(self):
+        """
+        :return: BAM's checksum as hex string
+        """
+        if self._checksum is None:
+            if self._verbose:
+                print("Calculating BAM's checksum")
+            self._checksum = cmn.checksum(self._bam_filename)
+        
+        return self._checksum
     
     def mutate(
             self,
@@ -77,19 +92,15 @@ class BamMutator:
         :param vac_filename:
         :param mut_bam_filename:
         :param secret: Secret key written into DIFF used for unmapped alignment encryption.
-        Secret must be of size specified by DIFF format.
         :return diff_file:
         """
         self._stats = {}
         
-        vac_checksum = cmn.bytes2hex(cmn.checksum(vac_filename))
-        bam_checksum = cmn.bytes2hex(self._bam_checksum)
-        header = bam.mut_header(self._bam_header, bam_checksum, vac_checksum)
-        
-        mut = Mutator(fai=self._fai, rnd=self._rnd, verbose=self._verbose)
+        header = bam.mut_header(self._bam_header, self.checksum, cmn.checksum(vac_filename))
         with bam.open_bam(mut_bam_filename, 'wb', header=header) as mut_bam_file, \
                 iters.VacIterator(vac_filename, self._fai) as vac_iter, \
                 iters.FullBamIterator(self._bam_filename) as bam_iter:
+            mut = Mutator(fai=self._fai, rnd=self._rnd, verbose=self._verbose)
             bdiff_io = mut.mutate(
                 mut_bam_file=mut_bam_file,
                 vac_iter=vac_iter,
@@ -117,10 +128,10 @@ class BamMutator:
         # exit(0)
         
         return bdiff_io.file(header={
-            self.FROM_INDEX: self._fai.first_index(),
-            self.TO_INDEX: self._fai.last_index(),
-            self.MB_CHECKSUM: cmn.bytes2hex(cmn.checksum(mut_bam_filename)),
-            self.SECRET: cmn.bytes2hex(secret)
+            BdiffIO.FROM_INDEX: self._fai.first_index(),
+            BdiffIO.TO_INDEX: self._fai.last_index(),
+            self.BDIFF_CHECKSUM_TAG: cmn.checksum(mut_bam_filename),
+            self.BDIFF_SECRET_TAG: cmn.bytes2hex(secret)
         })
     
     def unmutate(
@@ -156,15 +167,15 @@ class BamMutator:
             mut = Mutator(fai=self._fai, rnd=self._rnd, verbose=self._verbose)
             
             with bam.open_bam(out_bam_filename, 'wb', header=header) as out_bam_file:
-                bdiff_io = bdiff.BdiffIO(bdiff_file)
+                bdiff_io = BdiffIO(bdiff_file)
                 # validate checksum
-                # TODO refactor
-                if self._bam_checksum != cmn.hex2bytes(bdiff_io.header[self.MB_CHECKSUM]):
+                # TODO refactor checksuming
+                if self.checksum != bdiff_io.header[self.BDIFF_CHECKSUM_TAG]:
                     raise ValueError('BDIFF does not refer to this BAM')
                 # TODO user friendly exception on missing bdiff_io header value
                 start_index, end_index = self.resolve_range(
-                    bdiff_from_index=bdiff_io.header[self.FROM_INDEX],
-                    bdiff_to_index=bdiff_io.header[self.TO_INDEX],
+                    bdiff_from_index=bdiff_io.header[BdiffIO.FROM_INDEX],
+                    bdiff_to_index=bdiff_io.header[BdiffIO.TO_INDEX],
                     start_ref_name=start_ref_name,
                     start_ref_pos=start_ref_pos,
                     end_ref_name=end_ref_name,
@@ -186,7 +197,7 @@ class BamMutator:
                         end_index=end_index
                     ),
                     out_bam_file=out_bam_file,
-                    secret=cmn.hex2bytes(bdiff_io.header[self.SECRET])
+                    secret=cmn.hex2bytes(bdiff_io.header[self.BDIFF_SECRET_TAG])
                 )
             
             self._stats = {
@@ -196,17 +207,18 @@ class BamMutator:
                 self.STAT_DIFF_COUNT: mut.diff_counter
             }
     
+    # TODo refactor
     def resolve_range(
             self,
-            bdiff_from_index,
-            bdiff_to_index,
+            bdiff_from_index: int,
+            bdiff_to_index: int,
             start_ref_name: str,
             start_ref_pos: int,
             end_ref_name: str,
             end_ref_pos: int
     ):
         """
-        Resolve between DIFF range and user specified range.
+        Resolve between the DIFF range and a range specified by user.
         :param bdiff_from_index:
         :param bdiff_to_index:
         :param start_ref_name:

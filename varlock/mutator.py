@@ -1,13 +1,12 @@
 import hashlib
 import random
+
 import pysam
 
 import varlock.bdiff as bdiff
 import varlock.common as cmn
 import varlock.iters as iters
 import varlock.po as po
-
-from varlock.cigar import Cigar
 from varlock.fasta_index import FastaIndex
 
 
@@ -25,9 +24,7 @@ class Mutator:
         self._fai = fai
         self._rnd = rnd
         self._verbose = verbose
-        self._bam_checksum = None
-        
-        self.prev_alignment = None
+        self._prev_alignment = None
     
     def __is_before_index(self, alignment, index):
         """
@@ -52,19 +49,19 @@ class Mutator:
         :param alignment: pysam.AlignedSegment
         :return:
         """
-        are_placed = self.prev_alignment is not None and cmn.is_placed_alignment(
-            alignment) and cmn.is_placed_alignment(self.prev_alignment)
+        are_placed = self._prev_alignment is not None and cmn.is_placed_alignment(
+            alignment) and cmn.is_placed_alignment(self._prev_alignment)
         # FIXME is case of placed after unplaced alignment valid ?
-        if are_placed and alignment.reference_start < self.prev_alignment.reference_start:
+        if are_placed and alignment.reference_start < self._prev_alignment.reference_start:
             # safety check
             raise IndexError('Unordered write: %s after %s' % (
                 self.alignment2str(alignment),
-                self.alignment2str(self.prev_alignment)
+                self.alignment2str(self._prev_alignment)
             ))
         
         bam_file.write(alignment)
         self.alignment_counter += 1
-        self.prev_alignment = alignment
+        self._prev_alignment = alignment
         
         if self._verbose and self.alignment_counter % 10000 == 0:
             print("%d alignments processed" % self.alignment_counter)
@@ -129,7 +126,7 @@ class Mutator:
                     alignment = next(bam_iter)
                 
                 if self._verbose:
-                    print('last alignment: %s' % self.alignment2str(self.prev_alignment))
+                    print('last alignment: %s' % self.alignment2str(self._prev_alignment))
                     print("total of %d alignments processed" % self.alignment_counter)
                 
                 break
@@ -213,7 +210,7 @@ class Mutator:
                     alignment = next(bam_iter)
                 
                 if self._verbose:
-                    print('last alignment: %s' % self.alignment2str(self.prev_alignment))
+                    print('last alignment: %s' % self.alignment2str(self._prev_alignment))
                     print("total of %d alignments processed" % self.alignment_counter)
                 
                 break
@@ -284,7 +281,6 @@ class Mutator:
             # TODO maybe include query quality?
             sha512.update(secret + alignment.query_name.encode())
             
-            # TODO what about soft clipped bases?
             mut_seq = cmn.stream_cipher(alignment.query_sequence, sha512.digest())
             alignment.query_sequence = mut_seq
     
