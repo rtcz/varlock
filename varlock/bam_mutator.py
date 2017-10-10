@@ -82,6 +82,20 @@ class BamMutator:
         
         return self._checksum
     
+    @staticmethod
+    def extract_secret_bytes(bdiff_io: BdiffIO):
+        """
+        Extract secret bytes from BDIFF file.
+        :param bdiff_io:
+        :return:
+        """
+        secret_bytes = None
+        secret_hex = bdiff_io.header.get(BamMutator.BDIFF_SECRET_TAG)
+        if secret_hex is not None:
+            secret_bytes = cmn.hex2bytes(secret_hex)
+        
+        return secret_bytes
+    
     def mutate(
             self,
             vac_filename: str,
@@ -168,10 +182,15 @@ class BamMutator:
             
             with bam.open_bam(out_bam_filename, 'wb', header=header) as out_bam_file:
                 bdiff_io = BdiffIO(bdiff_file)
+                
+                secret = self.extract_secret_bytes(bdiff_io)
+                if (include_unmapped or unmapped_only) and secret is None:
+                    raise ValueError('BDIFF must contain secret to decrypt unmapped reads.')
+                
                 # validate checksum
-                # TODO refactor checksuming
                 if self.checksum != bdiff_io.header[self.BDIFF_CHECKSUM_TAG]:
                     raise ValueError('BDIFF does not refer to this BAM')
+                
                 # TODO user friendly exception on missing bdiff_io header value
                 start_index, end_index = self.resolve_range(
                     bdiff_from_index=bdiff_io.header[BdiffIO.FROM_INDEX],
@@ -181,6 +200,7 @@ class BamMutator:
                     end_ref_name=end_ref_name,
                     end_ref_pos=end_ref_pos
                 )
+                
                 # TODO move iterators to with statement
                 mut.unmutate(
                     bam_iter=iters.bam_iterator(
@@ -197,7 +217,7 @@ class BamMutator:
                         end_index=end_index
                     ),
                     out_bam_file=out_bam_file,
-                    secret=cmn.hex2bytes(bdiff_io.header[self.BDIFF_SECRET_TAG])
+                    secret=secret
                 )
             
             self._stats = {
@@ -207,7 +227,7 @@ class BamMutator:
                 self.STAT_DIFF_COUNT: mut.diff_counter
             }
     
-    # TODo refactor
+    # TODO refactor
     def resolve_range(
             self,
             bdiff_from_index: int,

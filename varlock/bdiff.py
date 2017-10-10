@@ -398,6 +398,35 @@ class BdiffIO:
         
         return bdiff_file
     
+    def _build_index(self, from_index_pos: int, to_index: int):
+        assert self.is_read_mode
+        
+        self._bdiff_file.seek(from_index_pos)
+        
+        file_index = []
+        snv_count = 0
+        indel_count = 0
+        while True:
+            try:
+                index, ref_id, alts = self._read_record()
+            except EOFError:
+                break
+            
+            if index > to_index:
+                break
+            
+            if isinstance(alts, tuple):
+                # SNV
+                snv_count += 1
+            else:
+                # INDEL
+                indel_count += 1
+            
+            if (snv_count + indel_count) % self._index_resolution == 0:
+                file_index.append((index, self._bdiff_file.tell()))
+        
+        return file_index, snv_count, indel_count
+    
     def _file_from_slice(self, header: dict):
         assert self.is_read_mode
         
@@ -405,38 +434,19 @@ class BdiffIO:
         self._write_header(bdiff_file, header)
         
         if self.FROM_INDEX in header and self.TO_INDEX in header:
-            start_pos, end_pos = self.tell_range(header[self.FROM_INDEX], header[self.TO_INDEX])
+            from_index_pos, to_index_pos = self.tell_range(header[self.FROM_INDEX], header[self.TO_INDEX])
+            file_index, snv_count, indel_count = self._build_index(from_index_pos, header[self.TO_INDEX])
             
-            bdiff_file.seek(start_pos)
-            snv_count = 0
-            indel_count = 0
-            file_index = []
-
-            # build index
-            while True:
-                index, ref_id, alts = self._read_record()
-                if index > header[self.TO_INDEX]:
-                    break
-                
-                if isinstance(alts, tuple):
-                    # SNV
-                    snv_count += 1
-                else:
-                    # INDEL
-                    indel_count += 1
-                
-                if (snv_count + indel_count) % self._index_resolution == 0:
-                    file_index.append((index, self._bdiff_file.tell()))
-            
-            self._bdiff_file.seek(end_pos)
+            self._bdiff_file.seek(to_index_pos)
             last_index, ref_id, alts = self._read_record()
-            last_pos = self._bdiff_file.tell()
+            end_pos = self._bdiff_file.tell()
             
             self._write_counts(bdiff_file, snv_count, indel_count)
             self._write_index(bdiff_file, file_index, last_index, self._index_resolution)
-            
+
+            self._bdiff_file.seek(from_index_pos)
             # TODO optimalize writing
-            bdiff_file.write(self._bdiff_file.read(last_pos - start_pos))
+            bdiff_file.write(self._bdiff_file.read(end_pos - from_index_pos))
         else:
             # unmapped only
             self._write_counts(bdiff_file, 0, 0)
@@ -496,29 +506,29 @@ class BdiffIO:
         Genomic index range of file records between lower_index and upper_index.
         :param from_index: from index inclusive
         :param to_index: to index inclusive
-        :return: (start_pos, end_pos)
-            start_pos is file position of first record with index greater than or equal to from_index
-            end_pos is position of last record with index lower than or equal to to_index
+        :return: (from_index_pos, to_index_pos)
+            from_index_pos is file position of first record with index greater than or equal to from_index
+            to_index_pos is position of last record with index lower than or equal to to_index
         :raises: IndexError
         """
         assert self.is_read_mode
         assert from_index <= to_index
         
-        start_pos = self.tell_index_gte(from_index)
-        end_pos = self.tell_index_lte(to_index)
+        from_index_pos = self.tell_index_gte(from_index)
+        to_index_pos = self.tell_index_lte(to_index)
         
-        if start_pos is None:
+        if from_index_pos is None:
             raise IndexError("Empty range")
         
-        if end_pos is None:
+        if to_index_pos is None:
             raise IndexError("Empty range")
         
-        return start_pos, end_pos
+        return from_index_pos, to_index_pos
     
     def tell_index_gte(self, pivot_index: int):
         """
         :param pivot_index:
-        :return: file position of index greater than or equal to pivot_index
+        :return: the first file position of index greater than or equal to pivot_index
         None if such index does not exists.
         """
         assert self.is_read_mode
@@ -542,11 +552,11 @@ class BdiffIO:
     def tell_index_lte(self, pivot_index: int):
         """
         :param pivot_index:
-        :return: file position of index lower than or equal to pivot_index
+        :return: the last file position of index lower than or equal to pivot_index
         None if such index does not exists.
         """
         assert self.is_read_mode
-        
+
         if self.first_index is None or pivot_index < self.first_index:
             # desired index does not exists
             return None

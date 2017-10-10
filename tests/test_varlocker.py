@@ -1,8 +1,11 @@
 import unittest
+import pysam
 
 from Crypto.PublicKey import RSA
 
 from varlock.varlocker import Varlocker
+import varlock.common as cmn
+from varlock.vac import Vac
 
 
 class TestVarlocker(unittest.TestCase):
@@ -19,6 +22,10 @@ class TestVarlocker(unittest.TestCase):
         cls.locker = Varlocker()
     
     def test1_encrypt(self):
+        cmn.sam2bam(self.RESOURCE_PATH + 'encrypt/input.sam', self.RESOURCE_PATH + 'encrypt/input.bam')
+        pysam.index(self.RESOURCE_PATH + 'encrypt/input.bam')
+        Vac.text2vac(self.RESOURCE_PATH + 'encrypt/input.vac.txt', self.RESOURCE_PATH + 'encrypt/input.vac')
+        
         with open(self.RESOURCE_PATH + 'admin', 'r') as key_file, \
                 open(self.RESOURCE_PATH + 'admin.pub', 'r') as pub_key_file:
             rsa_key = RSA.importKey(key_file.read(), passphrase=self.KEY_PASS)
@@ -33,6 +40,9 @@ class TestVarlocker(unittest.TestCase):
                 out_bam_filename=self.RESOURCE_PATH + 'encrypt/output.mut.bam',
                 out_enc_diff_filename=self.RESOURCE_PATH + 'encrypt/output.diff.enc'
             )
+
+        pysam.index(self.RESOURCE_PATH + 'encrypt/output.mut.bam')
+        cmn.bam2sam(self.RESOURCE_PATH + 'encrypt/output.mut.bam', self.RESOURCE_PATH + 'encrypt/output.mut.sam')
     
     def test2_reencrypt(self):
         with open(self.RESOURCE_PATH + 'admin', 'r') as key_file, \
@@ -84,7 +94,7 @@ class TestVarlocker(unittest.TestCase):
                 rsa_enc_key=rsa_enc_key,
                 bam_filename=self.RESOURCE_PATH + 'encrypt/output.mut.bam',
                 enc_diff_filename=self.RESOURCE_PATH + 'reencrypt/output.diff.enc',
-                out_enc_diff_filename=self.RESOURCE_PATH + 'reencrypt/temp.diff.enc',
+                out_enc_diff_filename=self.RESOURCE_PATH + 'reencrypt/output2.diff.enc',
                 include_unmapped=False,
                 unmapped_only=True,
                 rsa_ver_key=rsa_ver_key
@@ -95,7 +105,7 @@ class TestVarlocker(unittest.TestCase):
                 rsa_enc_key=rsa_enc_key,
                 bam_filename=self.RESOURCE_PATH + 'encrypt/output.mut.bam',
                 enc_diff_filename=self.RESOURCE_PATH + 'encrypt/output.diff.enc',
-                out_enc_diff_filename=self.RESOURCE_PATH + 'reencrypt/temp.diff.enc',
+                out_enc_diff_filename=self.RESOURCE_PATH + 'reencrypt/output2.diff.enc',
                 include_unmapped=False,
                 unmapped_only=True,
                 rsa_ver_key=rsa_ver_key
@@ -112,7 +122,7 @@ class TestVarlocker(unittest.TestCase):
                 rsa_key=rsa_key,
                 bam_filename=self.RESOURCE_PATH + 'encrypt/output.mut.bam',
                 enc_diff_filename=self.RESOURCE_PATH + 'reencrypt/output.diff.enc',
-                out_bam_filename=self.RESOURCE_PATH + 'decrypt/temp.bam',
+                out_bam_filename=self.RESOURCE_PATH + 'decrypt/output2.bam',
                 include_unmapped=False,
                 unmapped_only=True,
                 rsa_ver_key=rsa_ver_key,
@@ -122,7 +132,7 @@ class TestVarlocker(unittest.TestCase):
                 rsa_key=rsa_key,
                 bam_filename=self.RESOURCE_PATH + 'encrypt/output.mut.bam',
                 enc_diff_filename=self.RESOURCE_PATH + 'encrypt/output.diff.enc',
-                out_bam_filename=self.RESOURCE_PATH + 'decrypt/temp.bam',
+                out_bam_filename=self.RESOURCE_PATH + 'decrypt/output2.bam',
                 include_unmapped=False,
                 unmapped_only=True,
                 rsa_ver_key=rsa_ver_key,

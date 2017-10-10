@@ -173,8 +173,16 @@ class Mutator:
             bam_iter: iters.BamIterator,
             bdiff_iter: iters.BdiffIterator,
             out_bam_file,
-            secret: bytes
+            secret: bytes = None
     ):
+        """
+        :param bam_iter:
+        :param bdiff_iter:
+        :param out_bam_file:
+        :param secret: secret key used for encryptiuon of unmapped alignments
+            Must be present when iterating over unmapped alignments.
+        :return:
+        """
         self.__init_counters()
         
         alignment_queue = []
@@ -276,6 +284,9 @@ class Mutator:
         :return: encrypter/decrypted alignment
         """
         if alignment.is_unmapped:
+            if secret is None:
+                raise ValueError('Secret key must be present when unmapped alignments are iterated.')
+            
             # use 64B long hash (encrypts 256 bases)
             sha512 = hashlib.sha512()
             # TODO maybe include query quality?

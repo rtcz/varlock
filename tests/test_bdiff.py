@@ -31,6 +31,10 @@ class TestBdiff(unittest.TestCase):
         # TODO
         pass
     
+    def test_file_index(self):
+        # TODO !!!
+        pass
+    
     def test_io(self):
         bdiff = BdiffIO(self._bdiff_file)
         self.assertTrue(bdiff.is_read_mode)

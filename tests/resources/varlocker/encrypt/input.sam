@@ -1,0 +1,24 @@
+@HD	VN:1.0	SO:coordinate
+@SQ	SN:chr1	LN:10000
+@SQ	SN:chr2	LN:10000
+*	2	chr2	1002	6	6M	=	1	0	GAAGCA	*
+*	2	chr2	1005	6	4M	=	1	0	GCAC	*
+*	2	chr2	1010	6	9M	=	1	0	CCTCATAGC	*
+*	2	chr2	1012	6	4M	=	1	0	TCAT	*
+*	2	chr2	1013	6	8M	=	1	0	CATAGCCT	*
+*	2	chr2	1017	6	7M	=	1	0	GCCTATC	*
+*	2	chr2	1019	7	7M	=	1	0	CTGTCGC	*
+*	2	chr2	1020	7	7M	=	1	0	TATCGCT	*
+*	2	chr2	1021	30	3M	=	1	0	ATC	*
+*	4	chr2	1025	255	*	=	1	0	CTT	*
+*	2	chr2	1027	30	2M1D3M	=	1	0	TACTA	*
+*	2	chr2	1027	30	3M1I4M	=	1	0	TAGTCTAT	*
+*	2	chr2	1028	30	2M1I2M	=	1	0	AGTCT	*
+*	2	chr2	1029	30	1M1I6M	=	1	0	GTCTTTCG	*
+*	2	chr2	1030	30	1I5M	=	1	0	TCTATC	*
+*	2	chr2	1034	6	6M	=	1	0	CGCAGC	*
+*	2	chr2	1037	6	2M2D2M	=	1	0	AGAC	*
+*	2	chr2	1038	6	1M2D3M	=	1	0	GACT	*
+*	4	*	0	255	*	*	1	0	CTAGT	*
+*	4	*	0	255	*	*	1	0	ACAA	*
+*	4	*	0	255	*	*	1	0	GTTCCA	*
