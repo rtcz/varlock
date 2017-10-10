@@ -7,6 +7,11 @@ class TestBdiff(unittest.TestCase):
     # SECRET = bytes([255] * Diff.SECRET_SIZE)
     # CHECKSUM = b'0123456789ABCDEF'
     
+    _header = {
+        BdiffIO.FROM_INDEX: 1000,
+        BdiffIO.TO_INDEX: 2000
+    }
+    
     @classmethod
     def setUpClass(cls):
         bdiff = BdiffIO()
@@ -17,7 +22,8 @@ class TestBdiff(unittest.TestCase):
         bdiff._write_indel(1050, 1, ['T', 'TT'])
         bdiff._write_indel(1060, 2, ['GCG', 'G', 'GCGCG'])
         bdiff._write_snv(1070, 3, ('G', 'C', 'A', 'T'))
-        cls._bdiff_file = bdiff.file()
+        
+        cls._bdiff_file = bdiff.file(cls._header)
     
     def test_from_text_file(self):
         # TODO
@@ -38,7 +44,7 @@ class TestBdiff(unittest.TestCase):
     def test_io(self):
         bdiff = BdiffIO(self._bdiff_file)
         self.assertTrue(bdiff.is_read_mode)
-        self.assertDictEqual({}, bdiff.header)
+        self.assertDictEqual(self._header, bdiff.header)
         self.assertEqual(4, bdiff.snv_count)
         self.assertEqual(3, bdiff.indel_count)
         self.assertTupleEqual((1010, 0, ('C', 'A', 'T', 'G')), bdiff._read_record())
@@ -191,136 +197,73 @@ class TestBdiff(unittest.TestCase):
         self.assertTupleEqual(self._range2pos(1, 1), bdiff.tell_range(1000, 1010))
         self.assertTupleEqual(self._range2pos(1, 2), bdiff.tell_range(1000, 1020))
         self.assertTupleEqual(self._range2pos(1, 3), bdiff.tell_range(1000, 1030))
+    
+    def test_file(self):
+        """
+        Testing only branch with inner method BdiffIO._file_from_slice.
+        """
+        bdiff = BdiffIO(self._bdiff_file)
         
-        # def test_header_range(self):
-        #     diff_file = io.BytesIO()
-        #     self.assertRaises(AssertionError, lambda: Diff.write_header(diff_file, 20, 10, self.CHECKSUM))
-        #
-        #     diff_file = io.BytesIO()
-        #     Diff.write_header(diff_file, 10, 20, self.CHECKSUM)
-        #     Diff.write_record(diff_file, 10, ('C', 'A', 'T', 'G'))
-        #     Diff.write_record(diff_file, 20, ('G', 'A', 'T', 'C'))
-        #     Diff.validate_header_range(diff_file)
-        #
-        #     diff_file = io.BytesIO()
-        #     Diff.write_header(diff_file, 10, 10, self.CHECKSUM)
-        #     Diff.write_record(diff_file, 10, ('C', 'A', 'T', 'G'))
-        #     Diff.validate_header_range(diff_file)
-        #
-        #     diff_file = io.BytesIO()
-        #     Diff.write_header(diff_file, 11, 20, self.CHECKSUM)
-        #     Diff.write_record(diff_file, 10, ('C', 'A', 'T', 'G'))
-        #     Diff.write_record(diff_file, 20, ('G', 'A', 'T', 'C'))
-        #     self.assertRaises(ValueError, lambda: Diff.validate_header_range(diff_file))
-        #
-        #     diff_file = io.BytesIO()
-        #     Diff.write_header(diff_file, 10, 19, self.CHECKSUM)
-        #     Diff.write_record(diff_file, 10, ('C', 'A', 'T', 'G'))
-        #     Diff.write_record(diff_file, 20, ('G', 'A', 'T', 'C'))
-        #     self.assertRaises(ValueError, lambda: Diff.validate_header_range(diff_file))
+        # invalid range
+        self.assertRaises(AssertionError, lambda: bdiff.file({BdiffIO.FROM_INDEX: 2000, BdiffIO.TO_INDEX: 1000}, False))
         
-        # def test_truncate(self):
-        #     diff_file = self.__build_diff_file()
-        #     truncated_file = Diff.truncate(diff_file)
-        #     self.assertTupleEqual(
-        #         (self.CHECKSUM, 2000000000, 3000000000, self.SECRET),
-        #         Diff.read_header(truncated_file)
-        #     )
-        #     self.assertRaises(EOFError, lambda: Diff.read_record(truncated_file))
+        # out of range
+        self.assertRaises(IndexError, lambda: bdiff.file({BdiffIO.FROM_INDEX: 1071, BdiffIO.TO_INDEX: 2000}, False))
+        self.assertRaises(IndexError, lambda: bdiff.file({BdiffIO.FROM_INDEX: 0, BdiffIO.TO_INDEX: 1009}, False))
         
-        # def test_slice(self):
-        #     bdiff = BdiffWrapper(self._bdiff_file)
-        #
-        #     # invalid range
-        #     self.assertRaises(AssertionError, lambda: Diff.slice(diff_file, 2000000000, 1000000000))
-        #
-        #     # out of range
-        #     self.assertRaises(IndexError, lambda: Diff.slice(diff_file, 2000000000, 2000000000))
-        #     self.assertRaises(IndexError, lambda: Diff.slice(diff_file, 3000000000, 3000000000))
-        #
-        #     # erase secret key
-        #     sliced_file = Diff.slice(diff_file, 2000000000, 3000000000, False)
-        #     self.assertTupleEqual(
-        #         (self.CHECKSUM, 2000000000, 3000000000, Diff.SECRET_PLACEHOLDER),
-        #         Diff.read_header(sliced_file)
-        #     )
-        #
-        #     # exact range
-        #     sliced_file = Diff.slice(diff_file, 2830728741, 2830728806)
-        #     self.assertTupleEqual(
-        #         (self.CHECKSUM, 2830728741, 2830728806, self.SECRET),
-        #         Diff.read_header(sliced_file)
-        #     )
-        #     self.assertTupleEqual((2830728741, ('C', 'A', 'T', 'G')), Diff.read_record(sliced_file))
-        #     self.assertTupleEqual((2830728781, ('G', 'A', 'T', 'C')), Diff.read_record(sliced_file))
-        #     self.assertTupleEqual((2830728786, ('T', 'G', 'A', 'C')), Diff.read_record(sliced_file))
-        #     self.assertTupleEqual((2830728806, ('G', 'C', 'A', 'T')), Diff.read_record(sliced_file))
-        #     self.assertRaises(EOFError, lambda: Diff.read_record(sliced_file))
-        #
-        #     # outer range
-        #     sliced_file = Diff.slice(diff_file, 2000000000, 3000000000)
-        #     self.assertTupleEqual(
-        #         (self.CHECKSUM, 2000000000, 3000000000, self.SECRET),
-        #         Diff.read_header(sliced_file)
-        #     )
-        #     self.assertTupleEqual((2830728741, ('C', 'A', 'T', 'G')), Diff.read_record(sliced_file))
-        #     self.assertTupleEqual((2830728781, ('G', 'A', 'T', 'C')), Diff.read_record(sliced_file))
-        #     self.assertTupleEqual((2830728786, ('T', 'G', 'A', 'C')), Diff.read_record(sliced_file))
-        #     self.assertTupleEqual((2830728806, ('G', 'C', 'A', 'T')), Diff.read_record(sliced_file))
-        #     self.assertRaises(EOFError, lambda: Diff.read_record(sliced_file))
-        #
-        #     # inner range
-        #     sliced_file = Diff.slice(diff_file, 2830728781, 2830728786)
-        #     self.assertTupleEqual(
-        #         (self.CHECKSUM, 2830728781, 2830728786, self.SECRET),
-        #         Diff.read_header(sliced_file)
-        #     )
-        #     self.assertTupleEqual((2830728781, ('G', 'A', 'T', 'C')), Diff.read_record(sliced_file))
-        #     self.assertTupleEqual((2830728786, ('T', 'G', 'A', 'C')), Diff.read_record(sliced_file))
-        #     self.assertRaises(EOFError, lambda: Diff.read_record(sliced_file))
-        #
-        #     sliced_file = Diff.slice(diff_file, 2830728780, 2830728790)
-        #     self.assertTupleEqual(
-        #         (self.CHECKSUM, 2830728780, 2830728790, self.SECRET),
-        #         Diff.read_header(sliced_file)
-        #     )
-        #     self.assertTupleEqual((2830728781, ('G', 'A', 'T', 'C')), Diff.read_record(sliced_file))
-        #     self.assertTupleEqual((2830728786, ('T', 'G', 'A', 'C')), Diff.read_record(sliced_file))
-        #     self.assertRaises(EOFError, lambda: Diff.read_record(sliced_file))
-        #
-        #     # right intersect range
-        #     sliced_file = Diff.slice(diff_file, 2830728806, 3000000000)
-        #     self.assertTupleEqual(
-        #         (self.CHECKSUM, 2830728806, 3000000000, self.SECRET),
-        #         Diff.read_header(sliced_file)
-        #     )
-        #     self.assertTupleEqual((2830728806, ('G', 'C', 'A', 'T')), Diff.read_record(sliced_file))
-        #     self.assertRaises(EOFError, lambda: Diff.read_record(sliced_file))
-        #
-        #     sliced_file = Diff.slice(diff_file, 2830728790, 3000000000)
-        #     self.assertTupleEqual(
-        #         (self.CHECKSUM, 2830728790, 3000000000, self.SECRET),
-        #         Diff.read_header(sliced_file)
-        #     )
-        #     self.assertTupleEqual((2830728806, ('G', 'C', 'A', 'T')), Diff.read_record(sliced_file))
-        #     self.assertRaises(EOFError, lambda: Diff.read_record(sliced_file))
-        #
-        #     # left intersect range
-        #     sliced_file = Diff.slice(diff_file, 2000000000, 2830728741)
-        #     self.assertTupleEqual(
-        #         (self.CHECKSUM, 2000000000, 2830728741, self.SECRET),
-        #         Diff.read_header(sliced_file)
-        #     )
-        #     self.assertTupleEqual((2830728741, ('C', 'A', 'T', 'G')), Diff.read_record(sliced_file))
-        #     self.assertRaises(EOFError, lambda: Diff.read_record(sliced_file))
-        #
-        #     sliced_file = Diff.slice(diff_file, 2000000000, 2830728750)
-        #     self.assertTupleEqual(
-        #         (self.CHECKSUM, 2000000000, 2830728750, self.SECRET),
-        #         Diff.read_header(sliced_file)
-        #     )
-        #     self.assertTupleEqual((2830728741, ('C', 'A', 'T', 'G')), Diff.read_record(sliced_file))
-        #     self.assertRaises(EOFError, lambda: Diff.read_record(sliced_file))
+        # full range
+        bdiff_io = BdiffIO(bdiff.file({BdiffIO.FROM_INDEX: 0, BdiffIO.TO_INDEX: 2000}, False))
+        self.assertDictEqual({BdiffIO.FROM_INDEX: 0, BdiffIO.TO_INDEX: 2000}, bdiff_io.header)
+        self.assertEqual(1010, bdiff_io.first_index)
+        self.assertEqual(1070, bdiff_io.last_index)
+        self.assertEqual(4, bdiff_io.snv_count)
+        self.assertEqual(3, bdiff_io.indel_count)
+        
+        # exact range
+        bdiff_io = BdiffIO(bdiff.file({BdiffIO.FROM_INDEX: 1010, BdiffIO.TO_INDEX: 1070}, False))
+        self.assertDictEqual({BdiffIO.FROM_INDEX: 1010, BdiffIO.TO_INDEX: 1070}, bdiff_io.header)
+        self.assertEqual(1010, bdiff_io.first_index)
+        self.assertEqual(1070, bdiff_io.last_index)
+        self.assertEqual(4, bdiff_io.snv_count)
+        self.assertEqual(3, bdiff_io.indel_count)
+        
+        # inner range
+        bdiff_io = BdiffIO(bdiff.file({BdiffIO.FROM_INDEX: 1020, BdiffIO.TO_INDEX: 1060}, False))
+        self.assertDictEqual({BdiffIO.FROM_INDEX: 1020, BdiffIO.TO_INDEX: 1060}, bdiff_io.header)
+        self.assertEqual(1020, bdiff_io.first_index)
+        self.assertEqual(1060, bdiff_io.last_index)
+        self.assertEqual(2, bdiff_io.snv_count)
+        self.assertEqual(3, bdiff_io.indel_count)
+        
+        # left intersect range
+        bdiff_io = BdiffIO(bdiff.file({BdiffIO.FROM_INDEX: 0, BdiffIO.TO_INDEX: 1020}, False))
+        self.assertDictEqual({BdiffIO.FROM_INDEX: 0, BdiffIO.TO_INDEX: 1020}, bdiff_io.header)
+        self.assertEqual(1010, bdiff_io.first_index)
+        self.assertEqual(1020, bdiff_io.last_index)
+        self.assertEqual(2, bdiff_io.snv_count)
+        self.assertEqual(0, bdiff_io.indel_count)
+        
+        bdiff_io = BdiffIO(bdiff.file({BdiffIO.FROM_INDEX: 0, BdiffIO.TO_INDEX: 1010}, False))
+        self.assertDictEqual({BdiffIO.FROM_INDEX: 0, BdiffIO.TO_INDEX: 1010}, bdiff_io.header)
+        self.assertEqual(1010, bdiff_io.first_index)
+        self.assertEqual(1010, bdiff_io.last_index)
+        self.assertEqual(1, bdiff_io.snv_count)
+        self.assertEqual(0, bdiff_io.indel_count)
+        
+        # right intersect range
+        bdiff_io = BdiffIO(bdiff.file({BdiffIO.FROM_INDEX: 1060, BdiffIO.TO_INDEX: 2000}, False))
+        self.assertDictEqual({BdiffIO.FROM_INDEX: 1060, BdiffIO.TO_INDEX: 2000}, bdiff_io.header)
+        self.assertEqual(1060, bdiff_io.first_index)
+        self.assertEqual(1070, bdiff_io.last_index)
+        self.assertEqual(1, bdiff_io.snv_count)
+        self.assertEqual(1, bdiff_io.indel_count)
+        
+        bdiff_io = BdiffIO(bdiff.file({BdiffIO.FROM_INDEX: 1070, BdiffIO.TO_INDEX: 2000}, False))
+        self.assertDictEqual({BdiffIO.FROM_INDEX: 1070, BdiffIO.TO_INDEX: 2000}, bdiff_io.header)
+        self.assertEqual(1070, bdiff_io.first_index)
+        self.assertEqual(1070, bdiff_io.last_index)
+        self.assertEqual(1, bdiff_io.snv_count)
+        self.assertEqual(0, bdiff_io.indel_count)
 
 
 if __name__ == '__main__':

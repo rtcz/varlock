@@ -518,10 +518,10 @@ class BdiffIO:
         to_index_pos = self.tell_index_lte(to_index)
         
         if from_index_pos is None:
-            raise IndexError("Empty range")
+            raise IndexError("Supplied range is empty")
         
         if to_index_pos is None:
-            raise IndexError("Empty range")
+            raise IndexError("Supplied range is empty")
         
         return from_index_pos, to_index_pos
     
