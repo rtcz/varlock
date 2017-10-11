@@ -38,8 +38,36 @@ class TestBdiff(unittest.TestCase):
         pass
     
     def test_file_index(self):
-        # TODO !!!
-        pass
+        write_io = BdiffIO(index_resolution=3)
+        write_io._write_snv(1000, 0, ('C', 'A', 'T', 'G'))
+        write_io._write_snv(1010, 0, ('C', 'A', 'T', 'G'))
+        write_io._write_snv(1020, 0, ('C', 'A', 'T', 'G'))
+        write_io._write_snv(1030, 0, ('C', 'A', 'T', 'G'))
+        write_io._write_snv(1040, 0, ('C', 'A', 'T', 'G'))
+        write_io._write_snv(1050, 0, ('C', 'A', 'T', 'G'))
+        write_io._write_snv(1060, 0, ('C', 'A', 'T', 'G'))
+        write_io._write_snv(1070, 0, ('C', 'A', 'T', 'G'))
+        write_io._write_snv(1080, 0, ('C', 'A', 'T', 'G'))
+        write_io._write_snv(1090, 0, ('C', 'A', 'T', 'G'))
+        
+        read_io = BdiffIO(write_io.file())
+        
+        self.assertEqual(1000, read_io.first_index)
+        self.assertEqual(1090, read_io.last_index)
+        self.assertEqual(10, read_io.snv_count)
+        self.assertEqual(0, read_io.indel_count)
+        self.assertEqual(True, read_io.is_read_mode)
+        self.assertEqual(3, read_io.index_resolution)
+        self.assertListEqual([(1020, 14), (1050, 35), (1080, 56)], read_io.file_index)
+        
+        self.assertEqual(self._index2pos(read_io, 1000), read_io._indexed_pos(0))
+        self.assertEqual(self._index2pos(read_io, 1000), read_io._indexed_pos(1000))
+        self.assertEqual(self._index2pos(read_io, 1000), read_io._indexed_pos(1019))
+        self.assertEqual(self._index2pos(read_io, 1020), read_io._indexed_pos(1020))
+        self.assertEqual(self._index2pos(read_io, 1020), read_io._indexed_pos(1021))
+        self.assertEqual(self._index2pos(read_io, 1020), read_io._indexed_pos(1049))
+        self.assertEqual(self._index2pos(read_io, 1050), read_io._indexed_pos(1050))
+        self.assertEqual(self._index2pos(read_io, 1000), read_io._indexed_pos(1010))
     
     def test_io(self):
         bdiff = BdiffIO(self._bdiff_file)
@@ -56,12 +84,32 @@ class TestBdiff(unittest.TestCase):
         self.assertTupleEqual((1070, 3, ('G', 'C', 'A', 'T')), bdiff._read_record())
         self.assertRaises(EOFError, lambda: bdiff._read_record())
     
+    @staticmethod
+    def _index2pos(bdiff: BdiffIO, search_index: int):
+        """
+        Record with search_index must be present.
+        :param bdiff:
+        :param search_index:
+        :return:
+        """
+        saved_pos = bdiff.tell()
+        pos = saved_pos
+        while True:
+            index, ref_id, alts = bdiff._read_record()
+            if index == search_index:
+                break
+            pos = bdiff.tell()
+        
+        bdiff.seek(saved_pos)
+        return pos
+    
     def _record2pos(self, record_id: int):
         """
+        Record with record_id must be present.
         :param record_id: 1-based
         :return:
         """
-        cur_pos = self._bdiff_file.tell()
+        saved_pos = self._bdiff_file.tell()
         bdiff = BdiffIO(self._bdiff_file)
         
         curr_id = 1
@@ -70,7 +118,7 @@ class TestBdiff(unittest.TestCase):
             curr_id += 1
         
         record_pos = self._bdiff_file.tell()
-        self._bdiff_file.seek(cur_pos)
+        self._bdiff_file.seek(saved_pos)
         return record_pos
     
     def test_empty_file(self):

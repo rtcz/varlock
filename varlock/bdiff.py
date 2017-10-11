@@ -4,6 +4,7 @@ import io
 import os
 
 import math
+import shutil
 
 import varlock.common as cmn
 
@@ -112,15 +113,15 @@ class BdiffIO:
     
     def __init__(self, diff_file: io.BytesIO = None, index_resolution=1000):
         """
-        Instance is either in read or write mode.
-        :param diff_file: provide for read mode
+        CLass for handling BDIFF file. Instance is either in write or read mode.
+        :param diff_file:  write_mode if None, read_mode otherwise
+        :param index_resolution: relevant only for write_mode, read_mode uses value stored in the file
         """
         self._file_index = []
         self._header = {}
         self._snv_count = self._indel_count = 0
         self._last_index = 0
         self._data_offset = 0
-        self._header_size = 0
         self._index_resolution = index_resolution
         self._bdiff_file = None
         self._record_file = None
@@ -128,8 +129,8 @@ class BdiffIO:
         if diff_file is not None:
             # read mode
             diff_file.seek(0)
-            self._header_size = struct.unpack('<I', diff_file.read(self.INT_SIZE))[0]
-            self._header = cmn.bytes2dict(diff_file.read(self._header_size))
+            header_size = struct.unpack('<I', diff_file.read(self.INT_SIZE))[0]
+            self._header = cmn.bytes2dict(diff_file.read(header_size))
             self._snv_count, self._indel_count = struct.unpack('<II', diff_file.read(self.INT_SIZE * 2))
             
             # read_record index
@@ -162,6 +163,11 @@ class BdiffIO:
     
     @property
     def file_index(self):
+        """
+        :return: list of tuples (genomic_index, file_pos)
+            file_pos is position relative to data_offset.
+            Add data_offset to obtain absolute file position.
+        """
         return self._file_index.copy()
     
     @property
@@ -226,8 +232,8 @@ class BdiffIO:
         """
         Reads next SNV or INDEL record
         :return: index, is_snv, alternatives
-        SNV alternatives is a tuple
-        INDEL alternatives is a list
+            SNV alternatives is a tuple
+            INDEL alternatives is a list
         """
         assert self.is_read_mode
         byte_str = self._bdiff_file.read(self.INT_SIZE + self.BYTE_SIZE * 2)
@@ -383,8 +389,7 @@ class BdiffIO:
         self._write_index(bdiff_file, self._file_index, self._last_index, self._index_resolution)
         
         self._record_file.seek(0)
-        # TODO optimalize writing
-        bdiff_file.write(self._record_file.read())
+        shutil.copyfileobj(self._record_file, bdiff_file)
         
         return bdiff_file
     
@@ -393,8 +398,7 @@ class BdiffIO:
         
         bdiff_file = io.BytesIO()
         self._bdiff_file.seek(0)
-        # TODO optimalize writing
-        bdiff_file.write(self._bdiff_file.read())
+        shutil.copyfileobj(self._bdiff_file, bdiff_file)
         
         return bdiff_file
     
@@ -443,10 +447,13 @@ class BdiffIO:
             
             self._write_counts(bdiff_file, snv_count, indel_count)
             self._write_index(bdiff_file, file_index, last_index, self._index_resolution)
-
+            
             self._bdiff_file.seek(from_index_pos)
-            # TODO optimalize writing
+            # TODO optimalize writing (use buffer)
             bdiff_file.write(self._bdiff_file.read(end_pos - from_index_pos))
+            
+            shutil.copyfileobj(self._bdiff_file, bdiff_file)
+        
         else:
             # unmapped only
             self._write_counts(bdiff_file, 0, 0)
@@ -556,7 +563,7 @@ class BdiffIO:
         None if such index does not exists.
         """
         assert self.is_read_mode
-
+        
         if self.first_index is None or pivot_index < self.first_index:
             # desired index does not exists
             return None
@@ -582,13 +589,13 @@ class BdiffIO:
     def _indexed_pos(self, pivot_index: int):
         """
         :param pivot_index:
-        :return: indexed position of record with index lower than or equal to pivot_index.
-        Zero position is implicitly indexed and returned if indexed position is not found.
-        Returned position if file absolute.
+        :return: index position of record with index lower than or equal to pivot_index.
+            Zero position is implicitly indexed and returned if indexed position is not found.
+            Returned position is absolute within the file.
         """
         indexed_pos = 0
         for index, pos in self._file_index:
-            if pivot_index <= index:
+            if index <= pivot_index:
                 indexed_pos = pos
             else:
                 break
