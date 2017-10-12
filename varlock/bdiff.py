@@ -344,6 +344,7 @@ class BdiffIO:
     @staticmethod
     def seq_perm(mut_map: dict):
         """
+        Sorts map by its keys and returns list of its values in respective order.
         :param mut_map:
         :return: sequence permutation list
         """

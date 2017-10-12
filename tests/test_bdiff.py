@@ -34,8 +34,8 @@ class TestBdiff(unittest.TestCase):
         pass
     
     def test_seq_perm(self):
-        # TODO
-        pass
+        self.assertListEqual(['T', 'TT', 'A', 'AA'], BdiffIO.seq_perm({'T': 'A', 'AA': 'TT', 'TT': 'AA', 'A': 'T'}))
+        self.assertListEqual(['C', 'A', 'T', 'G'], BdiffIO.seq_perm({'A': 'C', 'T': 'G', 'G': 'T', 'C': 'A'}))
     
     def test_file_index(self):
         write_io = BdiffIO(index_resolution=3)
