@@ -1,11 +1,12 @@
+import filecmp
 import unittest
 
 from varlock.bdiff import BdiffIO
 
 
 class TestBdiff(unittest.TestCase):
-    # SECRET = bytes([255] * Diff.SECRET_SIZE)
-    # CHECKSUM = b'0123456789ABCDEF'
+    
+    RESOURCE_PATH = 'tests/resources/bdiff/'
     
     _header = {
         BdiffIO.FROM_INDEX: 1000,
@@ -26,12 +27,49 @@ class TestBdiff(unittest.TestCase):
         cls._bdiff_file = bdiff.file(cls._header)
     
     def test_from_text_file(self):
-        # TODO
-        pass
+        bdiff_file = BdiffIO.from_text_file(self.RESOURCE_PATH + 'input.diff.txt')
+        bdiff = BdiffIO(bdiff_file)
+        
+        self.assertDictEqual({
+            "_from_index": 0,
+            "_to_index": 19999,
+            "mb_checksum": "f05027eaa1923a6aab76bf7ead4fe976",
+            "secret": "ffffffffffffffffffffffffffffffff"
+        }, bdiff.header)
+        
+        self.assertEqual(1000, bdiff.index_resolution)
+        self.assertEqual(11011, bdiff.first_index)
+        self.assertEqual(11037, bdiff.last_index)
+        self.assertEqual(4, bdiff.snv_count)
+        self.assertEqual(2, bdiff.indel_count)
+        
+        self.assertTupleEqual((11011, 2, ('A', 'G', 'T', 'C')), bdiff._read_record())
+        self.assertTupleEqual((11015, 3, ('C', 'A', 'T', 'G')), bdiff._read_record())
+        self.assertTupleEqual((11020, 2, ('G', 'T', 'A', 'C')), bdiff._read_record())
+        self.assertTupleEqual((11027, 2, ['A', 'AGT', 'AG']), bdiff._read_record())
+        self.assertTupleEqual((11031, 2, ('G', 'A', 'T', 'C')), bdiff._read_record())
+        self.assertTupleEqual((11037, 0, ['GCG', 'G']), bdiff._read_record())
     
     def test_to_text_file(self):
-        # TODO
-        pass
+        bdiff = BdiffIO()
+        bdiff._write_snv(11011, 2, ('A', 'G', 'T', 'C'))
+        bdiff._write_snv(11015, 3, ('C', 'A', 'T', 'G'))
+        bdiff._write_snv(11020, 2, ('G', 'T', 'A', 'C'))
+        bdiff._write_indel(11027, 2, ['A', 'AGT', 'AG'])
+        bdiff._write_snv(11031, 2, ('G', 'A', 'T', 'C'))
+        bdiff._write_indel(11037, 0, ['GCG', 'G'])
+        
+        BdiffIO.to_text_file(bdiff.file({
+            "_from_index": 0,
+            "_to_index": 19999,
+            "mb_checksum": "f05027eaa1923a6aab76bf7ead4fe976",
+            "secret": "ffffffffffffffffffffffffffffffff"
+        }), self.RESOURCE_PATH + 'output.diff.txt')
+        
+        self.assertTrue(filecmp.cmp(
+            self.RESOURCE_PATH + 'input.diff.txt',
+            self.RESOURCE_PATH + 'output.diff.txt'
+        ))
     
     def test_seq_perm(self):
         self.assertListEqual(['T', 'TT', 'A', 'AA'], BdiffIO.seq_perm({'T': 'A', 'AA': 'TT', 'TT': 'AA', 'A': 'T'}))

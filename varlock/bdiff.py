@@ -231,7 +231,7 @@ class BdiffIO:
     def _read_record(self):
         """
         Reads next SNV or INDEL record
-        :return: index, is_snv, alternatives
+        :return: index, reference_id, alternatives
             SNV alternatives is a tuple
             INDEL alternatives is a list
         """

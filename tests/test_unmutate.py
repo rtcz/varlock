@@ -55,8 +55,10 @@ class TestUnmutate(unittest.TestCase):
         self.assertEqual(3, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
         
         bam2sam(self.RESOURCE_PATH + 'output_03.bam', self.RESOURCE_PATH + 'output_03.sam')
-        is_equal = filecmp.cmp(self.RESOURCE_PATH + 'desired_03.sam', self.RESOURCE_PATH + 'output_03.sam')
-        self.assertEqual(True, is_equal)
+        self.assertTrue(filecmp.cmp(
+            self.RESOURCE_PATH + 'desired_03.sam',
+            self.RESOURCE_PATH + 'output_03.sam')
+        )
     
     def test_unmutate_05(self):
         # include unmapped
@@ -74,8 +76,10 @@ class TestUnmutate(unittest.TestCase):
         self.assertEqual(6, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
         
         bam2sam(self.RESOURCE_PATH + 'output_05.bam', self.RESOURCE_PATH + 'output_05.sam')
-        is_equal = filecmp.cmp(self.RESOURCE_PATH + 'desired_05.sam', self.RESOURCE_PATH + 'output_05.sam')
-        self.assertEqual(True, is_equal)
+        self.assertTrue(filecmp.cmp(
+            self.RESOURCE_PATH + 'desired_05.sam',
+            self.RESOURCE_PATH + 'output_05.sam')
+        )
     
     def test_unmutate_06(self):
         # include unmapped with range
@@ -96,8 +100,10 @@ class TestUnmutate(unittest.TestCase):
         self.assertEqual(3, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
         
         bam2sam(self.RESOURCE_PATH + 'output_06.bam', self.RESOURCE_PATH + 'output_06.sam')
-        is_equal = filecmp.cmp(self.RESOURCE_PATH + 'desired_06.sam', self.RESOURCE_PATH + 'output_06.sam')
-        self.assertEqual(True, is_equal)
+        self.assertTrue(filecmp.cmp(
+            self.RESOURCE_PATH + 'desired_06.sam',
+            self.RESOURCE_PATH + 'output_06.sam')
+        )
     
     def test_unmutate_07(self):
         # include unmapped
@@ -115,8 +121,10 @@ class TestUnmutate(unittest.TestCase):
         self.assertEqual(1, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
         
         bam2sam(self.RESOURCE_PATH + 'output_07.bam', self.RESOURCE_PATH + 'output_07.sam')
-        is_equal = filecmp.cmp(self.RESOURCE_PATH + 'desired_07.sam', self.RESOURCE_PATH + 'output_07.sam')
-        self.assertEqual(True, is_equal)
+        self.assertTrue(filecmp.cmp(
+            self.RESOURCE_PATH + 'desired_07.sam',
+            self.RESOURCE_PATH + 'output_07.sam')
+        )
 
 
 if __name__ == '__main__':

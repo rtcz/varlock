@@ -1,0 +1,17 @@
+{
+    "_from_index": 0,
+    "_to_index": 19999,
+    "mb_checksum": "f05027eaa1923a6aab76bf7ead4fe976",
+    "secret": "ffffffffffffffffffffffffffffffff"
+}
+snvs	4
+indels	2
+last_index	11038
+index_res	1000
+index_size	0
+11012	0	2	A,G,T,C
+11016	0	3	C,A,T,G
+11021	0	2	G,T,A,C
+11028	1	2	A,AGT,AG
+11032	0	2	G,A,T,C
+11038	1	0	GCG,G

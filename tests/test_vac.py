@@ -49,8 +49,6 @@ class TestVac(unittest.TestCase):
         self.assertListEqual([10000, 1000, 100, 10], vac.compact_base_count([10000, 1000, 100, 10]))
         self.assertListEqual([65535, 6554, 655, 66], vac.compact_base_count([100000, 10000, 1000, 100]))
     
-    # AC=5;AF=0.000998403;AN=5008;NS=2504;DP=20274;EAS_AF=0;AMR_AF=0.0014;AFR_AF=0;EUR_AF=0.004;SAS_AF=0;AA=.
-    
     def test_parse_ac(self):
         self.assertListEqual([5, 3], Vac.parse_ac(['AC=5,3', 'AN=5008', 'NS=2504']))
     

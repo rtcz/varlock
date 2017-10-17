@@ -41,12 +41,16 @@ class TestMutate(unittest.TestCase):
         self.assertEqual(6, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
         
         cmn.bam2sam(self.RESOURCE_PATH + 'output_01.bam', self.RESOURCE_PATH + 'output_01.sam')
-        is_equal = filecmp.cmp(self.RESOURCE_PATH + 'desired_01.sam', self.RESOURCE_PATH + 'output_01.sam')
-        self.assertTrue(is_equal)
+        self.assertTrue(filecmp.cmp(
+            self.RESOURCE_PATH + 'desired_01.sam',
+            self.RESOURCE_PATH + 'output_01.sam')
+        )
         
         BdiffIO.to_text_file(bdiff_file, self.RESOURCE_PATH + 'output_01.diff.txt')
-        is_equal = filecmp.cmp(self.RESOURCE_PATH + 'desired_01.diff.txt', self.RESOURCE_PATH + 'output_01.diff.txt')
-        self.assertTrue(is_equal)
+        self.assertTrue(filecmp.cmp(
+            self.RESOURCE_PATH + 'desired_01.diff.txt',
+            self.RESOURCE_PATH + 'output_01.diff.txt')
+        )
     
     def test_mutate_02(self):
         # EOF VAC case
@@ -64,8 +68,10 @@ class TestMutate(unittest.TestCase):
         self.assertEqual(5, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
         
         cmn.bam2sam(self.RESOURCE_PATH + 'output_02.bam', self.RESOURCE_PATH + 'output_02.sam')
-        is_equal = filecmp.cmp(self.RESOURCE_PATH + 'desired_02.sam', self.RESOURCE_PATH + 'output_02.sam')
-        self.assertTrue(is_equal)
+        self.assertTrue(filecmp.cmp(
+            self.RESOURCE_PATH + 'desired_02.sam',
+            self.RESOURCE_PATH + 'output_02.sam'
+        ))
         
         BdiffIO.to_text_file(bdiff_file, self.RESOURCE_PATH + 'output_02.diff.txt')
         is_equal = filecmp.cmp(self.RESOURCE_PATH + 'desired_02.diff.txt', self.RESOURCE_PATH + 'output_02.diff.txt')
