@@ -78,14 +78,7 @@ class TestCommon(unittest.TestCase):
         self.assertIsNone(cmn.ref_pos2seq_pos(alignment=alignment, ref_pos=1010))
         self.assertEqual(19, cmn.ref_pos2seq_pos(alignment=alignment, ref_pos=1009))
     
-    # def test_cigar(self):
-    #     alignment = self.build_alignment()
-    #     Cigar.validate(alignment=alignment, snv_pos=9)
-    #     self.assertRaises(ValueError, lambda: Cigar.validate(alignment=alignment, snv_pos=10))
-    #     self.assertRaises(ValueError, lambda: Cigar.validate(alignment=alignment, snv_pos=11))
-    
     def test_snv_mut_map(self):
-        # TODO more test, also with tuples
         mut_map = cmn.snv_mut_map(alt_freqs=[1, 1, 1, 1], ref_freqs=[1, 1, 1, 1], rnd=Random(0))
         self.assertDictEqual({'A': 'G', 'T': 'T', 'G': 'C', 'C': 'A', 'N': 'N'}, mut_map)
         
