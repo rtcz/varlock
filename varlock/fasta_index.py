@@ -50,10 +50,10 @@ class FastaIndex:
         
         return self.pos2index(end_ref_name, end_ref_pos)
     
-    def first_ref(self):
+    def first_ref(self) -> FaiRecord:
         return self._indices[0]
     
-    def last_ref(self):
+    def last_ref(self) -> FaiRecord:
         return self._indices[len(self._indices) - 1]
     
     def first_index(self):

@@ -49,8 +49,8 @@ class TestFastaIndex(unittest.TestCase):
         self.assertEqual(19999, self._fai.last_index())
         
     def test_ref(self):
-        self.assertEqual('chr1', self._fai.first_ref())
-        self.assertEqual('chr2', self._fai.last_ref())
+        self.assertEqual('chr1', self._fai.first_ref().name)
+        self.assertEqual('chr2', self._fai.last_ref().name)
 
 
 if __name__ == '__main__':
