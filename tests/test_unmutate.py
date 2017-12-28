@@ -14,7 +14,7 @@ class TestUnmutate(unittest.TestCase):
     
     @classmethod
     def setUpClass(cls):
-        # TODO problem (bam->sam->bam) != bam
+        # TODO problem (bam1->sam->bam2) != bam1
         # sam2bam(cls.RESOURCE_PATH + 'input.sam', cls.RESOURCE_PATH + 'input.bam')
         cls.mut = BamMutator(cls.RESOURCE_PATH + 'input.bam', RandomMockup())
         pysam.index(cls.RESOURCE_PATH + 'input.bam')
@@ -128,7 +128,5 @@ class TestUnmutate(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    # TODO more unmutate slice tests
-    # TODO test cases with alignments of different length
-    # TODO test cases with more references (chromosomes)
+    # TODO test case with more references (chromosomes)
     unittest.main()

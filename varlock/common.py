@@ -224,14 +224,14 @@ def file_size(file_obj):
     return size
 
 
-def checksum(filename: str, as_bytes=False):
+def checksum(filepath: str, as_bytes=False):
     """
-    :param filename:
+    :param filepath:
     :param as_bytes: when true, function returns bytes instead of hex string
     :return: checksum in hex string or byte format
     """
     hasher = hashlib.md5()
-    with open(filename, "rb") as f:
+    with open(filepath, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
             hasher.update(chunk)
     

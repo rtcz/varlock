@@ -21,6 +21,11 @@ class TestVac(unittest.TestCase):
         return Vac(FastaIndex(sam_header))
     
     @classmethod
+    def __build_empty_vac_file(cls):
+        # TODO
+        pass
+    
+    @classmethod
     def __build_vac_file(cls):
         vac_file = io.BytesIO()
         Vac.write_header(vac_file, 3, 3)

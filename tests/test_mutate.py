@@ -79,6 +79,5 @@ class TestMutate(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    # TODO test cases with alignments of different length
-    # TODO test cases with more references (chromosomes)
+    # TODO test case with more references (chromosomes)
     unittest.main()
