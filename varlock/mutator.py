@@ -199,7 +199,7 @@ class Mutator:
                 if self._verbose:
                     if diff is None:
                         print("EOF DIFF")
-                    else:
+                    if alignment is None:
                         print("EOF BAM")
                 
                 # last mutation
@@ -218,7 +218,8 @@ class Mutator:
                     alignment = next(bam_iter)
                 
                 if self._verbose:
-                    print('last alignment: %s' % self.alignment2str(self._prev_alignment))
+                    if alignment is not None:
+                        print('last alignment: %s' % self.alignment2str(self._prev_alignment))
                     print("total of %d alignments processed" % self.alignment_counter)
                 
                 break
@@ -265,6 +266,8 @@ class Mutator:
                 variant.clear()
     
     def alignment2str(self, alignment):
+        if alignment is None:
+            return "None"
         if cmn.is_placed_alignment(alignment):
             ref_name = alignment.reference_name
             ref_start = alignment.reference_start

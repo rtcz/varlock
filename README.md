@@ -133,26 +133,26 @@ Varlock is a tool suitable for storing BAM files in a depersonalized form with t
 # Development
 ## Testing
 
-run all tests
-python3 -m unittest discover
+run all tests:
+<code>python3 -m unittest discover </code>
 
-run single test
-python3 -m unittest tests.<FILE_NAME>.<CLASS_NAME>.<METHOD_NAME>
+run single test:
+<code>python3 -m unittest tests.<FILE_NAME>.<CLASS_NAME>.<METHOD_NAME></code>
 
 ## Examples
-run example
-python3 -m examples.bam_mutator
+run example:
+<code>python3 -m examples.bam_mutator</code>
 
-profile example
-python3 -m cProfile -s tottime examples/bam_mutator.py | head -n 140
+profile example:
+<code>python3 -m cProfile -s tottime examples/bam_mutator.py | head -n 140</code>
 
 
 ## Samtools help
-samtools view -H examples/resources/sample.mut.bam
+<code>samtools view -H examples/resources/sample.mut.bam</code>
 
-samtools view -h resources/out.mut.bam >> out.mut.sam
+<code>samtools view -h resources/out.mut.bam >> out.mut.sam</code>
 
-less chr22.vcf.gz | egrep -v "^#" | cut -f 4,5 | awk 'length($1) > 2 || length($2) > 2'
+<code>less chr22.vcf.gz | egrep -v "^#" | cut -f 4,5 | awk 'length($1) > 2 || length($2) > 2'</code>
 
 
 

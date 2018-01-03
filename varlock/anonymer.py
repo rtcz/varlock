@@ -321,11 +321,10 @@ class Anonymer:
         example: path/file_R1.fasq -> path/file
         """
         return re.sub(self.FASTQ_SUFFIX_PATTERN, "", fastq)
-    
-    @staticmethod
-    def build_mapping_command(r1, r2, gen_idx, threads):
+
+    def build_mapping_command(self, r1, r2, gen_idx, threads):
         """
-        builds command as array for subprocess.Popen
+        Builds command as array for Popen from subprocess
         :param threads: number of processing threads
         :param gen_idx: genome index file
         :param r1: r1 fastq file
@@ -334,14 +333,20 @@ class Anonymer:
         """
         command = []
         command.append('bowtie2')
-        command.append('-x ' + gen_idx)
-        command.append('-1 ' + r1)
-        command.append('-2 ' + r2)
+        command.append('-x')
+        command.append(gen_idx)
+        command.append('-1')
+        command.append(r1)
+        command.append('-2')
+        command.append(r2)
         command.append('--very-sensitive')
         command.append('--reorder')
         command.append('--no-head')
         command.append('--quiet')
-        command.append('--threads ' + str(threads))
+        command.append('--threads')
+        command.append(str(threads))
+        if self.verbose:
+            print(command)
         return command
     
     @staticmethod
