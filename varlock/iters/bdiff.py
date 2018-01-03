@@ -1,4 +1,3 @@
-from varlock.common import BASES
 from varlock.po import DiffSnvRecord, DiffIndelRecord, DiffRecord
 
 from varlock.fasta_index import FastaIndex
