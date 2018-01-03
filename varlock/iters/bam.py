@@ -1,18 +1,20 @@
 import pysam
-from varlock.fasta_index import FastaIndex
+
 from varlock.bam import open_bam
+from varlock.fasta_index import FastaIndex
 
 
 class BamIterator:
     def __iter__(self):
         return self
     
-    def __next__(self):
+    def __next__(self) -> pysam.AlignedSegment:
+        # noinspection PyTypeChecker
         return None
 
 
 def bam_iterator(
-        filename: str,
+        filename: iter,
         start_index: int,
         end_index: int,
         unmapped_only: bool,
@@ -120,7 +122,7 @@ class MappedBamIterator(BamIterator):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._bam_file.close()
     
-    def __next__(self):
+    def __next__(self) -> pysam.AlignedSegment:
         try:
             alignment = next(self._iterator)
             while alignment.is_unmapped:
@@ -131,6 +133,7 @@ class MappedBamIterator(BamIterator):
             self._iterator = self.__next_iterator()
             if self._iterator is None:
                 self._bam_file.close()
+                # noinspection PyTypeChecker
                 return None
             else:
                 return next(self)
@@ -156,7 +159,7 @@ class UnmappedBamIterator(BamIterator):
     def __iter__(self):
         return self
     
-    def __next__(self):
+    def __next__(self) -> pysam.AlignedSegment:
         try:
             alignment = next(self._iterator)
             # proceed to (placed or unplaced) unmapped alignment if mapped
@@ -166,6 +169,7 @@ class UnmappedBamIterator(BamIterator):
             return alignment
         except StopIteration:
             self._bam_file.close()
+            # noinspection PyTypeChecker
             return None
 
 
@@ -186,11 +190,12 @@ class FullBamIterator(BamIterator):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._bam_file.close()
     
-    def __next__(self):
+    def __next__(self) -> pysam.AlignedSegment:
         try:
             return next(self._iterator)
         except StopIteration:
             self._bam_file.close()
+            # noinspection PyTypeChecker
             return None
 
 
@@ -227,7 +232,7 @@ class RangedBamIterator(BamIterator):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._bam_file.close()
     
-    def __next__(self):
+    def __next__(self) -> pysam.AlignedSegment:
         try:
             while True:
                 alignment = next(self._iterator)
@@ -249,4 +254,5 @@ class RangedBamIterator(BamIterator):
         
         except StopIteration:
             self._bam_file.close()
+            # noinspection PyTypeChecker
             return None

@@ -1,16 +1,36 @@
+import numpy as np
+
 import varlock.po as po
 from varlock.common import BASES
-
 from varlock.fasta_index import FastaIndex
 from varlock.vac import Vac
 
 
-class VacIterator:
+class VariantIterator:
+    def __init__(self, vac_filename: str, fai: FastaIndex, mut_p: int):
+        """
+        :param vac_filename:
+        :param fai:
+        :param mut_p:
+        """
+        pass
+    
+    def __next__(self) -> po.VacRecord:
+        # TODO
+        pass
+
+
+class VacFileIterator:
     """
-    Iterates over VAC file alternating between both SNV and INDEL records in order of genomic index.
+    Iterates over VAC file alternating between both SNV and INDEL records sorted by genomic index.
     """
     
     def __init__(self, vac_filename: str, fai: FastaIndex):
+        """
+        :param vac_filename:
+        :param fai:
+        does not affect bases listed in VAC file
+        """
         with open(vac_filename, 'rb') as vac_file:
             # read header
             self._snv_count, self._indel_count = Vac.read_header(vac_file)
@@ -88,7 +108,7 @@ class VacIterator:
         self._snv_file.close()
         self._indel_file.close()
     
-    def __next__(self):
+    def __next__(self) -> po.VacRecord:
         if self._snv_record is not None and self._indel_record is not None:
             if self._snv_record.index == self._indel_record.index:
                 raise ValueError("SNV and INDEL have the same position")
@@ -109,4 +129,38 @@ class VacIterator:
             # EOF
             self._snv_file.close()
             self._indel_file.close()
+            # noinspection PyTypeChecker
             return None
+
+
+class RandomSnvIterator:
+    """
+    Random rare SNV iterator. SNVs positions are randomly generated across whole genome.
+    """
+    
+    def __init__(self, fai: FastaIndex, mut_p: int):
+        """
+        :param mut_p: random variant (mutation) probability per genome base
+        :param fai:
+        """
+        assert mut_p > 0
+        self._fai = fai
+        length = fai.last_index() - fai.first_index()
+        mut_count = int(mut_p * length)
+        
+        # sample random genomic indices from uniform distribution
+        self._indices = np.sort(np.random.randint(fai.first_index(), fai.last_index(), mut_count))
+        self._counter = 0
+    
+    def __next__(self) -> po.VacRecord:
+        index = self._indices[self._counter]
+        self._counter += 1
+        ref_name, ref_pos = self._fai.index2pos(index)
+        return po.VacSnvRecord(
+            index=index,
+            ref_name=ref_name,
+            ref_pos=ref_pos,
+            freqs=[3, 3, 2, 2],  # approximate GC content in human genome
+            seqs=BASES,
+            ref_id=0  # TODO use real value based on genome fasta via pyfaidx
+        )

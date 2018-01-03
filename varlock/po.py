@@ -1,4 +1,5 @@
 import pysam
+
 from varlock.cigar import Cigar
 
 
@@ -12,6 +13,7 @@ class VariantPosition(object):
         return '#%d %s:%d' % (self.index, self.ref_name, self.ref_pos)
 
 
+# TODO rename VariantDiff
 class DiffRecord(VariantPosition):
     def __init__(self, index: int, ref_name: str, ref_pos: int, mut_map: dict, ref_seq: str):
         super().__init__(index, ref_name, ref_pos)
@@ -19,6 +21,7 @@ class DiffRecord(VariantPosition):
         self.ref_seq = ref_seq
 
 
+# TODO rename SnvDiff
 class DiffSnvRecord(DiffRecord):
     # def __init__(self, index: int, ref_name: str, ref_pos: int, mut_map: dict, ref_base: str):
     #     super().__init__(index, ref_name, ref_pos)
@@ -30,6 +33,7 @@ class DiffSnvRecord(DiffRecord):
     pass
 
 
+# TODO rename IndelDiff
 class DiffIndelRecord(DiffRecord):
     # def __init__(self, index: int, ref_name: str, ref_pos: int, mut_map: dict, ref_seq: str):
     #     super().__init__(index, ref_name, ref_pos)
@@ -41,6 +45,7 @@ class DiffIndelRecord(DiffRecord):
     pass
 
 
+# TODO rename VariantOccurence
 class VacRecord(VariantPosition):
     def __init__(self, index: int, ref_name: str, ref_pos: int, freqs: list, seqs: list, ref_id: int):
         super().__init__(index, ref_name, ref_pos)
@@ -57,6 +62,7 @@ class VacRecord(VariantPosition):
         return self.seqs[self.ref_id]
 
 
+# TODO rename SnvOccurence
 class VacSnvRecord(VacRecord):
     # def __init__(self, index: int, ref_name: str, ref_pos: int, freqs: tuple, ref_id: int):
     #     super().__init__(index, ref_name, ref_pos)
@@ -68,6 +74,7 @@ class VacSnvRecord(VacRecord):
     pass
 
 
+# TODO rename IndelOccurence
 class VacIndelRecord(VacRecord):
     # """
     #     :param index: genomic index
@@ -160,6 +167,7 @@ class AlignedVariant:
         assert len(seq) > 0
         if self._is_snv:
             # TODO treat [X, =] OP cases
+            # TODO at least assert that corresponding cigar letter is M
             # expecting only M OP now - it does not change with different SNV
             pass
         elif self._is_indel:

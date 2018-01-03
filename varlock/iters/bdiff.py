@@ -1,5 +1,5 @@
 from varlock.common import BASES
-from varlock.po import DiffSnvRecord, DiffIndelRecord
+from varlock.po import DiffSnvRecord, DiffIndelRecord, DiffRecord
 
 from varlock.fasta_index import FastaIndex
 import varlock.bdiff as bdiff
@@ -28,7 +28,7 @@ class BdiffIterator:
     def __iter__(self):
         return self
     
-    def __next__(self):
+    def __next__(self) -> DiffRecord:
         """
         :return: next DIFF record (SNV or INDEL) by genomic index order
         BDIFF reversed mut_map:

@@ -1,14 +1,15 @@
-import numpy as np
-
 import binascii
 import gzip
 import hashlib
+import json
 import math
 import os
-import json
-import varlock.po as po
+from random import Random
 
+import numpy as np
 import pysam
+
+import varlock.po as po
 
 BASES = ("A", "T", "G", "C")
 UNKNOWN_BASE = "N"
@@ -50,7 +51,7 @@ def stream_cipher(seq: str, key: bytes):
     return mut_seq
 
 
-def snv_mut_map(alt_freqs: list, ref_freqs: list, rnd):
+def snv_mut_map(alt_freqs: list, ref_freqs: list, rnd: Random):
     """
     :param alt_freqs: list of alternative A,T,G,C DNA bases frequencies
     :param ref_freqs: list of reference A,T,G,C DNA bases frequencies
@@ -86,7 +87,7 @@ def indel_mut_map(alt_freq_map: dict, ref_freq_map: dict, rnd):
     return _mut_map(seqs, alt_freqs, ref_freqs, rnd)
 
 
-def _mut_map(seqs: list, alt_freqs: list, ref_freqs: list, rnd):
+def _mut_map(seqs: list, alt_freqs: list, ref_freqs: list, rnd: Random):
     """
     Function tampers with parameters to avoid list copying.
     :param seqs: sequences to mutate
@@ -122,7 +123,7 @@ def _mut_map(seqs: list, alt_freqs: list, ref_freqs: list, rnd):
     return mut_map
 
 
-def multi_random(p_dist: list, rnd):
+def multi_random(p_dist: list, rnd: Random):
     """
     Draw index from multinomial probability distribution.
     :param p_dist: Probability distribution. When all probabilities are zero, each outcome has equal probability.
@@ -180,18 +181,6 @@ def base_freqs(pileup: list):
                 raise ValueError("Illegal DNA base %s" % base)
     
     return freqs
-
-
-def strip_chr(value):
-    """
-    Strip 'chr' prefix from string.
-    :param value: string ot strip
-    :return: stripped string
-    """
-    if value[:3] == 'chr':
-        return value[3:]
-    else:
-        return value
 
 
 def sam2bam(sam_filename, bam_filename):

@@ -1,9 +1,9 @@
-from .bdiff_iterator import BdiffIterator
-from .vac_iterator import VacIterator
+from .bdiff import BdiffIterator
+from .variant import VacFileIterator
 
-from .bam_iterators import BamIterator
-from .bam_iterators import MappedBamIterator
-from .bam_iterators import RangedBamIterator
-from .bam_iterators import UnmappedBamIterator
-from .bam_iterators import FullBamIterator
-from .bam_iterators import bam_iterator
+from .bam import BamIterator
+from .bam import MappedBamIterator
+from .bam import RangedBamIterator
+from .bam import UnmappedBamIterator
+from .bam import FullBamIterator
+from .bam import bam_iterator

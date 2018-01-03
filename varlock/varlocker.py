@@ -1,22 +1,20 @@
-import pysam
 import io
 import os
 import struct
 
+import pysam
 from Crypto.Cipher import PKCS1_OAEP
-from Crypto.Signature import PKCS1_v1_5
-from Crypto.PublicKey import RSA
 from Crypto.Hash import MD5
+from Crypto.PublicKey import RSA
+from Crypto.Signature import PKCS1_v1_5
 
+from varlock.aes import FileAES
 from varlock.bam import open_bam
-from varlock.common import open_vcf
+from varlock.bam_mutator import BamMutator
 from varlock.bdiff import BdiffIO
+from varlock.common import open_vcf
 from varlock.fasta_index import FastaIndex
 from varlock.vac import Vac
-from varlock.bam_mutator import BamMutator
-from varlock.mutator import Mutator
-from varlock.aes import FileAES
-from varlock import common as cmn
 
 
 class Varlocker:
@@ -60,12 +58,12 @@ class Varlocker:
     ):
         """
         Mutate BAM file and store it along with encrypted DIFF file.
-        !!! BAM and VAC (VCF derivate file) should use the same reference genome !!!
+        !!! BAM and VAC (VCF derived file) should be derived from the same reference genome !!!
         Output formats:
         .mut.bam
         .diff.enc
         :param rsa_sign_key: private key to sign DIFF
-        :param rsa_enc_key: public key to encrypt DIFF (contained AES key)
+        :param rsa_enc_key: public key to encrypt AES key to encrypt DIFF
         :param bam_filename: input bam
         :param vac_filename: VAC file
         :param out_bam_filename: output bam
@@ -90,7 +88,7 @@ class Varlocker:
             
             signature = cls._sign(diff_file, rsa_sign_key, verbose)
             cls._write_aes_key(enc_diff_file, aes_key, rsa_enc_key)
-            cls.__write_signature(enc_diff_file, signature)
+            cls._write_signature(enc_diff_file, signature)
             cls._encrypt(diff_file, aes_key, enc_diff_file, verbose)
     
     @classmethod
@@ -113,7 +111,7 @@ class Varlocker:
         Reverse of mutate operation. Restore original BAM file.
         Output formats:
         .bam
-        :param rsa_key: An RSA key object (`RsaKey`) containing the private key
+        :param rsa_key: private key to decrypt AES key to decrypt DIFF
         :param bam_filename: mutated BAM
         :param enc_diff_filename:
         :param out_bam_filename: output BAM
@@ -176,8 +174,8 @@ class Varlocker:
         Reencrypt DIFF file with supplied public_key.
         Output formats:
         .diff.enc
-        :param rsa_key: RSA key with private key for decryption of DIFF and signing new DIFF
-        :param rsa_enc_key: RSA key with public key for encryption of new DIFF
+        :param rsa_key: private key to decrypt DIFF and sign new DIFF
+        :param rsa_enc_key: public key to encrypt new DIFF
         :param bam_filename: mutated BAM
         :param enc_diff_filename: diff to reencrypt
         :param out_enc_diff_filename: reencrypted DIFF
@@ -241,7 +239,7 @@ class Varlocker:
             with out_diff, open(out_enc_diff_filename, 'wb') as out_enc_diff_file:
                 out_signature = cls._sign(out_diff, rsa_key, verbose)
                 cls._write_aes_key(out_enc_diff_file, aes_key, rsa_enc_key)
-                cls.__write_signature(out_enc_diff_file, out_signature)
+                cls._write_signature(out_enc_diff_file, out_signature)
                 cls._encrypt(out_diff, aes_key, out_enc_diff_file, verbose)
     
     @classmethod
@@ -332,7 +330,7 @@ class Varlocker:
         return enc_diff.read(signature_length)
     
     @classmethod
-    def __write_signature(cls, enc_diff, signature):
+    def _write_signature(cls, enc_diff, signature):
         """
         :param enc_diff:
         """

@@ -113,7 +113,7 @@ class BdiffIO:
     
     def __init__(self, diff_file: io.BytesIO = None, index_resolution=1000):
         """
-        CLass for handling BDIFF file. Instance is either in write or read mode.
+        Class for handling BDIFF file. Instance is either in write or read mode.
         :param diff_file:  write_mode if None, read_mode otherwise
         :param index_resolution: relevant only for write_mode, read_mode uses value stored in the file
         """
