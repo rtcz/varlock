@@ -1,7 +1,7 @@
 Reference position range: <1,50>
 Genomic index range: <11001, 11050>
 
-# TODO alignments starting and ending with an insertion (/deletion ?)
+# TODO? do exist alignments starting and ending with an insertion / deletion
 
 Alignments:
 ......................................G__ACT......
@@ -24,6 +24,10 @@ Alignments:
 TAAAGCACTCCGCATCGCCTGTCGCTTAG_CTGTCGCAGCGACTCTCGCA
 00010000100100010000100000020_00100000200000000000
 
+LEGEND
+1: SNV position
+2: INDEL position
+_: gap
 
 VAC		A,T,G,C
 ***************

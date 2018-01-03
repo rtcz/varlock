@@ -78,10 +78,10 @@ class Mutator:
     def mutate(
             self,
             mut_bam_file: pysam.AlignmentFile,
-            vac_iter: iters.VacIterator,
+            vac_iter: iters.VacFileIterator,
             bam_iter: iters.FullBamIterator,
             secret: bytes
-    ):
+    ) -> bdiff.BdiffIO:
         """
         :param mut_bam_file:
         :param vac_iter:
@@ -94,6 +94,8 @@ class Mutator:
         
         alignment_queue = []
         alignment = next(bam_iter)
+        
+        # TODO optimalization: seek to first alignment covering vac to skip all preceeding records
         vac = next(vac_iter)
         
         if self._verbose:
@@ -264,7 +266,7 @@ class Mutator:
                 # done with current vac
                 variant.clear()
     
-    def alignment2str(self, alignment):
+    def alignment2str(self, alignment) -> str:
         if cmn.is_placed_alignment(alignment):
             ref_name = alignment.reference_name
             ref_start = alignment.reference_start
@@ -295,7 +297,7 @@ class Mutator:
             mut_seq = cmn.stream_cipher(alignment.query_sequence, sha512.digest())
             alignment.query_sequence = mut_seq
     
-    def __mutate_pos(self, bdiff_io: bdiff.BdiffIO, variant_queue: list, vac: po.VariantPosition):
+    def __mutate_pos(self, bdiff_io: bdiff.BdiffIO, variant_queue: list, vac: po.VariantPosition) -> bool:
         """
         Mutate alignments at the variant allele count position.
         :param variant_queue: list of SnvAlignment
@@ -311,7 +313,7 @@ class Mutator:
         
         return is_mutated
     
-    def _mutate_snv_pos(self, bdiff_io: bdiff.BdiffIO, variant_queue: list, vac: po.VacSnvRecord):
+    def _mutate_snv_pos(self, bdiff_io: bdiff.BdiffIO, variant_queue: list, vac: po.VacSnvRecord) -> bool:
         is_mutated = False
         variant_seqs = cmn.variant_seqs(variant_queue)
         
@@ -331,7 +333,7 @@ class Mutator:
         
         return is_mutated
     
-    def _mutate_indel_pos(self, bdiff_io: bdiff.BdiffIO, variant_queue: list, vac: po.VacIndelRecord):
+    def _mutate_indel_pos(self, bdiff_io: bdiff.BdiffIO, variant_queue: list, vac: po.VacIndelRecord) -> bool:
         is_mutated = False
         variant_seqs = cmn.variant_seqs(variant_queue)
         
@@ -350,7 +352,7 @@ class Mutator:
         
         return is_mutated
     
-    def _mutate_variant(self, variant: po.AlignedVariant, mut_map: dict):
+    def _mutate_variant(self, variant: po.AlignedVariant, mut_map: dict) -> bool:
         """
         Mutate alignment by mutation map at SNV position.
         :param variant:

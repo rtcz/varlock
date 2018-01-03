@@ -112,7 +112,7 @@ class BamMutator:
         
         header = bam.mut_header(self._bam_header, self.checksum, cmn.checksum(vac_filename))
         with bam.open_bam(mut_bam_filename, 'wb', header=header) as mut_bam_file, \
-                iters.VacIterator(vac_filename, self._fai) as vac_iter, \
+                iters.VacFileIterator(vac_filename, self._fai) as vac_iter, \
                 iters.FullBamIterator(self._bam_filename) as bam_iter:
             mut = Mutator(fai=self._fai, rnd=self._rnd, verbose=self._verbose)
             bdiff_io = mut.mutate(

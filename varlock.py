@@ -98,7 +98,7 @@ def main():
 
 def parse_command():
     if len(sys.argv) < 2:
-        raise InvalidCommandError("Command is missing.")
+        raise InvalidCommandError("command is missing")
     else:
         command = sys.argv[1]
         args = sys.argv[2:]

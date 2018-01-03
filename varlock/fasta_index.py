@@ -63,13 +63,13 @@ class FastaIndex:
         fai_ref = self.last_ref()
         return fai_ref.start + fai_ref.length - 1
     
-    def resolve_start_pos(self, start_index):
+    def resolve_start_pos(self, start_index) -> (str, int):
         if start_index is None:
             return self.index2pos(self.first_index())
         else:
             return self.index2pos(start_index)
     
-    def resolve_end_pos(self, end_index):
+    def resolve_end_pos(self, end_index) -> (str, int):
         if end_index is None:
             return self.index2pos(self.last_index())
         else:
@@ -85,7 +85,7 @@ class FastaIndex:
     def ref_name(self, ref_id):
         return self._indices[ref_id].name
     
-    def index2pos(self, index):
+    def index2pos(self, index) -> (str, int):
         """
         Convert absolute position (index) on genome to reference position.
         :param index: 0-based position on genome
@@ -100,7 +100,7 @@ class FastaIndex:
                 ref_pos = new_ref_pos
         raise ValueError("reference position for index %d not found" % index)
     
-    def pos2index(self, ref_name, ref_pos):
+    def pos2index(self, ref_name, ref_pos) -> int:
         """
         Convert reference position to absolute position (index) on genome.
         :param ref_name: reference name
