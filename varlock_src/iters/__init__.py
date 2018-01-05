@@ -1,5 +1,5 @@
 from .bdiff import BdiffIterator
-from .variant import VacFileIterator
+from .variant import VariantIterator
 
 from .bam import BamIterator
 from .bam import MappedBamIterator

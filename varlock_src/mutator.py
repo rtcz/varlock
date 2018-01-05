@@ -84,10 +84,10 @@ class Mutator:
     def mutate(
             self,
             mut_bam_file: pysam.AlignmentFile,
-            vac_iter: iters.VacFileIterator,
+            vac_iter: iters.VariantIterator,
             bam_iter: iters.FullBamIterator,
             secret: bytes,
-            rnd: VeryRandom,
+            rnd: VeryRandom
     ) -> bdiff.BdiffIO:
         """
         :param mut_bam_file:

@@ -1,11 +1,11 @@
 import unittest
-import pysam
 
+import pysam
 from Crypto.PublicKey import RSA
 
-from varlock_src.varlocker import Varlocker
 import varlock_src.common as cmn
 from varlock_src.vac import Vac
+from varlock_src.varlocker import Varlocker
 
 
 class TestVarlocker(unittest.TestCase):
@@ -38,9 +38,10 @@ class TestVarlocker(unittest.TestCase):
                 bam_filename=self.RESOURCE_PATH + 'encrypt/input.bam',
                 vac_filename=self.RESOURCE_PATH + 'encrypt/input.vac',
                 out_bam_filename=self.RESOURCE_PATH + 'encrypt/output.mut.bam',
-                out_enc_diff_filename=self.RESOURCE_PATH + 'encrypt/output.diff.enc'
+                out_enc_diff_filename=self.RESOURCE_PATH + 'encrypt/output.diff.enc',
+                mut_p=0
             )
-
+        
         pysam.index(self.RESOURCE_PATH + 'encrypt/output.mut.bam')
         cmn.bam2sam(self.RESOURCE_PATH + 'encrypt/output.mut.bam', self.RESOURCE_PATH + 'encrypt/output.mut.sam')
     

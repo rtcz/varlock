@@ -1,3 +1,5 @@
+# TODO refactor, use @property, etc
+
 class VariantPosition(object):
     def __init__(self, index: int, ref_name: str, ref_pos: int):
         self.index = index

@@ -13,8 +13,8 @@ from varlock_src.bam_mutator import BamMutator
 from varlock_src.bdiff import BdiffIO
 from varlock_src.common import open_vcf
 from varlock_src.fasta_index import FastaIndex
-from varlock_src.vac import Vac
 from varlock_src.random import VeryRandom
+from varlock_src.vac import Vac
 
 
 class Varlocker:
@@ -23,13 +23,13 @@ class Varlocker:
     by altering contained SNVs and INDELs based on supplied VAC (VCF based) file.
     """
     AES_KEY_LENGTH = 32
-
+    
     # key used in stream cipher encryption of unmapped alignments
     SECRET_KEY_LENGTH = 16
-
+    
     def __init__(self, verbose=False):
         self._verbose = verbose
-
+    
     def create_vac(self, bam_filename: str, vcf_filename: str, out_vac_filename: str):
         """
         BAM and VCF should use same reference genome.
@@ -45,7 +45,6 @@ class Varlocker:
             vac = Vac(FastaIndex(sam_file.header), self._verbose)
             vac.vcf2vac(vcf_file, out_vac_file)
     
-
     def encrypt(
             self,
             rsa_sign_key: RSA,
@@ -54,6 +53,7 @@ class Varlocker:
             vac_filename: str,
             out_bam_filename: str,
             out_enc_diff_filename: str,
+            mut_p: float,
             seed: str = None
     ):
         """
@@ -68,24 +68,26 @@ class Varlocker:
         :param vac_filename: VAC file
         :param out_bam_filename: output bam
         :param out_enc_diff_filename: output binary file
+        :param mut_p: random variant (mutation) probability per genome base
         :param seed: random number generator seed
         """
         if self._verbose:
             print('--- Mutating BAM ---')
-
+        
         rnd = VeryRandom(seed)
         aes_key = rnd.rand_bytes(self.AES_KEY_LENGTH)
         mut = BamMutator(filename=bam_filename, verbose=self._verbose)
         
         with open(out_enc_diff_filename, 'wb') as enc_diff_file:
-
+            
             diff_file = mut.mutate(
                 vac_filename=vac_filename,
                 mut_bam_filename=out_bam_filename,
                 secret=rnd.rand_bytes(self.SECRET_KEY_LENGTH),
+                mut_p=mut_p,
                 rnd=rnd
             )
-
+            
             if self._verbose:
                 print('stats: %s' % mut.stats)
             
@@ -93,8 +95,7 @@ class Varlocker:
             self._write_aes_key(enc_diff_file, aes_key, rsa_enc_key)
             self._write_signature(enc_diff_file, signature)
             self._encrypt(diff_file, aes_key, enc_diff_file)
-
-
+    
     def decrypt(
             self,
             rsa_key: RSA,
@@ -128,10 +129,10 @@ class Varlocker:
         """
         # TODO verify if bam_filename is mutated
         # TODO compare mutated BAM checksum to checksum stored in DIFF header
-
+        
         if self._verbose:
             print('--- Unmutating BAM ---')
-
+        
         # make sure that BAM is indexed
         pysam.index(bam_filename)
         with io.BytesIO() as diff_file, \
@@ -140,8 +141,7 @@ class Varlocker:
             signature = self._read_signature(enc_diff_file)
             self._decrypt(enc_diff_file, aes_key, diff_file)
             self._verify(diff_file, signature, rsa_ver_key)
-
-
+            
             # unmutate
             mut = BamMutator(bam_filename, verbose=self._verbose)
             mut.unmutate(
@@ -155,7 +155,6 @@ class Varlocker:
                 unmapped_only
             )
     
-
     def reencrypt(
             self,
             rsa_key: RSA,
@@ -205,7 +204,6 @@ class Varlocker:
                 raise ValueError("Provided BDIFF is not associated with this BAM."
                                  " Reason: checksum mismatch.")
             
-
             from_index, to_index = bam_mut.resolve_range(
                 bdiff.header[BdiffIO.FROM_INDEX],
                 bdiff.header[BdiffIO.TO_INDEX],
@@ -217,10 +215,10 @@ class Varlocker:
             # use actual effective range
             bdiff.header[BdiffIO.FROM_INDEX] = from_index
             bdiff.header[BdiffIO.TO_INDEX] = to_index
-
+            
             if (unmapped_only or include_unmapped) and BamMutator.BDIFF_SECRET_TAG not in bdiff.header:
                 raise ValueError('BDIFF must contain secret to decrypt unmapped reads.')
-
+            
             if unmapped_only:
                 del bdiff.header[BdiffIO.FROM_INDEX]
                 del bdiff.header[BdiffIO.TO_INDEX]
@@ -231,22 +229,21 @@ class Varlocker:
                 # mapped only
                 del bdiff.header[BamMutator.BDIFF_SECRET_TAG]
                 out_diff = bdiff.file(bdiff.header)
-
+            
             with out_diff, open(out_enc_diff_filename, 'wb') as out_enc_diff_file:
                 out_signature = self._sign(out_diff, rsa_key)
                 self._write_aes_key(out_enc_diff_file, aes_key, rsa_enc_key)
                 self._write_signature(out_enc_diff_file, out_signature)
                 self._encrypt(out_diff, aes_key, out_enc_diff_file)
-
+    
     def _encrypt(self, diff, aes_key, enc_diff):
         if self._verbose:
             print('--- Encrypting DIFF ---')
-
+        
         diff.seek(0)
         out_aes = FileAES(aes_key)
         out_aes.encrypt(diff, enc_diff)
     
-
     def _decrypt(self, enc_diff, aes_key, diff):
         if self._verbose:
             print('--- Decrypting DIFF ---')
@@ -254,7 +251,6 @@ class Varlocker:
         aes = FileAES(aes_key)
         aes.decrypt(enc_diff, diff)
     
-
     def _sign(self, diff, rsa_key: RSA):
         """
         :param diff:
@@ -263,7 +259,7 @@ class Varlocker:
         """
         if self._verbose:
             print('--- Signing DIFF ---')
-
+        
         # must use Crypto hash object
         hash_obj = MD5.new()
         diff.seek(0)
@@ -271,7 +267,6 @@ class Varlocker:
         diff.seek(0)
         return PKCS1_v1_5.new(rsa_key).sign(hash_obj)
     
-
     def _verify(self, diff, signature, rsa_key: RSA):
         """
         :param diff:
@@ -282,7 +277,7 @@ class Varlocker:
             # verification step
             if self._verbose:
                 print('--- Verifying DIFF ---')
-
+            
             # must use Crypto hash object
             hash_obj = MD5.new()
             diff.seek(0)
@@ -290,7 +285,7 @@ class Varlocker:
             diff.seek(0)
             if not PKCS1_v1_5.new(rsa_key).verify(hash_obj, signature):
                 raise ValueError('DIFF has invalid signature')
-
+    
     @staticmethod
     def _read_aes_key(enc_diff, rsa_key: RSA):
         """
@@ -301,7 +296,7 @@ class Varlocker:
         aes_length = struct.unpack_from('<I', enc_diff.read(4))[0]
         enc_aes_key = enc_diff.read(aes_length)
         return PKCS1_OAEP.new(rsa_key).decrypt(enc_aes_key)
-
+    
     @staticmethod
     def _write_aes_key(enc_diff, aes_key: bytes, rsa_key: RSA):
         """
@@ -313,7 +308,7 @@ class Varlocker:
         enc_aes_key = PKCS1_OAEP.new(rsa_key).encrypt(aes_key)
         enc_diff.write(struct.pack('<I', len(enc_aes_key)))
         enc_diff.write(enc_aes_key)
-
+    
     @staticmethod
     def _read_signature(enc_diff):
         """
@@ -322,7 +317,7 @@ class Varlocker:
         """
         signature_length = struct.unpack_from('<I', enc_diff.read(4))[0]
         return enc_diff.read(signature_length)
-
+    
     @staticmethod
     def _write_signature(enc_diff, signature):
         """

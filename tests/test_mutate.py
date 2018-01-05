@@ -34,6 +34,7 @@ class TestMutate(unittest.TestCase):
             vac_filename=self.RESOURCE_PATH + 'input_01.vac',
             mut_bam_filename=self.RESOURCE_PATH + 'output_01.bam',
             secret=self.SECRET,
+            mut_p=0,
             rnd=self._rnd
         )
         
@@ -62,6 +63,7 @@ class TestMutate(unittest.TestCase):
             vac_filename=self.RESOURCE_PATH + 'input_02.vac',
             mut_bam_filename=self.RESOURCE_PATH + 'output_02.bam',
             secret=self.SECRET,
+            mut_p=0,
             rnd=self._rnd
         )
         
