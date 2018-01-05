@@ -76,10 +76,10 @@ class Mutator:
     def mutate(
             self,
             mut_bam_file: pysam.AlignmentFile,
-            vac_iter: iters.VacFileIterator,
+            vac_iter: iters.VariantIterator,
             bam_iter: iters.FullBamIterator,
             secret: bytes,
-            rnd: VeryRandom,
+            rnd: VeryRandom
     ) -> bdiff.BdiffIO:
         """
         :param mut_bam_file:
@@ -94,7 +94,7 @@ class Mutator:
         
         alignment_queue = []
         alignment = next(bam_iter)
-
+        
         # TODO optimalization: seek to first alignment covering vac to skip all preceeding records
         vac = next(vac_iter)
         

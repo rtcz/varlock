@@ -6,8 +6,6 @@ import varlock_src.iters as iters
 from varlock_src.bdiff import BdiffIO
 from varlock_src.fasta_index import FastaIndex
 from varlock_src.mutator import Mutator
-
-
 # TODO rename MutatorWrapper ?
 from varlock_src.random import VeryRandom
 
@@ -99,12 +97,14 @@ class BamMutator:
             vac_filename: str,
             mut_bam_filename: str,
             secret: bytes,
+            mut_p: float,
             rnd: VeryRandom
     ):
         """
         :param vac_filename:
         :param mut_bam_filename:
         :param secret: Secret key written into DIFF used for unmapped alignment encryption.
+        :param mut_p: random variant (mutation) probability per genome base
         :param rnd:  random number generator
         :return diff_file:
         """
@@ -112,7 +112,7 @@ class BamMutator:
         
         header = bam.mut_header(self._bam_header, self.checksum, cmn.checksum(vac_filename))
         with bam.open_bam(mut_bam_filename, 'wb', header=header) as mut_bam_file, \
-                iters.VacFileIterator(vac_filename, self._fai) as vac_iter, \
+                iters.VariantIterator(vac_filename, self._fai, mut_p, rnd) as vac_iter, \
                 iters.FullBamIterator(self._bam_filename) as bam_iter:
             mut = Mutator(fai=self._fai, verbose=self._verbose)
             bdiff_io = mut.mutate(

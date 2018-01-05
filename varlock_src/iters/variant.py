@@ -3,22 +3,64 @@ import numpy as np
 import varlock_src.po as po
 from varlock_src.common import BASES
 from varlock_src.fasta_index import FastaIndex
-from varlock_src.vac import Vac
 from varlock_src.random import VeryRandom
+from varlock_src.vac import Vac
 
+
+# TODO do not use python iterator "interface", use custom next() and close() methods
 
 class VariantIterator:
-    def __init__(self, vac_filename: str, fai: FastaIndex, mut_p: int):
+    def __init__(self, vac_filename: str, fai: FastaIndex, mut_p: float, rnd: VeryRandom):
         """
+        Composite iterator using content of vac_file and randomness to return next VariantOccurence.
+        Returned VariantOccurence is either read from vac_file or randomly generated.
         :param vac_filename:
         :param fai:
-        :param mut_p:
+        :param mut_p: random variant (mutation) probability per genome base
         """
-        pass
+        self._iter1 = VacFileIterator(vac_filename, fai)
+        self._iter2 = RandomSnvIterator(fai, mut_p, rnd)
+        
+        # initialize current values
+        self._curr1 = next(self._iter1)
+        self._curr2 = next(self._iter2)
+    
+    @property
+    def counter(self):
+        return self._iter1.counter + self._iter2.counter
+    
+    def __iter__(self):
+        return self
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._iter1.__exit__(exc_type, exc_val, exc_tb)
+    
+    def _next1(self) -> po.VariantOccurence:
+        curr = self._curr1
+        self._curr1 = next(self._iter1)
+        return curr
+    
+    def _next2(self) -> po.VariantOccurence:
+        curr = self._curr2
+        self._curr2 = next(self._iter2)
+        return curr
     
     def __next__(self) -> po.VariantOccurence:
-        # TODO
-        pass
+        if self._curr1 is None and self._curr2 is None:
+            # noinspection PyTypeChecker
+            return None
+        elif self._curr1 is None:
+            return self._next2()
+        elif self._curr2 is None:
+            return self._next1()
+        elif self._curr1.index <= self._curr2.index:
+            # vac_file originated variants have precedence
+            return self._next1()
+        else:
+            return self._next2()
 
 
 class VacFileIterator:
@@ -139,24 +181,38 @@ class RandomSnvIterator:
     Random rare SNV iterator. SNVs positions are randomly generated across whole genome.
     """
     
-    def __init__(self, fai: FastaIndex, mut_p: int, rnd: VeryRandom):
+    def __init__(self, fai: FastaIndex, mut_p: float, rnd: VeryRandom):
         """
-        :param mut_p: random variant (mutation) probability per genome base
         :param fai:
+        :param mut_p: random variant (mutation) probability per genome base
+        :param rnd:
         """
-        assert mut_p > 0
+        assert 0 <= mut_p < 0.1
         self._fai = fai
         self._rnd = rnd
         length = fai.last_index() - fai.first_index()
+        assert length >= 0
         mut_count = int(mut_p * length)
         
         # sample random genomic indices from uniform distribution
         self._indices = np.sort(rnd.rand_ints(fai.first_index(), fai.last_index(), mut_count))
         self._counter = 0
     
+    @property
+    def counter(self):
+        return self._counter
+    
+    def __iter__(self):
+        return self
+    
     def __next__(self) -> po.VariantOccurence:
+        if self._counter >= len(self._indices):
+            # noinspection PyTypeChecker
+            return None
+        
         index = self._indices[self._counter]
         self._counter += 1
+        
         ref_name, ref_pos = self._fai.index2pos(index)
         return po.SnvOccurence(
             index=index,
