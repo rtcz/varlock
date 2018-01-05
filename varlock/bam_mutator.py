@@ -1,16 +1,19 @@
-import random
 import io
 
-from varlock.fasta_index import FastaIndex
-from varlock.mutator import Mutator
-from varlock.bdiff import BdiffIO
+from Crypto import Random
 
+import varlock.bam as bam
 import varlock.common as cmn
 import varlock.iters as iters
-import varlock.bam as bam
+from varlock.bdiff import BdiffIO
+from varlock.fasta_index import FastaIndex
+from varlock.mutator import Mutator
 
 
 # TODO rename MutatorWrapper ?
+from varlock.random import VeryRandom
+
+
 class BamMutator:
     # written alignments
     STAT_ALIGNMENT_COUNT = 'alignment_count'
@@ -36,16 +39,13 @@ class BamMutator:
     def __init__(
             self,
             filename: str,
-            rnd=random.SystemRandom(),
             verbose: bool = False
     ):
         """
         :param filename: BAM filename
-        :param rnd:  random number generator
         :param verbose:
         """
         self._verbose = verbose
-        self._rnd = rnd
         self._stats = {}
         self._bam_filename = filename
         
@@ -100,12 +100,14 @@ class BamMutator:
             self,
             vac_filename: str,
             mut_bam_filename: str,
-            secret: bytes
+            secret: bytes,
+            rnd: VeryRandom
     ):
         """
         :param vac_filename:
         :param mut_bam_filename:
         :param secret: Secret key written into DIFF used for unmapped alignment encryption.
+        :param rnd:  random number generator
         :return diff_file:
         """
         self._stats = {}
@@ -114,12 +116,13 @@ class BamMutator:
         with bam.open_bam(mut_bam_filename, 'wb', header=header) as mut_bam_file, \
                 iters.VacFileIterator(vac_filename, self._fai) as vac_iter, \
                 iters.FullBamIterator(self._bam_filename) as bam_iter:
-            mut = Mutator(fai=self._fai, rnd=self._rnd, verbose=self._verbose)
+            mut = Mutator(fai=self._fai, verbose=self._verbose)
             bdiff_io = mut.mutate(
                 mut_bam_file=mut_bam_file,
                 vac_iter=vac_iter,
                 bam_iter=bam_iter,
-                secret=secret
+                secret=secret,
+                rnd=rnd
             )
         
         self._stats = {
@@ -178,7 +181,7 @@ class BamMutator:
         
         with bam.open_bam(self._bam_filename, 'rb') as bam_file:
             header = bam.unmut_header(bam_file.header)
-            mut = Mutator(fai=self._fai, rnd=self._rnd, verbose=self._verbose)
+            mut = Mutator(fai=self._fai, verbose=self._verbose)
             
             with bam.open_bam(out_bam_filename, 'wb', header=header) as out_bam_file:
                 bdiff_io = BdiffIO(bdiff_file)

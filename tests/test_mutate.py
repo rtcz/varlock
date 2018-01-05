@@ -3,11 +3,12 @@ import unittest
 
 import pysam
 
-from varlock.bdiff import BdiffIO
 import varlock.common as cmn
+from tests.random import RandomMockup
 from varlock.bam_mutator import BamMutator
+from varlock.bdiff import BdiffIO
+from varlock.random import VeryRandom
 from varlock.vac import Vac
-from tests.random_mockup import RandomMockup
 
 
 class TestMutate(unittest.TestCase):
@@ -23,22 +24,24 @@ class TestMutate(unittest.TestCase):
     def setUpClass(cls):
         cmn.sam2bam(cls.RESOURCE_PATH + 'input.sam', cls.RESOURCE_PATH + 'input.bam')
         pysam.index(cls.RESOURCE_PATH + 'input.bam')
-        cls.mut = BamMutator(cls.RESOURCE_PATH + 'input.bam', RandomMockup())
+        cls._mut = BamMutator(cls.RESOURCE_PATH + 'input.bam')
+        cls._rnd = VeryRandom(RandomMockup(0.5))
     
     def test_mutate_01(self):
         # EOF BAM case
         Vac.text2vac(self.RESOURCE_PATH + 'input_01.vac.txt', self.RESOURCE_PATH + 'input_01.vac')
-        bdiff_file = self.mut.mutate(
+        bdiff_file = self._mut.mutate(
             vac_filename=self.RESOURCE_PATH + 'input_01.vac',
             mut_bam_filename=self.RESOURCE_PATH + 'output_01.bam',
-            secret=self.SECRET
+            secret=self.SECRET,
+            rnd=self._rnd
         )
         
-        self.assertEqual(21, self.mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
-        self.assertEqual(16, self.mut.stat(BamMutator.STAT_COVERING_COUNT))
-        self.assertEqual(8, self.mut.stat(BamMutator.STAT_VAC_COUNT))
-        self.assertEqual(16, self.mut.stat(BamMutator.STAT_MUT_COUNT))
-        self.assertEqual(6, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
+        self.assertEqual(21, self._mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
+        self.assertEqual(16, self._mut.stat(BamMutator.STAT_COVERING_COUNT))
+        self.assertEqual(8, self._mut.stat(BamMutator.STAT_VAC_COUNT))
+        self.assertEqual(16, self._mut.stat(BamMutator.STAT_MUT_COUNT))
+        self.assertEqual(6, self._mut.stat(BamMutator.STAT_DIFF_COUNT))
         
         cmn.bam2sam(self.RESOURCE_PATH + 'output_01.bam', self.RESOURCE_PATH + 'output_01.sam')
         self.assertTrue(filecmp.cmp(
@@ -55,17 +58,18 @@ class TestMutate(unittest.TestCase):
     def test_mutate_02(self):
         # EOF VAC case
         Vac.text2vac(self.RESOURCE_PATH + 'input_02.vac.txt', self.RESOURCE_PATH + 'input_02.vac')
-        bdiff_file = self.mut.mutate(
+        bdiff_file = self._mut.mutate(
             vac_filename=self.RESOURCE_PATH + 'input_02.vac',
             mut_bam_filename=self.RESOURCE_PATH + 'output_02.bam',
-            secret=self.SECRET
+            secret=self.SECRET,
+            rnd=self._rnd
         )
         
-        self.assertEqual(21, self.mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
-        self.assertEqual(13, self.mut.stat(BamMutator.STAT_COVERING_COUNT))
-        self.assertEqual(7, self.mut.stat(BamMutator.STAT_VAC_COUNT))
-        self.assertEqual(14, self.mut.stat(BamMutator.STAT_MUT_COUNT))
-        self.assertEqual(5, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
+        self.assertEqual(21, self._mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
+        self.assertEqual(13, self._mut.stat(BamMutator.STAT_COVERING_COUNT))
+        self.assertEqual(7, self._mut.stat(BamMutator.STAT_VAC_COUNT))
+        self.assertEqual(14, self._mut.stat(BamMutator.STAT_MUT_COUNT))
+        self.assertEqual(5, self._mut.stat(BamMutator.STAT_DIFF_COUNT))
         
         cmn.bam2sam(self.RESOURCE_PATH + 'output_02.bam', self.RESOURCE_PATH + 'output_02.sam')
         self.assertTrue(filecmp.cmp(

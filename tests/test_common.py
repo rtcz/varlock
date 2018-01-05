@@ -6,26 +6,28 @@ from bitarray import bitarray
 from bitstring import BitArray
 
 import varlock.common as cmn
-from tests.random_mockup import RandomMockup
+from tests.random import RandomMockup
 from varlock.cigar import Cigar
+from varlock.random import VeryRandom
 
 
 class TestCommon(unittest.TestCase):
     def test_multi_random(self):
-        self.assertEqual(2, cmn.multi_random([1, 1, 1, 1], RandomMockup()))
-        self.assertEqual(0, cmn.multi_random([1, 0, 0, 0], RandomMockup()))
-        self.assertEqual(3, cmn.multi_random([0, 0, 0, 1], RandomMockup()))
-        self.assertEqual(2, cmn.multi_random([0, 1, 1, 0], RandomMockup()))
-        self.assertEqual(1, cmn.multi_random([1, 1, 0, 0], RandomMockup()))
-        self.assertEqual(3, cmn.multi_random([0, 0, 1, 1], RandomMockup()))
-        self.assertEqual(0, cmn.multi_random([0, 0, 0, 0], RandomMockup()))
-        self.assertEqual(1, cmn.multi_random([1, 1], RandomMockup()))
-        self.assertEqual(1, cmn.multi_random([0, 1], RandomMockup()))
-        self.assertEqual(0, cmn.multi_random([1, 0], RandomMockup()))
-        self.assertEqual(0, cmn.multi_random([0, 0], RandomMockup()))
-        self.assertEqual(0, cmn.multi_random([0], RandomMockup()))
-        self.assertEqual(0, cmn.multi_random([0.8, 0.05, 0.15, 0], RandomMockup()))
-        self.assertEqual(3, cmn.multi_random([1, 0, 0, 1], RandomMockup()))
+        rnd = VeryRandom(RandomMockup(0.5))
+        self.assertEqual(2, rnd.multirand_index([1, 1, 1, 1]))
+        self.assertEqual(0, rnd.multirand_index([1, 0, 0, 0]))
+        self.assertEqual(3, rnd.multirand_index([0, 0, 0, 1]))
+        self.assertEqual(2, rnd.multirand_index([0, 1, 1, 0]))
+        self.assertEqual(1, rnd.multirand_index([1, 1, 0, 0]))
+        self.assertEqual(3, rnd.multirand_index([0, 0, 1, 1]))
+        self.assertEqual(0, rnd.multirand_index([0, 0, 0, 0]))
+        self.assertEqual(1, rnd.multirand_index([1, 1]))
+        self.assertEqual(1, rnd.multirand_index([0, 1]))
+        self.assertEqual(0, rnd.multirand_index([1, 0]))
+        self.assertEqual(0, rnd.multirand_index([0, 0]))
+        self.assertEqual(0, rnd.multirand_index([0]))
+        self.assertEqual(0, rnd.multirand_index([0.8, 0.05, 0.15, 0]))
+        self.assertEqual(3, rnd.multirand_index([1, 0, 0, 1]))
     
     def test_base_count(self):
         self.assertListEqual([3, 2, 1, 1], cmn.base_freqs(['A', 'A', 'G', 'T', 'C', 'T', 'A']))
@@ -79,24 +81,25 @@ class TestCommon(unittest.TestCase):
         self.assertEqual(19, cmn.ref_pos2seq_pos(alignment=alignment, ref_pos=1009))
     
     def test_snv_mut_map(self):
-        mut_map = cmn.snv_mut_map(alt_freqs=[1, 1, 1, 1], ref_freqs=[1, 1, 1, 1], rnd=Random(0))
+        mut_map = cmn.snv_mut_map(alt_freqs=[1, 1, 1, 1], ref_freqs=[1, 1, 1, 1], rnd=VeryRandom(Random(0)))
         self.assertDictEqual({'A': 'G', 'T': 'T', 'G': 'C', 'C': 'A', 'N': 'N'}, mut_map)
         
-        mut_map = cmn.snv_mut_map(alt_freqs=[3, 0, 1, 0], ref_freqs=[2, 1, 4, 0], rnd=RandomMockup())
+        mut_map = cmn.snv_mut_map(alt_freqs=[3, 0, 1, 0], ref_freqs=[2, 1, 4, 0], rnd=VeryRandom(RandomMockup(0.5)))
         self.assertDictEqual({'A': 'G', 'T': 'T', 'G': 'A', 'C': 'C', 'N': 'N'}, mut_map)
     
     def test_indel_mut_map(self):
         mut_map = cmn.indel_mut_map(
+
             alt_freq_map={'G': 2},
             ref_freq_map={'GCG': 1, 'G': 0},
-            rnd=RandomMockup()
+            rnd=VeryRandom(RandomMockup(0.5))
         )
         self.assertDictEqual({'G': 'GCG', 'GCG': 'G'}, mut_map)
         
         mut_map = cmn.indel_mut_map(
             alt_freq_map={'AGT': 2, 'A': 1},
             ref_freq_map={'AG': 2, 'A': 1, 'AGT': 0},
-            rnd=RandomMockup()
+            rnd=VeryRandom(RandomMockup(0.5))
         )
         self.assertDictEqual({'A': 'A', 'AG': 'AGT', 'AGT': 'AG'}, mut_map)
     

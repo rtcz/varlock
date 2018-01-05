@@ -146,6 +146,14 @@ run example:
 profile example:
 <code>python3 -m cProfile -s tottime examples/bam_mutator.py | head -n 140</code>
 
+python3 varlock.py encrypt --key resources/jozko --pub_key resources/jozko.pub --bam resources/input.bam --vac resources/input.vac --out_bam resources/out.mut.bam --out_diff resources/out.diff.enc -v -p password
+python3 varlock.py decrypt --key resources/jozko --bam resources/out.mut.bam --diff resources/out.diff.enc --out_bam out.bam
+python3 varlock.py reencrypt -d resources/jozko -e resources/jozko.pub -b resources/out.mut.bam -s resources/input.diff -o resources/output.diff -v -p password
+python3 varlock.py vac --bam examples/resources/sample.bam --vcf examples/resources/sample.vcf.gz --vac examples/resources/sample.vac
+
+
+python3 varlock.py encrypt --key tests/resources/varlocker/admin --pub_key tests/resources/varlocker/admin.pub --bam tests/resources/varlocker/encrypt/input.bam --vac tests/resources/varlocker/encrypt/input.vac --out_bam tests/resources/varlocker/encrypt/out.mut.bam --out_diff tests/resources/varlocker/encrypt/out.diff.enc -p password -s seed
+
 
 ## Samtools help
 <code>samtools view -H examples/resources/sample.mut.bam</code>

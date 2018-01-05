@@ -1,7 +1,7 @@
+import os
 import struct
 
 from .common import *
-import os
 
 
 # TODO refactor like file object interface
@@ -261,6 +261,7 @@ class Vac:
         indel_file.write(record)
     
     def vcf2vac(self, vcf_file, vac_file):
+        # TODO enable gzipped VCF file as input
         """
         Converts VCF to binary VAC file.
         Can preserve compatibility between different BAM and VCF reference genomes

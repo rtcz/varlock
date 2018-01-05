@@ -3,16 +3,17 @@ import os
 import sys
 
 from Crypto.PublicKey import RSA
+
 from varlock.varlocker import Varlocker
 
 
 def main():
     try:
-        locker = Varlocker()
         command, args = parse_command()
+        parsed_args = parse_encrypt_args(args)
+        locker = Varlocker(verbose=parsed_args.verbose)
+        
         if command == 'encrypt':
-            # python3 varlock.py encrypt --key resources/jozko --pub_key resources/jozko.pub --bam resources/input.bam --vac resources/input.vac --out_bam resources/out.mut.bam --out_diff resources/out.diff.enc -v -p password
-            parsed_args = parse_encrypt_args(args)
             with open(parsed_args.key, 'r') as key_file, \
                     open(parsed_args.pub_key, 'r') as pub_key_file:
                 rsa_key = RSA.importKey(key_file.read(), passphrase=parsed_args.password)
@@ -24,12 +25,10 @@ def main():
                     vac_filename=parsed_args.vac,
                     out_bam_filename=parsed_args.out_bam,
                     out_enc_diff_filename=parsed_args.out_diff,
-                    verbose=parsed_args.verbose
+                    seed=parsed_args.seed
                 )
         
         elif command == 'decrypt':
-            # python3 varlock.py decrypt --key resources/jozko --bam resources/out.mut.bam --diff resources/out.diff.enc --out_bam out.bam
-            parsed_args = parse_decrypt_args(args)
             with open(parsed_args.key, 'r') as key_file:
                 rsa_key = RSA.importKey(key_file.read(), passphrase=parsed_args.password)
                 
@@ -49,12 +48,9 @@ def main():
                     end_ref_pos=parsed_args.range[3],
                     include_unmapped=parsed_args.include_unmapped,
                     unmapped_only=parsed_args.unmapped_only,
-                    rsa_ver_key=rsa_ver_key,
-                    verbose=parsed_args.verbose
+                    rsa_ver_key=rsa_ver_key
                 )
         elif command == 'reencrypt':
-            # python3 varlock.py reencrypt -d resources/jozko -e resources/jozko.pub -b resources/out.mut.bam -s resources/input.diff -o resources/output.diff -v -p password
-            parsed_args = parse_reencrypt_args(args)
             with open(parsed_args.key, 'r') as key_file, \
                     open(parsed_args.pub_key, 'r') as pub_key_file:
                 rsa_key = RSA.importKey(key_file.read(), passphrase=parsed_args.password)
@@ -77,18 +73,15 @@ def main():
                     end_ref_pos=parsed_args.range[3],
                     include_unmapped=parsed_args.include_unmapped,
                     unmapped_only=parsed_args.unmapped_only,
-                    rsa_ver_key=rsa_ver_key,
-                    verbose=True
+                    rsa_ver_key=rsa_ver_key
                 )
         
         elif command == 'vac':
-            # python3 varlock.py vac --bam examples/resources/sample.bam --vcf examples/resources/sample.vcf.gz --vac examples/resources/sample.vac
             parsed_args = parse_vac_args(args)
             locker.create_vac(
                 bam_filename=parsed_args.bam,
                 vcf_filename=parsed_args.vcf,
-                out_vac_filename=parsed_args.vac,
-                verbose=parsed_args.verbose
+                out_vac_filename=parsed_args.vac
             )
         else:
             print("unrecognized command '%s'" % command)
@@ -127,6 +120,7 @@ def parse_encrypt_args(args):
     
     optional = parser.add_argument_group("Optional")
     optional.add_argument('-p', '--password', type=str, help='private key password')
+    optional.add_argument('-s', '--seed', type=str, help='random number generator seed')
     optional.add_argument('-v', '--verbose', action='store_true', help="explain what is being done")
     return parser.parse_args(args)
 
@@ -147,7 +141,7 @@ def parse_decrypt_args(args):
     optional.add_argument('-r', '--range', type=is_sam_range, help=range_help, default=(None, None, None, None))
     optional.add_argument('-i', '--include_unmapped', action='store_true', help="include all unplaced unmapped reads")
     optional.add_argument('-u', '--unmapped_only', action='store_true', help="only unmapped reads")
-    optional.add_argument('-s', '--ver_key', help="public key for verification", default=None)
+    optional.add_argument('-f', '--ver_key', help="public key for verification", default=None)
     optional.add_argument('-v', '--verbose', action='store_true', help="explain what is being done")
     return parser.parse_args(args)
 
@@ -168,7 +162,7 @@ def parse_reencrypt_args(args):
     optional.add_argument('-r', '--range', type=is_sam_range, help=range_help, default=(None, None, None, None))
     optional.add_argument('-i', '--include_unmapped', action='store_true', help="include all unplaced unmapped reads")
     optional.add_argument('-u', '--unmapped_only', action='store_true', help="only unmapped reads")
-    optional.add_argument('-s', '--ver_key', help="public key for verification", default=None)
+    optional.add_argument('-f', '--ver_key', help="public key for verification", default=None)
     optional.add_argument('-v', '--verbose', action='store_true', help="explain what is being done")
     
     return parser.parse_args(args)

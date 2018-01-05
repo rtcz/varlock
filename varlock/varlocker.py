@@ -1,5 +1,4 @@
 import io
-import os
 import struct
 
 import pysam
@@ -14,6 +13,7 @@ from varlock.bam_mutator import BamMutator
 from varlock.bdiff import BdiffIO
 from varlock.common import open_vcf
 from varlock.fasta_index import FastaIndex
+from varlock.random import VeryRandom
 from varlock.vac import Vac
 
 
@@ -27,34 +27,33 @@ class Varlocker:
     # key used in stream cipher encryption of unmapped alignments
     SECRET_KEY_LENGTH = 16
     
-    @staticmethod
-    def create_vac(bam_filename: str, vcf_filename: str, out_vac_filename: str, verbose=False):
+    def __init__(self, verbose=False):
+        self._verbose = verbose
+    
+    def create_vac(self, bam_filename: str, vcf_filename: str, out_vac_filename: str):
         """
         BAM and VCF should use same reference genome.
         VCF must contain INFO column with sub-fields AC and AN.
         :param bam_filename:
         :param vcf_filename:
         :param out_vac_filename:
-        :param verbose:
-        :return:
         """
         # TODO verify that BAM and VCF share the same reference genome ?
         with open_vcf(vcf_filename, 'rt') as vcf_file, \
                 open_bam(bam_filename, 'rb') as sam_file, \
                 open(out_vac_filename, 'wb') as out_vac_file:
-            vac = Vac(FastaIndex(sam_file.header), verbose)
+            vac = Vac(FastaIndex(sam_file.header), self._verbose)
             vac.vcf2vac(vcf_file, out_vac_file)
     
-    @classmethod
     def encrypt(
-            cls,
+            self,
             rsa_sign_key: RSA,
             rsa_enc_key: RSA,
             bam_filename: str,
             vac_filename: str,
             out_bam_filename: str,
             out_enc_diff_filename: str,
-            verbose=False
+            seed: str = None
     ):
         """
         Mutate BAM file and store it along with encrypted DIFF file.
@@ -68,32 +67,33 @@ class Varlocker:
         :param vac_filename: VAC file
         :param out_bam_filename: output bam
         :param out_enc_diff_filename: output binary file
-        :param verbose:
+        :param seed: random number generator seed
         """
-        aes_key = os.urandom(cls.AES_KEY_LENGTH)
-        mut = BamMutator(bam_filename, verbose=verbose)
+        rnd = VeryRandom(seed)
+        aes_key = rnd.rand_bytes(self.AES_KEY_LENGTH)
+        mut = BamMutator(filename=bam_filename, verbose=self._verbose)
         
         with open(out_enc_diff_filename, 'wb') as enc_diff_file:
-            if verbose:
+            if self._verbose:
                 print('--- Mutating BAM ---')
             
             diff_file = mut.mutate(
-                vac_filename,
-                out_bam_filename,
-                os.urandom(cls.SECRET_KEY_LENGTH)
+                vac_filename=vac_filename,
+                mut_bam_filename=out_bam_filename,
+                secret=rnd.rand_bytes(self.SECRET_KEY_LENGTH),
+                rnd=rnd
             )
             
-            if verbose:
+            if self._verbose:
                 print('stats: %s' % mut.stats)
             
-            signature = cls._sign(diff_file, rsa_sign_key, verbose)
-            cls._write_aes_key(enc_diff_file, aes_key, rsa_enc_key)
-            cls._write_signature(enc_diff_file, signature)
-            cls._encrypt(diff_file, aes_key, enc_diff_file, verbose)
+            signature = self._sign(diff_file, rsa_sign_key)
+            self._write_aes_key(enc_diff_file, aes_key, rsa_enc_key)
+            self._write_signature(enc_diff_file, signature)
+            self._encrypt(diff_file, aes_key, enc_diff_file)
     
-    @classmethod
     def decrypt(
-            cls,
+            self,
             rsa_key: RSA,
             bam_filename: str,
             enc_diff_filename: str,
@@ -104,8 +104,7 @@ class Varlocker:
             end_ref_pos: int = None,
             include_unmapped: bool = False,
             unmapped_only: bool = False,
-            rsa_ver_key: RSA = None,
-            verbose: bool = False
+            rsa_ver_key: RSA = None
     ):
         """
         Reverse of mutate operation. Restore original BAM file.
@@ -123,7 +122,6 @@ class Varlocker:
         :param unmapped_only: Only unmapped reads - both placed and unplaced.
          Overrides other parameters.
         :param rsa_ver_key: RSA key with public key to verify DIFF
-        :param verbose:
         """
         # TODO verify if bam_filename is mutated
         # TODO compare mutated BAM checksum to checksum stored in DIFF header
@@ -132,16 +130,16 @@ class Varlocker:
         pysam.index(bam_filename)
         with io.BytesIO() as diff_file, \
                 open(enc_diff_filename, 'rb') as enc_diff_file:
-            aes_key = cls._read_aes_key(enc_diff_file, rsa_key)
-            signature = cls._read_signature(enc_diff_file)
-            cls._decrypt(enc_diff_file, aes_key, diff_file, verbose)
-            cls._verify(diff_file, signature, rsa_ver_key, verbose)
+            aes_key = self._read_aes_key(enc_diff_file, rsa_key)
+            signature = self._read_signature(enc_diff_file)
+            self._decrypt(enc_diff_file, aes_key, diff_file)
+            self._verify(diff_file, signature, rsa_ver_key)
             
-            if verbose:
+            if self._verbose:
                 print('--- Unmutating BAM ---')
             
             # unmutate
-            mut = BamMutator(bam_filename, verbose=verbose)
+            mut = BamMutator(bam_filename, verbose=self._verbose)
             mut.unmutate(
                 diff_file,
                 out_bam_filename,
@@ -153,9 +151,8 @@ class Varlocker:
                 unmapped_only
             )
     
-    @classmethod
     def reencrypt(
-            cls,
+            self,
             rsa_key: RSA,
             rsa_enc_key: RSA,
             bam_filename: str,
@@ -167,8 +164,7 @@ class Varlocker:
             end_ref_pos: int = None,
             include_unmapped: bool = False,
             unmapped_only: bool = False,
-            rsa_ver_key: RSA = None,
-            verbose: bool = False
+            rsa_ver_key: RSA = None
     ):
         """
         Reencrypt DIFF file with supplied public_key.
@@ -187,17 +183,16 @@ class Varlocker:
         :param unmapped_only: Only unmapped reads - both placed and unplaced.
          Overrides other parameters.
         :param rsa_ver_key: RSA key with public key to verify DIFF
-        :param verbose:
         """
         # TODO verify if bam_filename is mutated
         # make sure that BAM is indexed
         pysam.index(bam_filename)
         with open(enc_diff_filename, 'rb') as enc_diff_file, \
                 io.BytesIO() as diff_file:
-            aes_key = cls._read_aes_key(enc_diff_file, rsa_key)
-            signature = cls._read_signature(enc_diff_file)
-            cls._decrypt(enc_diff_file, aes_key, diff_file, verbose)
-            cls._verify(diff_file, signature, rsa_ver_key, verbose)
+            aes_key = self._read_aes_key(enc_diff_file, rsa_key)
+            signature = self._read_signature(enc_diff_file)
+            self._decrypt(enc_diff_file, aes_key, diff_file)
+            self._verify(diff_file, signature, rsa_ver_key)
             
             bdiff = BdiffIO(diff_file)
             bam_mut = BamMutator(bam_filename)
@@ -206,7 +201,6 @@ class Varlocker:
                 raise ValueError("Provided BDIFF is not associated with this BAM."
                                  " Reason: checksum mismatch.")
             
-            # TODO refactor, validate BDIFF header
             from_index, to_index = bam_mut.resolve_range(
                 bdiff.header[BdiffIO.FROM_INDEX],
                 bdiff.header[BdiffIO.TO_INDEX],
@@ -237,36 +231,33 @@ class Varlocker:
                 out_diff = bdiff.file(bdiff.header)
             
             with out_diff, open(out_enc_diff_filename, 'wb') as out_enc_diff_file:
-                out_signature = cls._sign(out_diff, rsa_key, verbose)
-                cls._write_aes_key(out_enc_diff_file, aes_key, rsa_enc_key)
-                cls._write_signature(out_enc_diff_file, out_signature)
-                cls._encrypt(out_diff, aes_key, out_enc_diff_file, verbose)
+                out_signature = self._sign(out_diff, rsa_key)
+                self._write_aes_key(out_enc_diff_file, aes_key, rsa_enc_key)
+                self._write_signature(out_enc_diff_file, out_signature)
+                self._encrypt(out_diff, aes_key, out_enc_diff_file)
     
-    @classmethod
-    def _encrypt(cls, diff, aes_key, enc_diff, verbose):
-        if verbose:
+    def _encrypt(self, diff, aes_key, enc_diff):
+        if self._verbose:
             print('--- Encrypting DIFF ---')
         
         diff.seek(0)
         out_aes = FileAES(aes_key)
         out_aes.encrypt(diff, enc_diff)
     
-    @classmethod
-    def _decrypt(cls, enc_diff, aes_key, diff, verbose):
-        if verbose:
+    def _decrypt(self, enc_diff, aes_key, diff):
+        if self._verbose:
             print('--- Decrypting DIFF ---')
         # decrypt diff
         aes = FileAES(aes_key)
         aes.decrypt(enc_diff, diff)
     
-    @classmethod
-    def _sign(cls, diff, rsa_key: RSA, verbose):
+    def _sign(self, diff, rsa_key: RSA):
         """
         :param diff:
         :param rsa_key: RSA key with private key for signing DIFF
         :return:
         """
-        if verbose:
+        if self._verbose:
             print('--- Signing DIFF ---')
         
         # must use Crypto hash object
@@ -276,17 +267,15 @@ class Varlocker:
         diff.seek(0)
         return PKCS1_v1_5.new(rsa_key).sign(hash_obj)
     
-    @classmethod
-    def _verify(cls, diff, signature, rsa_key: RSA, verbose):
+    def _verify(self, diff, signature, rsa_key: RSA):
         """
         :param diff:
         :param signature: DIFF signature
         :param rsa_key: RSA key with public key to verify DIFF
-        :param verbose:
         """
         if rsa_key is not None:
             # verification step
-            if verbose:
+            if self._verbose:
                 print('--- Verifying DIFF ---')
             
             # must use Crypto hash object
@@ -297,8 +286,8 @@ class Varlocker:
             if not PKCS1_v1_5.new(rsa_key).verify(hash_obj, signature):
                 raise ValueError('DIFF has invalid signature')
     
-    @classmethod
-    def _read_aes_key(cls, enc_diff, rsa_key: RSA):
+    @staticmethod
+    def _read_aes_key(enc_diff, rsa_key: RSA):
         """
         Retrieve AES key decrypted by RSA private key from header of encrypted DIFF
         :param enc_diff: encrypted DIFF file
@@ -308,8 +297,8 @@ class Varlocker:
         enc_aes_key = enc_diff.read(aes_length)
         return PKCS1_OAEP.new(rsa_key).decrypt(enc_aes_key)
     
-    @classmethod
-    def _write_aes_key(cls, enc_diff, aes_key: bytes, rsa_key: RSA):
+    @staticmethod
+    def _write_aes_key(enc_diff, aes_key: bytes, rsa_key: RSA):
         """
         Write AES key encrypted by RSA public key into header of encrypted DIFF
         :param enc_diff: encrypted DIFF file
@@ -320,8 +309,8 @@ class Varlocker:
         enc_diff.write(struct.pack('<I', len(enc_aes_key)))
         enc_diff.write(enc_aes_key)
     
-    @classmethod
-    def _read_signature(cls, enc_diff):
+    @staticmethod
+    def _read_signature(enc_diff):
         """
         Retrieve decrypted signature (hash) from encrypted DIFF.
         :param enc_diff: encrypted DIFF file
@@ -329,56 +318,10 @@ class Varlocker:
         signature_length = struct.unpack_from('<I', enc_diff.read(4))[0]
         return enc_diff.read(signature_length)
     
-    @classmethod
-    def _write_signature(cls, enc_diff, signature):
+    @staticmethod
+    def _write_signature(enc_diff, signature):
         """
         :param enc_diff:
         """
         enc_diff.write(struct.pack('<I', len(signature)))
         enc_diff.write(signature)
-
-# @classmethod
-# def verify(cls, rsa_dec_key: RSA, rsa_ver_key: RSA, enc_diff_filename: str, verbose: False):
-#     """
-#     :param rsa_dec_key: RSA key with private key to decrypt DIFF
-#     :param rsa_ver_key: RSA key with public key to verify DIFF
-#     :param enc_diff_filename: diff to reencrypt
-#     :param verbose:
-#     :return: True if the DIFF was created by authority with the public key
-#     """
-#     with open(enc_diff_filename, 'rb') as enc_diff_file, \
-#             io.BytesIO() as diff_file:
-#         # retrieve encrypted AES from DIFF
-#         aes_length = struct.unpack_from('<I', enc_diff_file.read(4))[0]
-#         enc_aes_key = enc_diff_file.read(aes_length)
-#         aes_key = PKCS1_OAEP.new(rsa_dec_key).decrypt(enc_aes_key)
-#
-#         # retrieve signature from encrypted DIFF
-#         signature_length = struct.unpack_from('<I', enc_diff_file.read(4))[0]
-#         signature = enc_diff_file.read(signature_length)
-#         signed_hash = PKCS1_OAEP.new(rsa_ver_key.publickey()).decrypt(signature)
-#
-#         if verbose:
-#             print('Decrypting DIFF')
-#
-#         # decrypt diff
-#         aes = vrl.FileAES(aes_key)
-#         aes.decrypt(enc_diff_file, diff_file)
-#
-#         if verbose:
-#             print('Calculating DIFF hash')
-#
-#         return cls.__verify(diff_file, signed_hash)
-
-# @classmethod
-# def __verify(cls, diff_file, signed_hash):
-#     """
-#     :param diff_file: (decrypted) DIFF
-#     :param signed_hash: decrypted signature
-#     :return: True if verified
-#     """
-#     diff_file.seek(0)
-#     hasher = hashlib.md5()
-#     hasher.update(diff_file.read())
-#
-#     return signed_hash == hasher.digest()
