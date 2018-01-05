@@ -5,7 +5,6 @@ from varlock.bdiff import BdiffIO
 
 
 class TestBdiff(unittest.TestCase):
-    
     RESOURCE_PATH = 'tests/resources/bdiff/'
     
     _header = {

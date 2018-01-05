@@ -3,10 +3,9 @@ import unittest
 
 import pysam
 
-from varlock.bdiff import BdiffIO
 from varlock.bam_mutator import BamMutator
+from varlock.bdiff import BdiffIO
 from varlock.common import bam2sam
-from .random_mockup import RandomMockup
 
 
 class TestUnmutate(unittest.TestCase):
@@ -16,7 +15,7 @@ class TestUnmutate(unittest.TestCase):
     def setUpClass(cls):
         # TODO problem (bam1->sam->bam2) != bam1
         # sam2bam(cls.RESOURCE_PATH + 'input.sam', cls.RESOURCE_PATH + 'input.bam')
-        cls.mut = BamMutator(cls.RESOURCE_PATH + 'input.bam', RandomMockup())
+        cls.mut = BamMutator(cls.RESOURCE_PATH + 'input.bam')
         pysam.index(cls.RESOURCE_PATH + 'input.bam')
     
     def test_unmutate_01(self):

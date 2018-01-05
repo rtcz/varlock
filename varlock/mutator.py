@@ -1,5 +1,5 @@
 import hashlib
-import random
+from random import Random
 
 import pysam
 
@@ -8,21 +8,19 @@ import varlock.common as cmn
 import varlock.iters as iters
 import varlock.po as po
 from varlock.fasta_index import FastaIndex
+from varlock.random import VeryRandom
 
 
 class Mutator:
     def __init__(
             self,
             fai: FastaIndex,
-            rnd=random.SystemRandom(),
             verbose: bool = False
     ):
         """
-        :param rnd: (secure) random generator
         :param verbose:
         """
         self._fai = fai
-        self._rnd = rnd
         self._verbose = verbose
         self._prev_alignment = None
     
@@ -80,13 +78,15 @@ class Mutator:
             mut_bam_file: pysam.AlignmentFile,
             vac_iter: iters.VacFileIterator,
             bam_iter: iters.FullBamIterator,
-            secret: bytes
+            secret: bytes,
+            rnd: VeryRandom,
     ) -> bdiff.BdiffIO:
         """
         :param mut_bam_file:
         :param vac_iter:
         :param bam_iter:
         :param secret:
+        :param rnd: (secure) random generator
         :return: BdiffIO object
         BDIFF records are written only if bases at VAC position differ after mutation.
         """
@@ -115,7 +115,7 @@ class Mutator:
                 # last mutation
                 if vac is not None:
                     # noinspection PyTypeChecker
-                    self.__mutate_pos(bdiff_io, alignment_queue, vac)
+                    self.__mutate_pos(bdiff_io, alignment_queue, vac, rnd)
                 
                 for snv_alignment in alignment_queue:
                     # unmapped alignments in queue are already encrypted
@@ -145,7 +145,7 @@ class Mutator:
                 alignment = next(bam_iter)
             
             elif self.__is_after_index(alignment, vac.index):
-                self.__mutate_pos(bdiff_io, alignment_queue, vac)
+                self.__mutate_pos(bdiff_io, alignment_queue, vac, rnd)
                 # done with this vac, read next
                 prev_vac = vac
                 vac = next(vac_iter)
@@ -297,7 +297,13 @@ class Mutator:
             mut_seq = cmn.stream_cipher(alignment.query_sequence, sha512.digest())
             alignment.query_sequence = mut_seq
     
-    def __mutate_pos(self, bdiff_io: bdiff.BdiffIO, variant_queue: list, vac: po.VariantPosition) -> bool:
+    def __mutate_pos(
+            self,
+            bdiff_io: bdiff.BdiffIO,
+            variant_queue: list,
+            vac: po.VariantPosition,
+            rnd: VeryRandom
+    ) -> bool:
         """
         Mutate alignments at the variant allele count position.
         :param variant_queue: list of SnvAlignment
@@ -305,20 +311,26 @@ class Mutator:
         :return: True if NS mutation has occured
         """
         if isinstance(vac, po.VacSnvRecord):
-            is_mutated = self._mutate_snv_pos(bdiff_io, variant_queue, vac)
+            is_mutated = self._mutate_snv_pos(bdiff_io, variant_queue, vac, rnd)
         elif isinstance(vac, po.VacIndelRecord):
-            is_mutated = self._mutate_indel_pos(bdiff_io, variant_queue, vac)
+            is_mutated = self._mutate_indel_pos(bdiff_io, variant_queue, vac, rnd)
         else:
             raise ValueError("%s is not VAC record instance" % type(vac).__name__)
         
         return is_mutated
     
-    def _mutate_snv_pos(self, bdiff_io: bdiff.BdiffIO, variant_queue: list, vac: po.VacSnvRecord) -> bool:
+    def _mutate_snv_pos(
+            self,
+            bdiff_io: bdiff.BdiffIO,
+            variant_queue: list,
+            vac: po.VacSnvRecord,
+            rnd: VeryRandom
+    ) -> bool:
         is_mutated = False
         variant_seqs = cmn.variant_seqs(variant_queue)
         
         alt_freqs = cmn.base_freqs(variant_seqs)
-        mut_map = cmn.snv_mut_map(alt_freqs=alt_freqs, ref_freqs=vac.freqs, rnd=self._rnd)
+        mut_map = cmn.snv_mut_map(alt_freqs=alt_freqs, ref_freqs=vac.freqs, rnd=rnd)
         
         for variant in variant_queue:  # type: po.AlignedVariant
             if variant.is_present():
@@ -333,12 +345,22 @@ class Mutator:
         
         return is_mutated
     
-    def _mutate_indel_pos(self, bdiff_io: bdiff.BdiffIO, variant_queue: list, vac: po.VacIndelRecord) -> bool:
+    def _mutate_indel_pos(
+            self,
+            bdiff_io: bdiff.BdiffIO,
+            variant_queue: list,
+            vac: po.VacIndelRecord,
+            rnd: VeryRandom
+    ) -> bool:
         is_mutated = False
         variant_seqs = cmn.variant_seqs(variant_queue)
         
         alt_freq_map = cmn.freq_map(variant_seqs)
-        mut_map = cmn.indel_mut_map(alt_freq_map, dict(zip(vac.seqs, vac.freqs)), rnd=self._rnd)
+        mut_map = cmn.indel_mut_map(
+            alt_freq_map=alt_freq_map,
+            ref_freq_map=dict(zip(vac.seqs, vac.freqs)),
+            rnd=rnd
+        )
         
         for variant in variant_queue:  # type: po.AlignedVariant
             if variant.is_present():

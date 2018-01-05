@@ -4,12 +4,12 @@ import hashlib
 import json
 import math
 import os
-from random import Random
 
 import numpy as np
 import pysam
 
 import varlock.po as po
+from varlock.random import VeryRandom
 
 BASES = ("A", "T", "G", "C")
 UNKNOWN_BASE = "N"
@@ -51,7 +51,7 @@ def stream_cipher(seq: str, key: bytes):
     return mut_seq
 
 
-def snv_mut_map(alt_freqs: list, ref_freqs: list, rnd: Random):
+def snv_mut_map(alt_freqs: list, ref_freqs: list, rnd: VeryRandom):
     """
     :param alt_freqs: list of alternative A,T,G,C DNA bases frequencies
     :param ref_freqs: list of reference A,T,G,C DNA bases frequencies
@@ -61,12 +61,17 @@ def snv_mut_map(alt_freqs: list, ref_freqs: list, rnd: Random):
     assert len(alt_freqs) == len(ref_freqs) == len(BASES)
     # add random value to distinguish tied values
     alt_freqs = [ac + rnd.random() for ac in alt_freqs]
-    mut_map = _mut_map(list(BASES), alt_freqs, list(ref_freqs), rnd)
+    mut_map = _mut_map(
+        seqs=list(BASES),
+        alt_freqs=alt_freqs,
+        ref_freqs=list(ref_freqs),
+        rnd=rnd
+    )
     mut_map[UNKNOWN_BASE] = UNKNOWN_BASE
     return mut_map
 
 
-def indel_mut_map(alt_freq_map: dict, ref_freq_map: dict, rnd):
+def indel_mut_map(alt_freq_map: dict, ref_freq_map: dict, rnd: VeryRandom):
     """
     Create indel mutation mapping of reference sequences.
     :param alt_freq_map: {seq:count, ...}
@@ -87,7 +92,7 @@ def indel_mut_map(alt_freq_map: dict, ref_freq_map: dict, rnd):
     return _mut_map(seqs, alt_freqs, ref_freqs, rnd)
 
 
-def _mut_map(seqs: list, alt_freqs: list, ref_freqs: list, rnd: Random):
+def _mut_map(seqs: list, alt_freqs: list, ref_freqs: list, rnd: VeryRandom):
     """
     Function tampers with parameters to avoid list copying.
     :param seqs: sequences to mutate
@@ -104,7 +109,7 @@ def _mut_map(seqs: list, alt_freqs: list, ref_freqs: list, rnd: Random):
     
     for i in range(len(ref_freqs) - 1):
         # draw ref indel with multinomial probability
-        ref_indel_id = multi_random(ref_freqs, rnd)
+        ref_indel_id = rnd.multirand_index(ref_freqs)
         # draw most abundant indel from alt alleles
         # TODO why not use multi random here?
         alt_indel_id = np.argmax(alt_freqs)  # type: int
@@ -121,37 +126,6 @@ def _mut_map(seqs: list, alt_freqs: list, ref_freqs: list, rnd: Random):
     mut_map[alt_seqs[0]] = ref_seqs[0]
     
     return mut_map
-
-
-def multi_random(p_dist: list, rnd: Random):
-    """
-    Draw index from multinomial probability distribution.
-    :param p_dist: Probability distribution. When all probabilities are zero, each outcome has equal probability.
-    Each value represents probability of one outcome.
-    :param rnd: random number generator
-    :return: Always returns index of outcome in p_dist array.
-    """
-    if len(p_dist) == 1:
-        # only one choice
-        return 0
-    
-    if sum(p_dist) == 0:
-        # each outcome has equal probability
-        return rnd.randint(0, len(p_dist) - 1)
-    
-    p_level = 0
-    rnd_value = rnd.random()
-    
-    # make relative
-    p_value = rnd_value * sum(p_dist)
-    for i in range(len(p_dist)):
-        p_level += p_dist[i]
-        if p_level > p_value:
-            # random outcome has been reached
-            return i
-    
-    raise ValueError(
-        "sum of probability distribution %d must be greater then the probability value %d" % (sum(p_dist), p_value))
 
 
 def freq_map(values: list):
