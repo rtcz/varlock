@@ -23,7 +23,7 @@ class IndelDiff(VariantDiff):
     pass
 
 
-class VariantOccurence(VariantPosition):
+class VariantOccurrence(VariantPosition):
     def __init__(self, index: int, ref_name: str, ref_pos: int, freqs: list, seqs: list, ref_id: int):
         super().__init__(index, ref_name, ref_pos)
         self.freqs = freqs
@@ -38,13 +38,16 @@ class VariantOccurence(VariantPosition):
     def ref_seq(self):
         return self.seqs[self.ref_id]
 
+class SnvOccurrence(VariantOccurrence):
 
-class SnvOccurence(VariantOccurence):
-    pass
+    def __str__(self):
+        return '#%d %s:%d SNP' % (self.index, self.ref_name, self.ref_pos)
 
 
-class IndelOccurence(VariantOccurence):
-    pass
+class IndelOccurrence(VariantOccurrence):
+
+    def __str__(self):
+        return '#%d %s:%d INDEL' % (self.index, self.ref_name, self.ref_pos)
 
 
 class FaiRecord:

@@ -16,7 +16,7 @@ class VariantIterator:
         """
         pass
     
-    def __next__(self) -> po.VariantOccurence:
+    def __next__(self) -> po.VariantOccurrence:
         # TODO
         pass
 
@@ -58,7 +58,7 @@ class VacFileIterator:
             self._snv_count -= 1
             index, ref_id, freqs = Vac.read_snv_record(self._snv_file)
             ref_name, ref_pos = self._fai.index2pos(index)
-            self._snv_record = po.SnvOccurence(
+            self._snv_record = po.SnvOccurrence(
                 index=index,
                 ref_name=ref_name,
                 ref_pos=ref_pos,
@@ -75,7 +75,7 @@ class VacFileIterator:
             self._indel_count -= 1
             index, counts, seqs = Vac.read_indel_record(self._indel_file)
             ref_name, ref_pos = self._fai.index2pos(index)
-            self._indel_record = po.IndelOccurence(
+            self._indel_record = po.IndelOccurrence(
                 index=index,
                 ref_name=ref_name,
                 ref_pos=ref_pos,
@@ -109,10 +109,10 @@ class VacFileIterator:
         self._snv_file.close()
         self._indel_file.close()
     
-    def __next__(self) -> po.VariantOccurence:
+    def __next__(self) -> po.VariantOccurrence:
         if self._snv_record is not None and self._indel_record is not None:
             if self._snv_record.index == self._indel_record.index:
-                raise ValueError("SNV and INDEL have the same position")
+                raise ValueError("SNV and INDEL have the same position (%s)" % str(self._snv_record.index))
             elif self._snv_record.index < self._indel_record.index:
                 return self.next_snv()
             else:
@@ -154,11 +154,11 @@ class RandomSnvIterator:
         self._indices = np.sort(rnd.rand_ints(fai.first_index(), fai.last_index(), mut_count))
         self._counter = 0
     
-    def __next__(self) -> po.VariantOccurence:
+    def __next__(self) -> po.VariantOccurrence:
         index = self._indices[self._counter]
         self._counter += 1
         ref_name, ref_pos = self._fai.index2pos(index)
-        return po.SnvOccurence(
+        return po.SnvOccurrence(
             index=index,
             ref_name=ref_name,
             ref_pos=ref_pos,

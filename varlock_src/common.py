@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 import os
+import typing
 
 import numpy as np
 import pysam
@@ -36,7 +37,7 @@ def stream_cipher(seq: str, key: bytes):
         secret_byte = key[int(i / 4) % len(key)]
         # calculate padding
         rshift = 6 - (i % 4) * 2
-        
+
         if seq[i] == UNKNOWN_BASE:
             mut_seq += UNKNOWN_BASE
         else:
@@ -48,7 +49,7 @@ def stream_cipher(seq: str, key: bytes):
             except KeyError:
                 raise ValueError("Illegal DNA base %s" % seq[i])
             mut_seq += BITS2BASE[bits]
-    
+
     return mut_seq
 
 
@@ -89,7 +90,7 @@ def indel_mut_map(alt_freq_map: dict, ref_freq_map: dict, rnd: VeryRandom):
         alt_freqs[i] = alt_freq_map.get(seq, 0) + rnd.random()
         ref_freqs[i] = freq
         i += 1
-    
+
     return _mut_map(seqs, alt_freqs, ref_freqs, rnd)
 
 
@@ -104,10 +105,10 @@ def _mut_map(seqs: list, alt_freqs: list, ref_freqs: list, rnd: VeryRandom):
     assert len(seqs) == len(alt_freqs) == len(ref_freqs)
     ref_seqs = seqs
     alt_seqs = seqs[:]
-    
+
     mut_map = {}
     # map bases but skip last unmapped base
-    
+
     for i in range(len(ref_freqs) - 1):
         # draw ref indel with multinomial probability
         ref_indel_id = rnd.multirand_index(ref_freqs)
@@ -116,16 +117,16 @@ def _mut_map(seqs: list, alt_freqs: list, ref_freqs: list, rnd: VeryRandom):
         alt_indel_id = np.argmax(alt_freqs)  # type: int
         # add mapping
         mut_map[alt_seqs[alt_indel_id]] = ref_seqs[ref_indel_id]
-        
+
         # delete processed items
         del ref_seqs[ref_indel_id]
         del ref_freqs[ref_indel_id]
         del alt_seqs[alt_indel_id]
         del alt_freqs[alt_indel_id]
-    
+
     # last base mapping is obvious
     mut_map[alt_seqs[0]] = ref_seqs[0]
-    
+
     return mut_map
 
 
@@ -136,7 +137,7 @@ def freq_map(values: list):
             result[value] = 1
         else:
             result[value] += 1
-    
+
     return result
 
 
@@ -154,7 +155,7 @@ def base_freqs(pileup: list):
                 freqs[BASES.index(base)] += 1
             except KeyError:
                 raise ValueError("Illegal DNA base %s" % base)
-    
+
     return freqs
 
 
@@ -198,7 +199,7 @@ def checksum(filepath: str, as_bytes=False):
     with open(filepath, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
             hasher.update(chunk)
-    
+
     checksum_bytes = hasher.digest()
     if as_bytes:
         return checksum_bytes
@@ -224,7 +225,7 @@ def ref_pos2seq_pos(alignment: pysam.AlignedSegment, ref_pos: int):
         if current_ref_pos == ref_pos:
             seq_pos = current_seq_pos
             break
-    
+
     return seq_pos
 
 
@@ -238,7 +239,7 @@ def variant_seqs(variants: list):
         if variant.is_present():
             # alignment is mapped at snv position
             pileup_col.append(variant.seq)
-    
+
     return pileup_col
 
 
@@ -257,82 +258,63 @@ def max_match_len(sequence: str, pos: int, words: list):
         if pos + len(word) > len(sequence):
             max_length = 0
             break
-        
+
         if word == sequence[pos:end_pos]:
             # matching
             max_length = max(len(word), max_length)
-    
+
     return max_length
 
 
-# TODO refactor - merge with vac_aligned_variant
-def diff_aligned_variant(alignment: pysam.AlignedSegment, diff: po.VariantPosition):
-    """
-    Factory that creates AlignedVariant from pysam alignment and DIFF record.
-    Alignment and DIFF are assumed to be of the same reference.
-    :param alignment:
-    :param diff:
-    """
-    assert alignment.reference_name == diff.ref_name
-    
-    # reference_end is position after the last base
-    if diff.ref_pos >= alignment.reference_end or diff.ref_pos < alignment.reference_start:
-        # variant is after or before the alignment
-        variant = AlignedVariant(alignment)
-    else:
-        # obtain query_sequence position
-        pos = ref_pos2seq_pos(alignment, diff.ref_pos)
-        if pos is None:
-            message = "reference position %d on alignment with range <%d,%d> not found"
-            raise ValueError(message % (diff.ref_pos, alignment.reference_start, alignment.reference_end - 1))
-        elif isinstance(diff, po.SnvDiff):
-            variant = AlignedVariant(alignment, pos)
-        elif isinstance(diff, po.IndelDiff):
-            end_pos = pos + max_match_len(alignment.query_sequence, pos, diff.mut_map.values())
-            if end_pos > pos:
-                # indel was found
-                variant = AlignedVariant(alignment, pos, end_pos, diff.ref_seq)
-            else:
-                # match not found - this sould not occur
-                variant = AlignedVariant(alignment)
-        else:
-            raise ValueError("%s is not DIFF record instance" % type(diff).__name__)
-    
-    return variant
-
-
-def vac_aligned_variant(alignment: pysam.AlignedSegment, vac: po.VariantPosition):
+def vac_aligned_variant(alignment: pysam.AlignedSegment, vac: typing.Union[po.VariantPosition, po.VariantDiff], vac_occurrence: bool):
     """
     Factory that creates AlignedVariant from pysam alignment and VAC record.
     Alignment and VAC are assumed to be of the same reference.
-    :param alignment:
-    :param vac:
+    :param alignment: aligned read
+    :param vac: variant position of diff record if vac_occurrence is false
+    :param vac_occurrence: if we compare to Snv/IndelOccurrence (encrypt) or to Snv/IndelDiff (decrpyt)
     """
     assert alignment.reference_name == vac.ref_name
-    
+
+    SnpCompare = po.SnvOccurrence
+    IndelCompare = po.IndelOccurrence
+    if not vac_occurrence:
+        SnpCompare = po.SnvDiff
+        IndelCompare = po.IndelDiff
+
     # reference_end is position after the last base
+    # try:
+    #     test = vac.ref_pos >= alignment.reference_end
+    # except TypeError:
+    #     # attributes = [attr for attr in dir(alignment) if not attr.startswith('__')]
+    #     # dct = {k:getattr(alignment, k) for k in attributes}
+    #     # print(alignment, dct)
+    #     raise Exception
     if vac.ref_pos >= alignment.reference_end or vac.ref_pos < alignment.reference_start:
         # variant is after or before the alignment
         variant = AlignedVariant(alignment)
     else:
         pos = ref_pos2seq_pos(alignment, vac.ref_pos)
         if pos is None:
-            message = "reference position %d on alignment with range <%d,%d> not found"
-            raise ValueError(message % (vac.ref_pos, alignment.reference_start, alignment.reference_end - 1))
-        elif isinstance(vac, po.SnvOccurence):
+            message = "WARNING: reference position %d on alignment with range <%d,%d> not found (possible deletion in bam read)" % (vac.ref_pos, alignment.reference_start, alignment.reference_end - 1)
+            print(message)
+            return None
+        elif isinstance(vac, SnpCompare):
             variant = AlignedVariant(alignment, pos)
-        elif isinstance(vac, po.IndelOccurence):
-            end_pos = pos + max_match_len(alignment.query_sequence, pos, vac.seqs)
+        elif isinstance(vac, IndelCompare):
+            words = vac.seqs if vac_occurrence else vac.mut_map.values()
+            end_pos = pos + max_match_len(alignment.query_sequence, pos, words)
             if end_pos > pos:
                 # indel was found
-                assert len(vac.seqs)
+                if vac_occurrence:
+                    assert len(vac.seqs)
                 variant = AlignedVariant(alignment, pos, end_pos, vac.ref_seq)
             else:
                 # match not found or at least one variant exceeds alignment end
                 variant = AlignedVariant(alignment)
         else:
-            raise ValueError("%s is not VAC record instance" % type(vac).__name__)
-    
+            raise ValueError("%s is not %s/%s record instance" % (type(vac).__name__, type(SnpCompare).__name__, type(IndelCompare).__name__,))
+
     return variant
 
 
@@ -367,12 +349,12 @@ def seq2bytes(seq: str):
             byte |= BASE2BITS[seq[i]] << lshift
         except KeyError:
             raise ValueError("Illegal DNA base %s" % seq[i])
-        
+
         if (i + 1) % 4 == 0 or len(seq) == i + 1:
             # end of byte or end of sequence
             seq_bytes += bytes([byte])
             byte = 0
-    
+
     return seq_bytes
 
 
@@ -384,10 +366,10 @@ def bytes2seq(byte_list: bytes, seq_length: int):
     """
     if math.ceil(seq_length / 4) > len(byte_list):
         raise ValueError('Not enough bytes for supplied length')
-    
+
     if math.ceil(seq_length / 4) < len(byte_list):
         raise ValueError('Too much bytes for supplied length')
-    
+
     seq = ''
     for i in range(seq_length):
         byte = byte_list[int(i / 4)]
@@ -396,7 +378,7 @@ def bytes2seq(byte_list: bytes, seq_length: int):
         # extract next 2 bits
         bits = (byte & BASE_BITMASKS[i % 4]) >> rshift
         seq += BITS2BASE[bits]
-    
+
     return seq
 
 

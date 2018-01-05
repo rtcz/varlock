@@ -215,6 +215,7 @@ class Vac:
         # print('ws', index, ac_tuple)
         # assert 0 <= ref_id < len(BASES)
         snv_file.write(struct.pack(cls.SNV_FORMAT, index, ref_id, *ac_tuple))
+        return index
     
     @classmethod
     def read_indel_record(cls, indel_file):
@@ -259,6 +260,7 @@ class Vac:
         
         # print('wi', index, indel_map)
         indel_file.write(record)
+        return index
     
     def vcf2vac(self, vcf_file, vac_file):
         # TODO enable gzipped VCF file as input
@@ -275,6 +277,9 @@ class Vac:
         
         snv_filename = vac_file.name + self.SNV_TEMP_EXT
         indel_filename = vac_file.name + self.INDEL_TEMP_EXT
+
+        last_pos_written = -1
+        same_pos_records = 0
         
         with open(snv_filename, 'wb') as snv_file, \
                 open(indel_filename, 'wb') as indel_file:
@@ -295,6 +300,12 @@ class Vac:
                     chrom = data[self.VCF_CHROM_ID]
                     pos = int(data[self.VCF_POS_ID]) - 1  # vcf has 1-based index, convert it to 0-based index
                     index = self.fai.pos2index(chrom, pos)
+
+                    if last_pos_written == index:
+                        #if self.verbose:
+                        #   print("WARNING: skipping record (equal positions %d with previous record)" % index)
+                        same_pos_records += 1
+                        continue
                     
                     count_list = self.parse_allele_counts(data[self.VCF_INFO_ID])
                     if is_snv:
@@ -302,7 +313,7 @@ class Vac:
                         # allele count map
                         count_map = self.snv_count_map(allele_list, count_list)
                         count_tuple = (count_map['A'], count_map['T'], count_map['G'], count_map['C'])
-                        self._write_snv_record(
+                        last_pos_written = self._write_snv_record(
                             snv_file=snv_file,
                             index=index,
                             ref_id=BASES.index(data[self.VCF_REF_ID]),
@@ -311,13 +322,13 @@ class Vac:
                     else:  # is indel
                         indel_count += 1
                         indel_map = self._indel_count_map(allele_list, count_list)
-                        self._write_indel_record(
+                        last_pos_written = self._write_indel_record(
                             indel_file=indel_file,
                             index=index,
                             indel_map=indel_map
                         )
                 
-                if self.verbose and variant_cnt % 10000 == 0:
+                if self.verbose and variant_cnt % 100000 == 0:
                     print("variant %d" % variant_cnt)
         
         self.write_header(vac_file, snv_count, indel_count)
@@ -325,6 +336,7 @@ class Vac:
         if self.verbose:
             print("total variants %d" % variant_cnt)
             print("total SNVs %d" % snv_count)
+            print("total same_pos_records %d" % same_pos_records)
         
         self.__final_merge(vac_file, snv_filename, indel_filename)
     
