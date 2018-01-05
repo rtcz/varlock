@@ -9,6 +9,7 @@ import varlock.iters as iters
 import varlock.po as po
 from varlock.fasta_index import FastaIndex
 from varlock.random import VeryRandom
+from varlock.variant import AlignedVariant
 
 
 class Mutator:
@@ -140,7 +141,7 @@ class Mutator:
                     self.__write_alignment(mut_bam_file, alignment)
                 else:
                     # append to queue
-                    alignment_queue.append(po.AlignedVariant(alignment))
+                    alignment_queue.append(AlignedVariant(alignment))
                 
                 alignment = next(bam_iter)
             
@@ -232,7 +233,7 @@ class Mutator:
                     self.__write_alignment(out_bam_file, alignment)
                 else:
                     # append to queue
-                    alignment_queue.append(po.AlignedVariant(alignment))
+                    alignment_queue.append(AlignedVariant(alignment))
                 
                 alignment = next(bam_iter)
             
@@ -310,9 +311,9 @@ class Mutator:
         :param vac: variant allele count list
         :return: True if NS mutation has occured
         """
-        if isinstance(vac, po.VacSnvRecord):
+        if isinstance(vac, po.SnvOccurence):
             is_mutated = self._mutate_snv_pos(bdiff_io, variant_queue, vac, rnd)
-        elif isinstance(vac, po.VacIndelRecord):
+        elif isinstance(vac, po.IndelOccurence):
             is_mutated = self._mutate_indel_pos(bdiff_io, variant_queue, vac, rnd)
         else:
             raise ValueError("%s is not VAC record instance" % type(vac).__name__)
@@ -323,7 +324,7 @@ class Mutator:
             self,
             bdiff_io: bdiff.BdiffIO,
             variant_queue: list,
-            vac: po.VacSnvRecord,
+            vac: po.SnvOccurence,
             rnd: VeryRandom
     ) -> bool:
         is_mutated = False
@@ -332,7 +333,7 @@ class Mutator:
         alt_freqs = cmn.base_freqs(variant_seqs)
         mut_map = cmn.snv_mut_map(alt_freqs=alt_freqs, ref_freqs=vac.freqs, rnd=rnd)
         
-        for variant in variant_queue:  # type: po.AlignedVariant
+        for variant in variant_queue:  # type: AlignedVariant
             if variant.is_present():
                 # alignment has vac to mutate
                 is_mutated |= self._mutate_variant(variant, mut_map)
@@ -349,7 +350,7 @@ class Mutator:
             self,
             bdiff_io: bdiff.BdiffIO,
             variant_queue: list,
-            vac: po.VacIndelRecord,
+            vac: po.IndelOccurence,
             rnd: VeryRandom
     ) -> bool:
         is_mutated = False
@@ -362,7 +363,7 @@ class Mutator:
             rnd=rnd
         )
         
-        for variant in variant_queue:  # type: po.AlignedVariant
+        for variant in variant_queue:  # type: AlignedVariant
             if variant.is_present():
                 # alignment has vac to mutate
                 is_mutated |= self._mutate_variant(variant, mut_map)
@@ -374,7 +375,7 @@ class Mutator:
         
         return is_mutated
     
-    def _mutate_variant(self, variant: po.AlignedVariant, mut_map: dict) -> bool:
+    def _mutate_variant(self, variant: AlignedVariant, mut_map: dict) -> bool:
         """
         Mutate alignment by mutation map at SNV position.
         :param variant:

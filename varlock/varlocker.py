@@ -217,16 +217,13 @@ class Varlocker:
                 raise ValueError('BDIFF must contain secret to decrypt unmapped reads.')
             
             if unmapped_only:
-                # out_diff = Diff.truncate(diff_file)
                 del bdiff.header[BdiffIO.FROM_INDEX]
                 del bdiff.header[BdiffIO.TO_INDEX]
                 out_diff = bdiff.file(bdiff.header)
             elif include_unmapped:
-                # out_diff = Diff.slice(diff_file, start_index, end_index)
                 out_diff = bdiff.file(bdiff.header)
             else:
                 # mapped only
-                # out_diff = Diff.slice(diff_file, start_index, end_index, False)
                 del bdiff.header[BamMutator.BDIFF_SECRET_TAG]
                 out_diff = bdiff.file(bdiff.header)
             
