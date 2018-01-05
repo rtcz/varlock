@@ -1,4 +1,4 @@
-from varlock.po import DiffSnvRecord, DiffIndelRecord, DiffRecord
+from varlock.po import SnvDiff, IndelDiff, VariantDiff
 
 from varlock.fasta_index import FastaIndex
 import varlock.bdiff as bdiff
@@ -27,7 +27,7 @@ class BdiffIterator:
     def __iter__(self):
         return self
     
-    def __next__(self) -> DiffRecord:
+    def __next__(self) -> VariantDiff:
         """
         :return: next DIFF record (SNV or INDEL) by genomic index order
         BDIFF reversed mut_map:
@@ -43,12 +43,12 @@ class BdiffIterator:
             if is_indel:
                 # it is assumed that INDEL record was saved as:
                 # sorted(alts) -> permuted(alts)
-                record = DiffIndelRecord(index, ref_name, ref_pos, mut_map, ref_seq)
+                record = IndelDiff(index, ref_name, ref_pos, mut_map, ref_seq)
             else:
                 # is SNV
                 # it is assumed that SNV record was saved as:
                 # BASES -> permuted(BASES)
-                record = DiffSnvRecord(index, ref_name, ref_pos, mut_map, ref_seq)
+                record = SnvDiff(index, ref_name, ref_pos, mut_map, ref_seq)
         
         self._counter += 1
         return record

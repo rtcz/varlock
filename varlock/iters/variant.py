@@ -3,6 +3,7 @@ import numpy as np
 import varlock.po as po
 from varlock.common import BASES
 from varlock.fasta_index import FastaIndex
+from varlock.random import VeryRandom
 from varlock.vac import Vac
 
 
@@ -15,7 +16,7 @@ class VariantIterator:
         """
         pass
     
-    def __next__(self) -> po.VacRecord:
+    def __next__(self) -> po.VariantOccurence:
         # TODO
         pass
 
@@ -57,7 +58,7 @@ class VacFileIterator:
             self._snv_count -= 1
             index, ref_id, freqs = Vac.read_snv_record(self._snv_file)
             ref_name, ref_pos = self._fai.index2pos(index)
-            self._snv_record = po.VacSnvRecord(
+            self._snv_record = po.SnvOccurence(
                 index=index,
                 ref_name=ref_name,
                 ref_pos=ref_pos,
@@ -74,7 +75,7 @@ class VacFileIterator:
             self._indel_count -= 1
             index, counts, seqs = Vac.read_indel_record(self._indel_file)
             ref_name, ref_pos = self._fai.index2pos(index)
-            self._indel_record = po.VacIndelRecord(
+            self._indel_record = po.IndelOccurence(
                 index=index,
                 ref_name=ref_name,
                 ref_pos=ref_pos,
@@ -108,7 +109,7 @@ class VacFileIterator:
         self._snv_file.close()
         self._indel_file.close()
     
-    def __next__(self) -> po.VacRecord:
+    def __next__(self) -> po.VariantOccurence:
         if self._snv_record is not None and self._indel_record is not None:
             if self._snv_record.index == self._indel_record.index:
                 raise ValueError("SNV and INDEL have the same position")
@@ -138,29 +139,32 @@ class RandomSnvIterator:
     Random rare SNV iterator. SNVs positions are randomly generated across whole genome.
     """
     
-    def __init__(self, fai: FastaIndex, mut_p: int):
+    def __init__(self, fai: FastaIndex, mut_p: int, rnd: VeryRandom):
         """
         :param mut_p: random variant (mutation) probability per genome base
         :param fai:
         """
         assert mut_p > 0
         self._fai = fai
+        self._rnd = rnd
         length = fai.last_index() - fai.first_index()
         mut_count = int(mut_p * length)
         
         # sample random genomic indices from uniform distribution
-        self._indices = np.sort(np.random.randint(fai.first_index(), fai.last_index(), mut_count))
+        self._indices = np.sort(rnd.rand_ints(fai.first_index(), fai.last_index(), mut_count))
         self._counter = 0
     
-    def __next__(self) -> po.VacRecord:
+    def __next__(self) -> po.VariantOccurence:
         index = self._indices[self._counter]
         self._counter += 1
         ref_name, ref_pos = self._fai.index2pos(index)
-        return po.VacSnvRecord(
+        return po.SnvOccurence(
             index=index,
             ref_name=ref_name,
             ref_pos=ref_pos,
             freqs=[3, 3, 2, 2],  # approximate GC content in human genome
             seqs=BASES,
-            ref_id=0  # TODO use real value based on genome fasta via pyfaidx
+            # TODO use real value based on genome fasta via pyfaidx
+            # this could be later utilized in CIGAR edit
+            ref_id=0
         )

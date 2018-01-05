@@ -10,6 +10,7 @@ import pysam
 
 import varlock.po as po
 from varlock.random import VeryRandom
+from varlock.variant import AlignedVariant
 
 BASES = ("A", "T", "G", "C")
 UNKNOWN_BASE = "N"
@@ -233,7 +234,7 @@ def variant_seqs(variants: list):
     :return: list of bases at specific position
     """
     pileup_col = []
-    for variant in variants:  # type: po.AlignedVariant
+    for variant in variants:  # type: AlignedVariant
         if variant.is_present():
             # alignment is mapped at snv position
             pileup_col.append(variant.seq)
@@ -277,23 +278,23 @@ def diff_aligned_variant(alignment: pysam.AlignedSegment, diff: po.VariantPositi
     # reference_end is position after the last base
     if diff.ref_pos >= alignment.reference_end or diff.ref_pos < alignment.reference_start:
         # variant is after or before the alignment
-        variant = po.AlignedVariant(alignment)
+        variant = AlignedVariant(alignment)
     else:
         # obtain query_sequence position
         pos = ref_pos2seq_pos(alignment, diff.ref_pos)
         if pos is None:
             message = "reference position %d on alignment with range <%d,%d> not found"
             raise ValueError(message % (diff.ref_pos, alignment.reference_start, alignment.reference_end - 1))
-        elif isinstance(diff, po.DiffSnvRecord):
-            variant = po.AlignedVariant(alignment, pos)
-        elif isinstance(diff, po.DiffIndelRecord):
+        elif isinstance(diff, po.SnvDiff):
+            variant = AlignedVariant(alignment, pos)
+        elif isinstance(diff, po.IndelDiff):
             end_pos = pos + max_match_len(alignment.query_sequence, pos, diff.mut_map.values())
             if end_pos > pos:
                 # indel was found
-                variant = po.AlignedVariant(alignment, pos, end_pos, diff.ref_seq)
+                variant = AlignedVariant(alignment, pos, end_pos, diff.ref_seq)
             else:
                 # match not found - this sould not occur
-                variant = po.AlignedVariant(alignment)
+                variant = AlignedVariant(alignment)
         else:
             raise ValueError("%s is not DIFF record instance" % type(diff).__name__)
     
@@ -312,23 +313,23 @@ def vac_aligned_variant(alignment: pysam.AlignedSegment, vac: po.VariantPosition
     # reference_end is position after the last base
     if vac.ref_pos >= alignment.reference_end or vac.ref_pos < alignment.reference_start:
         # variant is after or before the alignment
-        variant = po.AlignedVariant(alignment)
+        variant = AlignedVariant(alignment)
     else:
         pos = ref_pos2seq_pos(alignment, vac.ref_pos)
         if pos is None:
             message = "reference position %d on alignment with range <%d,%d> not found"
             raise ValueError(message % (vac.ref_pos, alignment.reference_start, alignment.reference_end - 1))
-        elif isinstance(vac, po.VacSnvRecord):
-            variant = po.AlignedVariant(alignment, pos)
-        elif isinstance(vac, po.VacIndelRecord):
+        elif isinstance(vac, po.SnvOccurence):
+            variant = AlignedVariant(alignment, pos)
+        elif isinstance(vac, po.IndelOccurence):
             end_pos = pos + max_match_len(alignment.query_sequence, pos, vac.seqs)
             if end_pos > pos:
                 # indel was found
                 assert len(vac.seqs)
-                variant = po.AlignedVariant(alignment, pos, end_pos, vac.ref_seq)
+                variant = AlignedVariant(alignment, pos, end_pos, vac.ref_seq)
             else:
                 # match not found or at least one variant exceeds alignment end
-                variant = po.AlignedVariant(alignment)
+                variant = AlignedVariant(alignment)
         else:
             raise ValueError("%s is not VAC record instance" % type(vac).__name__)
     
