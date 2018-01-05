@@ -1,6 +1,6 @@
 import unittest
 
-from varlock.cigar import Cigar
+from varlock_src.cigar import Cigar
 
 
 class TestCigar(unittest.TestCase):

@@ -1,7 +1,7 @@
 import unittest
 import pysam
 
-from varlock.fasta_index import FastaIndex
+from varlock_src.fasta_index import FastaIndex
 
 
 class TestFastaIndex(unittest.TestCase):

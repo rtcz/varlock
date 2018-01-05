@@ -1,7 +1,7 @@
-from varlock.po import SnvDiff, IndelDiff, VariantDiff
+from varlock_src.po import SnvDiff, IndelDiff, VariantDiff
 
-from varlock.fasta_index import FastaIndex
-import varlock.bdiff as bdiff
+from varlock_src.fasta_index import FastaIndex
+import varlock_src.bdiff as bdiff
 
 
 class BdiffIterator:

@@ -1,4 +1,4 @@
-from varlock.po import FaiRecord
+from varlock_src.po import FaiRecord
 
 
 class FastaIndex:

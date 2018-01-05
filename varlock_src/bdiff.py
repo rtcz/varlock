@@ -6,7 +6,7 @@ import os
 import math
 import shutil
 
-import varlock.common as cmn
+import varlock_src.common as cmn
 
 
 class BdiffIO:

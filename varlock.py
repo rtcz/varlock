@@ -2,17 +2,25 @@ import argparse
 import os
 import sys
 
+from datetime import datetime
 from Crypto.PublicKey import RSA
 
-from varlock.varlocker import Varlocker
-
+from varlock_src.varlocker import Varlocker
 
 def main():
+    # print start time
+    start_time = datetime.now()
+    print('''VarLock = "Variant Locker" genome data anonymization tool \nVarLock Starting : {start: %Y-%m-%d %H:%M:%S}'''.format(start=start_time))
+
     try:
         command, args = parse_command()
-        parsed_args = parse_encrypt_args(args)
+        parse_args_function = {'encrypt':parse_encrypt_args, 'decrypt':parse_decrypt_args, 'reencrypt':parse_reencrypt_args, 'vac':parse_vac_args}
+        if command in parse_args_function.keys():
+            parsed_args = parse_args_function[command](args)
+        else:
+            raise InvalidCommandError("unknown command %s (use: %s)" % (command, ' '.join(parse_args_function.keys())))
         locker = Varlocker(verbose=parsed_args.verbose)
-        
+
         if command == 'encrypt':
             with open(parsed_args.key, 'r') as key_file, \
                     open(parsed_args.pub_key, 'r') as pub_key_file:
@@ -27,16 +35,16 @@ def main():
                     out_enc_diff_filename=parsed_args.out_diff,
                     seed=parsed_args.seed
                 )
-        
+
         elif command == 'decrypt':
             with open(parsed_args.key, 'r') as key_file:
                 rsa_key = RSA.importKey(key_file.read(), passphrase=parsed_args.password)
-                
+
                 rsa_ver_key = None
                 if parsed_args.ver_key is not None:
                     with open(parsed_args.ver_key, 'r') as ver_key_file:
                         rsa_ver_key = RSA.importKey(ver_key_file.read())
-                
+
                 locker.decrypt(
                     rsa_key=rsa_key,
                     bam_filename=parsed_args.bam,
@@ -55,12 +63,12 @@ def main():
                     open(parsed_args.pub_key, 'r') as pub_key_file:
                 rsa_key = RSA.importKey(key_file.read(), passphrase=parsed_args.password)
                 rsa_enc_key = RSA.importKey(pub_key_file.read())
-                
+
                 rsa_ver_key = None
                 if parsed_args.ver_key is not None:
                     with open(parsed_args.ver_key, 'r') as ver_key_file:
                         rsa_ver_key = RSA.importKey(ver_key_file.read())
-                
+
                 locker.reencrypt(
                     rsa_key=rsa_key,
                     rsa_enc_key=rsa_enc_key,
@@ -75,7 +83,7 @@ def main():
                     unmapped_only=parsed_args.unmapped_only,
                     rsa_ver_key=rsa_ver_key
                 )
-        
+
         elif command == 'vac':
             parsed_args = parse_vac_args(args)
             locker.create_vac(
@@ -87,6 +95,11 @@ def main():
             print("unrecognized command '%s'" % command)
     except InvalidCommandError:
         print_usage()
+
+    # print the time of the end:
+    end_time = datetime.now()
+    print('VarLock Stopping : {finish:%Y-%m-%d %H:%M:%S}'.format(finish=end_time))
+    print('Total time of run: {duration}'.format(duration=end_time - start_time))
 
 
 def parse_command():
@@ -109,7 +122,7 @@ def print_usage():
 
 def parse_encrypt_args(args):
     parser = argparse.ArgumentParser(prog='varlock encrypt')
-    
+
     required = parser.add_argument_group("Required")
     required.add_argument('-k', '--key', type=is_file, help='private key for signing', required=True)
     required.add_argument('-e', '--pub_key', type=is_file, help='public key for encryption', required=True)
@@ -117,7 +130,7 @@ def parse_encrypt_args(args):
     required.add_argument('-c', '--vac', type=is_file, help='VAC file', required=True)
     required.add_argument('-m', '--out_bam', type=str, help='output mutated BAM file', required=True)
     required.add_argument('-d', '--out_diff', type=str, help='output encrypted DIFF file', required=True)
-    
+
     optional = parser.add_argument_group("Optional")
     optional.add_argument('-p', '--password', type=str, help='private key password')
     optional.add_argument('-s', '--seed', type=str, help='random number generator seed')
@@ -127,13 +140,13 @@ def parse_encrypt_args(args):
 
 def parse_decrypt_args(args):
     parser = argparse.ArgumentParser(prog='varlock decrypt')
-    
+
     required = parser.add_argument_group("Required")
     required.add_argument('-k', '--key', type=is_file, help='private key for decryption', required=True)
     required.add_argument('-m', '--bam', type=is_file, help='mutated BAM file', required=True)
     required.add_argument('-d', '--diff', type=is_file, help='encrypted DIFF file', required=True)
     required.add_argument('-b', '--out_bam', type=str, help='output restored BAM file', required=True)
-    
+
     optional = parser.add_argument_group("Optional")
     optional.add_argument('-p', '--password', type=str, help='private key password')
     region_formats = "'chr1', 'chr1:chr2', 'chr1:10000:20000', 'chr1:10000:chr2:20000'"
@@ -154,7 +167,7 @@ def parse_reencrypt_args(args):
     required.add_argument('-b', '--bam', type=is_file, help='mutated BAM file', required=True)
     required.add_argument('-c', '--diff', type=is_file, help='encrypted DIFF input', required=True)
     required.add_argument('-o', '--out_diff', type=str, help='encrypted DIFF output', required=True)
-    
+
     optional = parser.add_argument_group("Optional")
     optional.add_argument('-p', '--password', type=str, help='private key password')
     region_formats = "'chr1', 'chr1:chr2', 'chr1:10000:20000', 'chr1:10000:chr2:20000'"
@@ -164,21 +177,21 @@ def parse_reencrypt_args(args):
     optional.add_argument('-u', '--unmapped_only', action='store_true', help="only unmapped reads")
     optional.add_argument('-f', '--ver_key', help="public key for verification", default=None)
     optional.add_argument('-v', '--verbose', action='store_true', help="explain what is being done")
-    
+
     return parser.parse_args(args)
 
 
 def parse_vac_args(args):
     parser = argparse.ArgumentParser(prog='varlock vac')
-    
+
     required = parser.add_argument_group("Required")
     required.add_argument('-b', '--bam', type=is_file, help='BAM file', required=True)
     required.add_argument('-f', '--vcf', type=is_file, help='VCF file', required=True)
-    required.add_argument('-c', '--vac', type=is_file, help='output VAC file', required=True)
-    
+    required.add_argument('-c', '--vac', type=str, help='output VAC file', required=True)
+
     optional = parser.add_argument_group("Optional")
     optional.add_argument('-v', '--verbose', action='store_true', help="explain what is being done")
-    
+
     return parser.parse_args(args)
 
 
@@ -190,7 +203,7 @@ def parse_sam_range(value: str):
     """
     start_ref_pos = None
     end_ref_pos = None
-    
+
     range_args = value.split(':')
     if len(range_args) == 1:
         # chr1
@@ -214,7 +227,7 @@ def parse_sam_range(value: str):
         end_ref_pos = int(range_args[3]) - 1
     else:
         raise ValueError("Invalid range format")
-    
+
     return start_ref_name, start_ref_pos, end_ref_name, end_ref_pos
 
 

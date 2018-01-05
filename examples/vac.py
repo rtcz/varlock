@@ -2,7 +2,7 @@ import gzip
 
 import pysam
 
-import varlock as vrl
+import varlock_src as vrl
 
 bam_filename = 'examples/resources/sample.bam'
 vcf_filename = 'examples/resources/sample.vcf.gz'

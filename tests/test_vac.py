@@ -3,9 +3,9 @@ import io
 import os
 import unittest
 
-from varlock.vac import Vac
-from varlock.fasta_index import FastaIndex
-from varlock.bam import open_bam
+from varlock_src.vac import Vac
+from varlock_src.fasta_index import FastaIndex
+from varlock_src.bam import open_bam
 
 
 class TestVac(unittest.TestCase):

@@ -1,7 +1,7 @@
 import filecmp
 import unittest
 
-from varlock.bdiff import BdiffIO
+from varlock_src.bdiff import BdiffIO
 
 
 class TestBdiff(unittest.TestCase):

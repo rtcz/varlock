@@ -1,7 +1,7 @@
 import io
 import random
 
-import varlock.bam_mutator as bammut
+import varlock_src.bam_mutator as bammut
 
 bam_filename = 'examples/resources/sample.bam'
 mut_bam_filename = 'examples/resources/sample.mut.bam'

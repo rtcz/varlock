@@ -2,7 +2,6 @@ import os
 
 from Crypto.Cipher import AES
 
-
 class FileAES:
     """
     AES encryption for binary input

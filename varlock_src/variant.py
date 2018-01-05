@@ -2,7 +2,7 @@ import pysam
 
 
 # TODO ? tests
-from varlock.cigar import Cigar
+from varlock_src.cigar import Cigar
 
 
 class AlignedVariant:

@@ -8,9 +8,9 @@ import os
 import numpy as np
 import pysam
 
-import varlock.po as po
-from varlock.random import VeryRandom
-from varlock.variant import AlignedVariant
+import varlock_src.po as po
+from varlock_src.random import VeryRandom
+from varlock_src.variant import AlignedVariant
 
 BASES = ("A", "T", "G", "C")
 UNKNOWN_BASE = "N"

@@ -5,10 +5,10 @@ import pysam
 from bitarray import bitarray
 from bitstring import BitArray
 
-import varlock.common as cmn
+import varlock_src.common as cmn
 from tests.random import RandomMockup
-from varlock.cigar import Cigar
-from varlock.random import VeryRandom
+from varlock_src.cigar import Cigar
+from varlock_src.random import VeryRandom
 
 
 class TestCommon(unittest.TestCase):

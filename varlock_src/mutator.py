@@ -1,15 +1,14 @@
 import hashlib
-from random import Random
 
 import pysam
 
-import varlock.bdiff as bdiff
-import varlock.common as cmn
-import varlock.iters as iters
-import varlock.po as po
-from varlock.fasta_index import FastaIndex
-from varlock.random import VeryRandom
-from varlock.variant import AlignedVariant
+import varlock_src.bdiff as bdiff
+import varlock_src.common as cmn
+import varlock_src.iters as iters
+import varlock_src.po as po
+from varlock_src.fasta_index import FastaIndex
+from varlock_src.random import VeryRandom
+from varlock_src.variant import AlignedVariant
 
 
 class Mutator:

@@ -10,13 +10,40 @@
 import argparse
 import os
 import re
+import sys
 from datetime import datetime
 
-from varlock.anonymer import Anonymer
+from varlock_src.anonymer import Anonymer
 
 GENOME_FILE = "/data/genome/human/hg38/hg38.fa"
 GENOME_INDEX = "/data/genome/human/hg38/bowtie2_index/hg38"
 PROCESS_COUNT = 8
+
+def main():
+    # print start time
+    start_time = datetime.now()
+    print('''Anonymizer - genome data anonymization tool \nAnonymizer Starting: {start: %Y-%m-%d %H:%M:%S}'''.format(start=start_time))
+
+    # read arguments
+    args = parse_args()
+    if args.verbose:
+        print(args)
+
+    # run anonymizer
+    anonym = Anonymer(r1=args.r1,
+                      r2=args.r2,
+                      out_dir=args.out_dir,
+                      gen_file=args.genome,
+                      gen_idx=args.bowtie_index,
+                      threads=PROCESS_COUNT,
+                      keep_temp=args.keep_temp,
+                      verbose=args.verbose)
+    anonym.substitute()
+
+    # print the time of the end:
+    end_time = datetime.now()
+    print('Anonymizer Stopping: {finish:%Y-%m-%d %H:%M:%S}'.format(finish=end_time))
+    print('Total time of run  : {duration}'.format(duration=end_time - start_time))
 
 def parse_args():
     """
@@ -75,28 +102,5 @@ def is_fastq_file(value):
 
 
 if __name__ == "__main__":
-
-    # print start time
-    start_time = datetime.now()
-    print('''VarLock = "Variant Locker" genome data anonymization tool \nVarLock Starting : {start: %Y-%m-%d %H:%M:%S}'''.format(start=start_time))
-
-    # read arguments
-    args = parse_args()
-    if args.verbose:
-        print(args)
-
-    # run anonymizer
-    anonym = Anonymer(r1=args.r1,
-                      r2=args.r2,
-                      out_dir=args.out_dir,
-                      gen_file=args.genome,
-                      gen_idx=args.bowtie_index,
-                      threads=PROCESS_COUNT,
-                      keep_temp=args.keep_temp,
-                      verbose=args.verbose)
-    anonym.substitute()
-
-    # print the time of the end:
-    end_time = datetime.now()
-    print('VarLock Stopping : {finish:%Y-%m-%d %H:%M:%S}'.format(finish=end_time))
-    print('Total time of run: {duration}'.format(duration=end_time - start_time))
+    status = main()
+    sys.exit(status)

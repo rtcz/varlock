@@ -1,17 +1,15 @@
 import io
 
-from Crypto import Random
-
-import varlock.bam as bam
-import varlock.common as cmn
-import varlock.iters as iters
-from varlock.bdiff import BdiffIO
-from varlock.fasta_index import FastaIndex
-from varlock.mutator import Mutator
+import varlock_src.bam as bam
+import varlock_src.common as cmn
+import varlock_src.iters as iters
+from varlock_src.bdiff import BdiffIO
+from varlock_src.fasta_index import FastaIndex
+from varlock_src.mutator import Mutator
 
 
 # TODO rename MutatorWrapper ?
-from varlock.random import VeryRandom
+from varlock_src.random import VeryRandom
 
 
 class BamMutator:
