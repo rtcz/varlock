@@ -1,6 +1,5 @@
 import pysam
 
-
 # TODO ? tests
 from varlock_src.cigar import Cigar
 
@@ -60,10 +59,12 @@ class AlignedVariant:
         Set variant sequence.
         :param seq: new sequence
         """
+        quality_seq = self.alignment.query_qualities
         mut_seq = self.alignment.query_sequence[:self._pos]
         mut_seq += seq
         mut_seq += self.alignment.query_sequence[self._end_pos:]
         self.alignment.query_sequence = mut_seq
+        self.alignment.query_qualities = quality_seq
         
         # print(self.alignment.query_alignment_sequence)
         # print(self._pos)
