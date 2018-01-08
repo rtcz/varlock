@@ -12,6 +12,10 @@
 .idea/deployment.xml
 .idea/webServers.xml
 
+# left out for containing python interpreter
+.idea/varlock.iml
+.idea/misc.xml
+
 # Sensitive or high-churn files:
 .idea/**/dataSources/
 .idea/**/dataSources.ids
