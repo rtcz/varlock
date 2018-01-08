@@ -179,3 +179,7 @@ venv.bak/
 *.bam
 *.bai
 *.vac
+
+/.idea/markdown-navigator.xml
+/.idea/other.xml
+/.idea/markdown-navigator/profiles_settings.xml
