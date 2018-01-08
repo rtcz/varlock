@@ -38,12 +38,12 @@ class VariantIterator:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._iter1.__exit__(exc_type, exc_val, exc_tb)
 
-    def _next1(self) -> po.VariantOccurence:
+    def _next1(self) -> po.VariantOccurrence:
         curr = self._curr1
         self._curr1 = next(self._iter1)
         return curr
 
-    def _next2(self) -> po.VariantOccurence:
+    def _next2(self) -> po.VariantOccurrence:
         curr = self._curr2
         self._curr2 = next(self._iter2)
         return curr

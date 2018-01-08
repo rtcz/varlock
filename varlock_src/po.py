@@ -1,5 +1,4 @@
 # TODO refactor, use @property, etc
-
 class VariantPosition(object):
     def __init__(self, index: int, ref_name: str, ref_pos: int):
         self.index = index
@@ -40,14 +39,13 @@ class VariantOccurrence(VariantPosition):
     def ref_seq(self):
         return self.seqs[self.ref_id]
 
-class SnvOccurrence(VariantOccurrence):
 
+class SnvOccurrence(VariantOccurrence):
     def __str__(self):
         return '#%d %s:%d SNP' % (self.index, self.ref_name, self.ref_pos)
 
 
 class IndelOccurrence(VariantOccurrence):
-
     def __str__(self):
         return '#%d %s:%d INDEL' % (self.index, self.ref_name, self.ref_pos)
 
