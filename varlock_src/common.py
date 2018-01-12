@@ -300,8 +300,8 @@ def vac_aligned_variant(alignment: pysam.AlignedSegment, vac: typing.Union[po.Va
         if pos is None:
             message = "WARNING: reference position %d on alignment with range <%d,%d> not found (possible deletion in bam read)" % (
             vac.ref_pos, alignment.reference_start, alignment.reference_end - 1)
-            print(message)
-            return None
+            #print(message)
+            return AlignedVariant(alignment)
         elif isinstance(vac, SnpCompare):
             variant = AlignedVariant(alignment, pos)
         elif isinstance(vac, IndelCompare):

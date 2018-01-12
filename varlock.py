@@ -11,9 +11,7 @@ from varlock_src.varlocker import Varlocker
 def main():
     # print start time
     start_time = datetime.now()
-    print(
-        '''VarLock = "Variant Locker" genome data anonymization tool \nVarLock Starting : {start: %Y-%m-%d %H:%M:%S}'''.format(
-            start=start_time))
+    print('VarLock = "Variant Locker" genome data anonymization tool \nVarLock Starting : {start: %Y-%m-%d %H:%M:%S}'.format(start=start_time))
     
     try:
         command, args = parse_command()
@@ -94,7 +92,8 @@ def main():
             locker.create_vac(
                 bam_filename=parsed_args.bam,
                 vcf_filename=parsed_args.vcf,
-                out_vac_filename=parsed_args.vac
+                out_vac_filename=parsed_args.vac,
+                ref_fasta_filename=parsed_args.ref_fasta
             )
         else:
             print("unrecognized command '%s'" % command)
@@ -197,6 +196,7 @@ def parse_vac_args(args):
     required.add_argument('-c', '--vac', type=str, help='output VAC file', required=True)
     
     optional = parser.add_argument_group("Optional")
+    optional.add_argument('-r', '--ref-fasta', type=is_file, help='Reference FASTA file', default=None)
     optional.add_argument('-v', '--verbose', action='store_true', help="explain what is being done")
     
     return parser.parse_args(args)

@@ -152,14 +152,16 @@ class Mutator:
                 alignment = next(bam_iter)
             
             elif self.__is_after_index(alignment, vac.index):
+                # apply the variant to alignment
                 self.__mutate_pos(bdiff_io, alignment_queue, vac, rnd)
                 # done with this vac, read next
                 prev_vac = vac
                 vac = next(vac_iter)
                 if self._verbose and vac_iter.counter % 100000 == 0:
                     print('%d VAC records done' % vac_iter.counter)
+                # not the end of VAC file
                 if vac is not None:
-                    # not the end of VAC file
+                    # write alignments to mutated BAM
                     self.__write_before_index(mut_bam_file, alignment_queue, vac.index)
                     # update alignment queue
                     for i in range(len(alignment_queue)):
