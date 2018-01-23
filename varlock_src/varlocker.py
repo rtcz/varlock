@@ -16,6 +16,8 @@ from varlock_src.fasta_index import FastaIndex
 from varlock_src.random import VeryRandom
 from varlock_src.vac import Vac
 
+import gzip
+import pyfaidx
 
 class Varlocker:
     """
@@ -30,20 +32,35 @@ class Varlocker:
     def __init__(self, verbose=False):
         self._verbose = verbose
     
-    def create_vac(self, bam_filename: str, vcf_filename: str, out_vac_filename: str):
+    def create_vac(self, bam_filename: str, vcf_filename: str, out_vac_filename: str, ref_fasta_filename: str, skip_indels: bool):
         """
         BAM and VCF should use same reference genome.
         VCF must contain INFO column with sub-fields AC and AN.
-        :param bam_filename:
-        :param vcf_filename:
-        :param out_vac_filename:
+        :param bam_filename: filename of the SAM/BAM file, from which the header is extracted
+        :param vcf_filename: filename of the input VCF file
+        :param out_vac_filename: filename of the output VAC file
+        :param ref_fasta_filename: filename to reference FASTA file
+        :param skip_indels: whether to skip indels and keep only SNPs
         """
         # TODO verify that BAM and VCF share the same reference genome ?
-        with open_vcf(vcf_filename, 'rt') as vcf_file, \
-                open_bam(bam_filename, 'rb') as sam_file, \
-                open(out_vac_filename, 'wb') as out_vac_file:
+
+        # load the reference FASTA
+        ref_fasta = None
+        if ref_fasta_filename is not None:
+            if self._verbose:
+                print('--- Loading Reference Fasta ---')
+            ref_fasta = pyfaidx.Fasta(ref_fasta_filename)
+
+        # is VCF gzipped?
+        is_gzipped = vcf_filename.endswith('.gz')
+
+        # open all files and create the VAC file
+        if self._verbose:
+            print('--- Processing VCF %s (gzipped: %s) ---' % (vcf_filename, is_gzipped))
+        with io.BufferedReader(gzip.open(vcf_filename)) if is_gzipped else open(vcf_filename, 'rt') as vcf_file, \
+                open_bam(bam_filename, 'rb') as sam_file, open(out_vac_filename, 'wb') as out_vac_file:
             vac = Vac(FastaIndex(sam_file.header), self._verbose)
-            vac.vcf2vac(vcf_file, out_vac_file)
+            vac.vcf2vac(vcf_file, out_vac_file, ref_fasta, skip_indels)
     
     def encrypt(
             self,

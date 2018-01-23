@@ -37,7 +37,7 @@ def stream_cipher(seq: str, key: bytes):
         secret_byte = key[int(i / 4) % len(key)]
         # calculate padding
         rshift = 6 - (i % 4) * 2
-        
+
         if seq[i] == UNKNOWN_BASE:
             mut_seq += UNKNOWN_BASE
         else:
@@ -49,7 +49,7 @@ def stream_cipher(seq: str, key: bytes):
             except KeyError:
                 raise ValueError("Illegal DNA base %s" % seq[i])
             mut_seq += BITS2BASE[bits]
-    
+
     return mut_seq
 
 
@@ -90,7 +90,7 @@ def indel_mut_map(alt_freq_map: dict, ref_freq_map: dict, rnd: VeryRandom):
         alt_freqs[i] = alt_freq_map.get(seq, 0) + rnd.random()
         ref_freqs[i] = freq
         i += 1
-    
+
     return _mut_map(seqs, alt_freqs, ref_freqs, rnd)
 
 
@@ -105,10 +105,10 @@ def _mut_map(seqs: list, alt_freqs: list, ref_freqs: list, rnd: VeryRandom):
     assert len(seqs) == len(alt_freqs) == len(ref_freqs)
     ref_seqs = seqs
     alt_seqs = seqs[:]
-    
+
     mut_map = {}
     # map bases but skip last unmapped base
-    
+
     for i in range(len(ref_freqs) - 1):
         # draw ref indel with multinomial probability
         ref_indel_id = rnd.multirand_index(ref_freqs)
@@ -117,16 +117,16 @@ def _mut_map(seqs: list, alt_freqs: list, ref_freqs: list, rnd: VeryRandom):
         alt_indel_id = np.argmax(alt_freqs)  # type: int
         # add mapping
         mut_map[alt_seqs[alt_indel_id]] = ref_seqs[ref_indel_id]
-        
+
         # delete processed items
         del ref_seqs[ref_indel_id]
         del ref_freqs[ref_indel_id]
         del alt_seqs[alt_indel_id]
         del alt_freqs[alt_indel_id]
-    
+
     # last base mapping is obvious
     mut_map[alt_seqs[0]] = ref_seqs[0]
-    
+
     return mut_map
 
 
@@ -137,7 +137,7 @@ def freq_map(values: list):
             result[value] = 1
         else:
             result[value] += 1
-    
+
     return result
 
 
@@ -155,7 +155,7 @@ def base_freqs(pileup: list):
                 freqs[BASES.index(base)] += 1
             except KeyError:
                 raise ValueError("Illegal DNA base %s" % base)
-    
+
     return freqs
 
 
@@ -199,7 +199,7 @@ def checksum(filepath: str, as_bytes=False):
     with open(filepath, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
             hasher.update(chunk)
-    
+
     checksum_bytes = hasher.digest()
     if as_bytes:
         return checksum_bytes
@@ -225,7 +225,7 @@ def ref_pos2seq_pos(alignment: pysam.AlignedSegment, ref_pos: int):
         if current_ref_pos == ref_pos:
             seq_pos = current_seq_pos
             break
-    
+
     return seq_pos
 
 
@@ -239,51 +239,107 @@ def variant_seqs(variants: list):
         if variant.is_present():
             # alignment is mapped at snv position
             pileup_col.append(variant.seq)
-    
+
     return pileup_col
 
 
-def max_match_len(sequence: str, pos: int, words: list):
+# def max_match_len(sequence: str, pos: int, words: list):
+#     """
+#     :param sequence:
+#     :param pos: position of matching
+#     :param words: words to match
+#     :return: Length of longest matching word in a string starting
+#     at specified position.
+#     When at least one word exceeds sequence length, zero is returned.
+#     """
+#     max_length = 0
+#     for word in words:
+#         end_pos = pos + len(word)
+#         if end_pos > len(sequence):
+#             max_length = 0
+#             break
+#
+#         if word == sequence[pos:end_pos]:
+#             # matching
+#             max_length = max(len(word), max_length)
+#
+#     return max_length
+
+
+def max_match_cigar(alignment: pysam.AlignedSegment, pos: int, ref_pos: int, words: list, reference: str):
     """
-    :param sequence:
-    :param pos: position of matching
-    :param words: words to match
-    :return: Length of longest matching word in a string starting
-    at specified position.
-    When at least one word exceeds sequence length, zero is returned.
+    Find maximal matching sequence from words in the alignment, that is present (skip deleted).
+    :param alignment: aligned read
+    :param pos: starting position in the read
+    :param ref_pos: reference position of the starting position
+    :param words: list of sequences to consider and test for
+    :return: the longest sequence from words
     """
     max_length = 0
+    best_word = ''
+
+    longest = max(len(word) for word in words)
+
+    # skip those that span more than the sequence TODO: upgrade
+    if alignment.reference_end < ref_pos + longest:
+        return 0
+
+    # create how the sequence should look like: (this can be faster, but INDELS are uncommon, so maybe it does not matter?)
+    full_cigar = ''
+    ref_seq = ''
+    writing = False
+    for current_seq_pos, current_ref_pos in alignment.get_aligned_pairs():
+        if not writing and current_seq_pos == pos:
+            writing = True
+        if writing:
+            if current_seq_pos is None:  # deletion
+                full_cigar += 'D'
+                ref_seq += 'N'
+                break
+            elif current_ref_pos is None:  # insertion
+                full_cigar += 'I'
+                ref_seq += alignment.query_sequence[current_seq_pos]
+            else:  # match
+                full_cigar += 'M'
+                ref_seq += alignment.query_sequence[current_seq_pos]
+            if len(full_cigar) == longest:
+                break
+
+    # check reference
+    if full_cigar[:len(reference)] == 'M' * len(reference) and ref_seq[:len(reference)] == reference:
+        max_length = max(len(reference), max_length)
+        best_word = reference
+
+    # check alternatives
     for word in words:
-        end_pos = pos + len(word)
-        if pos + len(word) > len(sequence):
-            max_length = 0
-            break
-        
-        if word == sequence[pos:end_pos]:
-            # matching
-            max_length = max(len(word), max_length)
-    
+        if word != reference:
+            # check if this word is available in alignment (insert is inside or it ends with the deletion)
+            if ref_seq[:len(word)] == word and ('I' in full_cigar[:len(word)] or 'D' == full_cigar[len(word):len(word) + 1]):
+                max_length = max(len(word), max_length)
+                best_word = word
+
+    # print(ref_seq, full_cigar, reference, words, max_length, best_word)
+
     return max_length
 
 
-# TODO refactor
 def vac_aligned_variant(alignment: pysam.AlignedSegment, vac: typing.Union[po.VariantPosition, po.VariantDiff],
                         vac_occurrence: bool):
     """
     Factory that creates AlignedVariant from pysam alignment and VAC record.
     Alignment and VAC are assumed to be of the same reference.
     :param alignment: aligned read
-    :param vac: variant position of diff record if vac_occurrence is false
+    :param vac: variant position of diff record if vac_occurrence is False
     :param vac_occurrence: if we compare to Snv/IndelOccurrence (encrypt) or to Snv/IndelDiff (decrpyt)
     """
     assert alignment.reference_name == vac.ref_name
-    
+
     SnpCompare = po.SnvOccurrence
     IndelCompare = po.IndelOccurrence
     if not vac_occurrence:
         SnpCompare = po.SnvDiff
         IndelCompare = po.IndelDiff
-    
+
     # reference_end is position after the last base
     # try:
     #     test = vac.ref_pos >= alignment.reference_end
@@ -299,26 +355,28 @@ def vac_aligned_variant(alignment: pysam.AlignedSegment, vac: typing.Union[po.Va
         pos = ref_pos2seq_pos(alignment, vac.ref_pos)
         if pos is None:
             message = "WARNING: reference position %d on alignment with range <%d,%d> not found (possible deletion in bam read)" % (
-            vac.ref_pos, alignment.reference_start, alignment.reference_end - 1)
-            print(message)
-            return None
+                vac.ref_pos, alignment.reference_start, alignment.reference_end - 1)
+            # print(message)
+            return AlignedVariant(alignment)
         elif isinstance(vac, SnpCompare):
             variant = AlignedVariant(alignment, pos)
         elif isinstance(vac, IndelCompare):
-            words = vac.seqs if vac_occurrence else vac.mut_map.values()
-            end_pos = pos + max_match_len(alignment.query_sequence, pos, words)
+            words = vac.seqs if vac_occurrence else list(vac.mut_map.values())
+            end_pos = pos + max_match_cigar(alignment, pos, vac.ref_pos, words, vac.ref_seq)
             if end_pos > pos:
                 # indel was found
                 if vac_occurrence:
                     assert len(vac.seqs)
+                #import sys
+                #print("INDEL:", pos, end_pos, vac.ref_pos, vac.ref_seq, words, alignment.query_sequence, file=sys.stderr)
                 variant = AlignedVariant(alignment, pos, end_pos, vac.ref_seq)
             else:
                 # match not found or at least one variant exceeds alignment end
                 variant = AlignedVariant(alignment)
         else:
             raise ValueError("%s is not %s/%s record instance" % (
-            type(vac).__name__, type(SnpCompare).__name__, type(IndelCompare).__name__,))
-    
+                type(vac).__name__, type(SnpCompare).__name__, type(IndelCompare).__name__,))
+
     return variant
 
 
@@ -353,12 +411,12 @@ def seq2bytes(seq: str):
             byte |= BASE2BITS[seq[i]] << lshift
         except KeyError:
             raise ValueError("Illegal DNA base %s" % seq[i])
-        
+
         if (i + 1) % 4 == 0 or len(seq) == i + 1:
             # end of byte or end of sequence
             seq_bytes += bytes([byte])
             byte = 0
-    
+
     return seq_bytes
 
 
@@ -370,10 +428,10 @@ def bytes2seq(byte_list: bytes, seq_length: int):
     """
     if math.ceil(seq_length / 4) > len(byte_list):
         raise ValueError('Not enough bytes for supplied length')
-    
+
     if math.ceil(seq_length / 4) < len(byte_list):
         raise ValueError('Too much bytes for supplied length')
-    
+
     seq = ''
     for i in range(seq_length):
         byte = byte_list[int(i / 4)]
@@ -382,7 +440,7 @@ def bytes2seq(byte_list: bytes, seq_length: int):
         # extract next 2 bits
         bits = (byte & BASE_BITMASKS[i % 4]) >> rshift
         seq += BITS2BASE[bits]
-    
+
     return seq
 
 
