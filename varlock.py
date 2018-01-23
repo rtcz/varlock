@@ -93,7 +93,8 @@ def main():
                 bam_filename=parsed_args.bam,
                 vcf_filename=parsed_args.vcf,
                 out_vac_filename=parsed_args.vac,
-                ref_fasta_filename=parsed_args.ref_fasta
+                ref_fasta_filename=parsed_args.ref_fasta,
+                skip_indels=parsed_args.no_indels
             )
         else:
             print("unrecognized command '%s'" % command)
@@ -198,6 +199,7 @@ def parse_vac_args(args):
     optional = parser.add_argument_group("Optional")
     optional.add_argument('-r', '--ref-fasta', type=is_file, help='Reference FASTA file', default=None)
     optional.add_argument('-v', '--verbose', action='store_true', help="explain what is being done")
+    optional.add_argument('--no-indels', action='store_true', help="Skip INDELs from VCF file.")
     
     return parser.parse_args(args)
 

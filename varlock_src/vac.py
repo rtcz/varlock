@@ -273,11 +273,14 @@ class Vac:
         :return: index of a reference, None if not found
         """
         for i, allele in enumerate(allele_list):
-            if str(reference[start_pos:start_pos + len(allele)]) == allele:
-                return i
+            try:
+                if str(reference[start_pos:start_pos + len(allele)]) == allele:
+                    return i
+            except ValueError:
+                return None
         return None
 
-    def vcf2vac(self, vcf_file: typing.Union[io.TextIOWrapper, io.BufferedReader], vac_file: io.BufferedWriter, ref_fasta: dict):
+    def vcf2vac(self, vcf_file: typing.Union[io.TextIOWrapper, io.BufferedReader], vac_file: io.BufferedWriter, ref_fasta: typing.Union[dict, None] = None, skip_indels: bool = False):
         # TODO enable gzipped VCF file as input
         """
         Converts VCF to binary VAC file.
@@ -286,10 +289,12 @@ class Vac:
         :param vcf_file: input VCF file
         :param vac_file: output VAC file
         :param ref_fasta: fasta file
+        :param skip_indels: whether to skip indels and keep only SNPs
         """
         variant_cnt = 0
         snv_count = 0
         indel_count = 0
+        incorrect_count = 0
 
         snv_filename = vac_file.name + self.SNV_TEMP_EXT
         indel_filename = vac_file.name + self.INDEL_TEMP_EXT
@@ -313,11 +318,24 @@ class Vac:
                 # split until last used column only
                 data = line.split(self.VCF_COL_SEP, maxsplit=8)
                 allele_list = [data[self.VCF_REF_ID]] + data[self.VCF_ALT_ID].split(self.VCF_LIST_SEP)
+                is_snv = self.is_snv(allele_list)
+                is_indel = self.is_indel(allele_list)
+
+                # skip if the first position is different:
+                if is_indel:
+                    incorrect = False
+                    for allele in allele_list[1:]:
+                        if allele_list[0][:1] != allele[:1]:
+                            incorrect = True
+                            break
+
+                    if incorrect:
+                        # print(allele_list)
+                        incorrect_count += 1
+                        continue
 
                 # TODO consider unknown bases
 
-                is_snv = self.is_snv(allele_list)
-                is_indel = self.is_indel(allele_list)
                 if is_snv or is_indel:
                     chrom = data[self.VCF_CHROM_ID]
                     pos = int(data[self.VCF_POS_ID]) - 1  # vcf has 1-based index, convert it to 0-based index
@@ -330,7 +348,7 @@ class Vac:
                         if ref_allele is None:
                             not_found_in_ref += 1
                             # if is_indel:
-                            #    print("Warning: could not find reference allele (reference ...%s...)." % reference[pos-5:pos+10], allele_list, "SKIPPING.", line)
+                            # print("Warning: could not find reference allele (reference ...%s...)." % reference[pos-1:pos+2], allele_list, "SKIPPING.", line)
                             continue
                         elif ref_allele != 0:
                             # swap them if it is not first
@@ -360,13 +378,14 @@ class Vac:
                             ac_tuple=count_tuple
                         )
                     else:  # is indel
-                        indel_count += 1
-                        indel_map = self._indel_count_map(allele_list, count_list)
-                        last_pos_written = self._write_indel_record(
-                            indel_file=indel_file,
-                            index=index,
-                            indel_map=indel_map
-                        )
+                        if not skip_indels:
+                            indel_count += 1
+                            indel_map = self._indel_count_map(allele_list, count_list)
+                            last_pos_written = self._write_indel_record(
+                                indel_file=indel_file,
+                                index=index,
+                                indel_map=indel_map
+                            )
 
         self.write_header(vac_file, snv_count, indel_count)
 
@@ -376,6 +395,7 @@ class Vac:
             print("total INDELs %d" % indel_count)
             print("total same_pos_records %d" % same_pos_records)
             print("total not found in reference %d" % not_found_in_ref)
+            print("total incorrect starting point %d" % incorrect_count)
 
         self.__final_merge(vac_file, snv_filename, indel_filename)
 

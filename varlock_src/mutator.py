@@ -245,7 +245,7 @@ class Mutator:
             elif alignment.is_unmapped or self.__is_before_index(alignment, diff.index):
                 self.__encrypt_unmapped(alignment, secret)
                 if len(alignment_queue) == 0:
-                    # good to go, all preceeding alignments are written
+                    # good to go, all preceding alignments are written
                     self.__write_alignment(out_bam_file, alignment)
                 else:
                     # append to queue
@@ -317,11 +317,13 @@ class Mutator:
             
             # use 64B long hash (encrypts 256 bases)
             sha512 = hashlib.sha512()
-            # TODO maybe include query quality?
             sha512.update(secret + alignment.query_name.encode())
-            
             mut_seq = cmn.stream_cipher(alignment.query_sequence, sha512.digest())
+
+            # change and preserve quality TODO: maybe do something else with the quality?
+            quality = alignment.query_qualities
             alignment.query_sequence = mut_seq
+            alignment.query_qualities = quality
     
     def __mutate_pos(
             self,

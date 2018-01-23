@@ -32,7 +32,7 @@ class Varlocker:
     def __init__(self, verbose=False):
         self._verbose = verbose
     
-    def create_vac(self, bam_filename: str, vcf_filename: str, out_vac_filename: str, ref_fasta_filename: str):
+    def create_vac(self, bam_filename: str, vcf_filename: str, out_vac_filename: str, ref_fasta_filename: str, skip_indels: bool):
         """
         BAM and VCF should use same reference genome.
         VCF must contain INFO column with sub-fields AC and AN.
@@ -40,6 +40,7 @@ class Varlocker:
         :param vcf_filename: filename of the input VCF file
         :param out_vac_filename: filename of the output VAC file
         :param ref_fasta_filename: filename to reference FASTA file
+        :param skip_indels: whether to skip indels and keep only SNPs
         """
         # TODO verify that BAM and VCF share the same reference genome ?
 
@@ -59,7 +60,7 @@ class Varlocker:
         with io.BufferedReader(gzip.open(vcf_filename)) if is_gzipped else open(vcf_filename, 'rt') as vcf_file, \
                 open_bam(bam_filename, 'rb') as sam_file, open(out_vac_filename, 'wb') as out_vac_file:
             vac = Vac(FastaIndex(sam_file.header), self._verbose)
-            vac.vcf2vac(vcf_file, out_vac_file, ref_fasta)
+            vac.vcf2vac(vcf_file, out_vac_file, ref_fasta, skip_indels)
     
     def encrypt(
             self,

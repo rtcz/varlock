@@ -10,6 +10,7 @@ from varlock_src.variant import qual_str2array
 from varlock_src.variant import qual_array2str
 
 from varlock_src.cigar import Cigar
+from varlock_src.common import max_match_cigar
 
 
 class TestVariant(unittest.TestCase):
@@ -72,4 +73,44 @@ class TestVariant(unittest.TestCase):
         self.assertEqual(qual_array2str(av.alignment.query_qualities), "GGGFGGGGGGGFCGGGGGGGGDGGGGGGGGGGCCCCC")
         self.assertEqual(av.alignment.cigarstring, "5M3I29M")
 
+        # another one
+        align = self.build_alignment("AGTTTCCTTTTTGTCAGAGACAAGGTCTCCCTACG", "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGCCCCC")
+        av = AlignedVariant(align, 26, 28, 'TC')
+        av.seq = 'T'
 
+        self.assertEqual(av.alignment.query_sequence, "AGTTTCCTTTTTGTCAGAGACAAGGTTCCCTACG")
+        self.assertEqual(av.alignment.cigarstring, "27M1D7M")
+
+        # double indels
+        align = self.build_alignment("CGGACTCTGGGCACTTGGGCCTCAGCTTTCAGAGC", "CC<<CGGGE<<FGGFFG@<FD>FFGGDCEGFCFAF")
+        av = AlignedVariant(align, 15, 17, 'TG')
+        av.seq = 'T'
+
+        self.assertEqual(av.alignment.query_sequence, 'CGGACTCTGGGCACTTGGCCTCAGCTTTCAGAGC')
+        self.assertEqual(av.alignment.cigarstring, "16M1D18M")
+
+        av = AlignedVariant(av.alignment, 18, 19, 'C')
+        av.seq = 'CAG'
+
+        self.assertEqual(av.alignment.query_sequence, 'CGGACTCTGGGCACTTGGCAGCTCAGCTTTCAGAGC')
+        self.assertEqual(av.alignment.cigarstring, "16M1D3M2I15M")
+
+        # and back:
+        av = AlignedVariant(av.alignment, 15, 16, 'TG')
+        av.seq = 'TG'
+
+        self.assertEqual(av.alignment.query_sequence, 'CGGACTCTGGGCACTTGGGCAGCTCAGCTTTCAGAGC')
+        self.assertEqual(av.alignment.cigarstring, "20M2I15M")
+
+        av = AlignedVariant(av.alignment, 19, 22, 'C')
+        av.seq = 'C'
+
+        self.assertEqual(av.alignment.query_sequence, 'CGGACTCTGGGCACTTGGGCCTCAGCTTTCAGAGC')
+        self.assertEqual(av.alignment.cigarstring, "35M")
+
+    def test_max_match_cigar(self):
+        align = self.build_alignment("AGTTTCCTTTTTGTCAGAGACAAGGTCTCCCTACG", "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGCCCCC")
+        align.reference_start = 1583399
+
+        mmc = max_match_cigar(align, 25, 1583423, ['T', 'TC'], 'T')
+        self.assertEqual(mmc, 1)
