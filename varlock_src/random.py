@@ -5,7 +5,7 @@ import numpy as np
 
 class VeryRandom:
     @staticmethod
-    def create(seed: str = None):
+    def create(seed: int = None):
         """
         :param seed: optional random number generator seed
         Providing seed is not cryptographically secure and is intended mainly for testing.
@@ -13,7 +13,7 @@ class VeryRandom:
         if seed is None:
             # use cryptographycally secure random generator
             rnd = random.SystemRandom()
-            np_rnd = np.random.seed(rnd.getrandbits(2 ** 32))
+            np_rnd = np.random.seed(rnd.randint(0, 2 ** 32))
         else:
             # use seedable random generator
             rnd = random.Random()

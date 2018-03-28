@@ -73,7 +73,7 @@ class Varlocker:
             out_bam_filename: str,
             out_enc_diff_filename: str,
             mut_p: float,
-            seed: str = None
+            seed: int = None
     ):
         """
         Mutate BAM file and store it along with encrypted DIFF file.
