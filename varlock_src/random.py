@@ -22,6 +22,7 @@ class VeryRandom:
         
         return VeryRandom(rnd, np_rnd)
     
+    # TODO remove optional parameters
     def __init__(self, rnd: random.Random = None, np_rnd: np.random.RandomState = None):
         """
         Use create() method to create new instance. Direct call to constructor is intended for testing.

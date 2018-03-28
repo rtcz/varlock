@@ -176,9 +176,6 @@ venv.bak/
 
 # Project
 */resources/**/output*
-*.bam
-*.bai
-*.vac
 
 /.idea/markdown-navigator.xml
 /.idea/other.xml

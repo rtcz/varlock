@@ -2,11 +2,15 @@ import gzip
 
 import pysam
 
-import varlock_src as vrl
+from varlock_src.bam import open_bam
+from varlock_src.vac import Vac
+from varlock_src.fasta_index import FastaIndex
+from io import BufferedReader
 
-bam_filename = 'examples/resources/sample.bam'
-vcf_filename = 'examples/resources/sample.vcf.gz'
-out_filenam = 'examples/resources/sample.vac'
+
+bam_filename = 'resources/chr20_10m.bam'
+vcf_filename = 'resources/chr20_10m.vcf.gz'
+out_filename = 'resources/chr20_10m.vac'
 
 # bam_filename = 'resources/full_chr22.bam'
 # vcf_filename = 'resources/full_chr22.vcf.gz'
@@ -16,8 +20,9 @@ out_filenam = 'examples/resources/sample.vac'
 
 with pysam.AlignmentFile(bam_filename, 'rb') as sam_file, \
         gzip.open(vcf_filename, 'rt') as vcf_file, \
-        open(out_filenam, 'wb') as out_vac_file:
-    vac = vrl.Vac(vrl.FastaIndex(sam_file, keep_chr=False), verbose=True)
+        open(out_filename, 'wb') as out_vac_file:
+    
+    vac = Vac(FastaIndex(sam_file.header), verbose=True)
     vac.vcf2vac(vcf_file, out_vac_file)
 
 # python3 -m cProfile -s tottime examples.vac

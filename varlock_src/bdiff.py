@@ -1,10 +1,9 @@
-import json
-import struct
 import io
-import os
-
+import json
 import math
+import os
 import shutil
+import struct
 
 import varlock_src.common as cmn
 
@@ -39,7 +38,7 @@ class BdiffIO:
     index 4B, 0-based absolute genomic position
     length 1B, number of alternatives
     reference index 1B, index of the reference allele in the sorted list
-    list:, of length, permutation of sorted (ascending) alternative sequences
+    list (of length): permutation of sorted (ascending) alternative sequences
         INDEL base length 2B, length of INDEL sequence
         list:
             INDEL 4 base sequence, 1B
@@ -255,7 +254,11 @@ class BdiffIO:
         index, ref_id, alts = self._read_record()
         if isinstance(alts, tuple):
             # is SNV
-            return index, False, cmn.BASES[ref_id], dict(zip(alts, cmn.BASES))
+            # TODO it is unknown if we need UNKNOWN base
+            return index, False, cmn.BASES[ref_id], dict(zip(
+                alts + (cmn.UNKNOWN_BASE,),
+                cmn.BASES + (cmn.UNKNOWN_BASE,))
+            )
         else:
             # is INDEL
             return index, True, alts[ref_id], dict(zip(alts, sorted(alts)))

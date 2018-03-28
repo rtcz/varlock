@@ -1,4 +1,5 @@
 import hashlib
+import typing
 
 import pysam
 
@@ -22,7 +23,6 @@ class Mutator:
         """
         self._fai = fai
         self._verbose = verbose
-        self._prev_alignment = None
     
     def __is_before_index(self, alignment, index):
         """
@@ -42,35 +42,16 @@ class Mutator:
         alignment_start = self._fai.pos2index(alignment.reference_name, alignment.reference_start)
         return alignment_start > index
     
-    def __write_alignment(self, bam_file, alignment):
+    def __write_alignment(self, bam_file, alignment: pysam.AlignedSegment):
         """
         :param alignment: pysam.AlignedSegment
         :return:
         """
-        are_placed = self._prev_alignment is not None and cmn.is_placed_alignment(alignment) and cmn.is_placed_alignment(self._prev_alignment)
-        # FIXME is case of placed after unplaced alignment valid ?
-        if are_placed:
-            # get the reference or pass without checking
-            try:
-                ref_name = alignment.reference_name
-                ref_name_prev = self._prev_alignment.reference_name
-            except ValueError:
-                ref_name = None
-                ref_name_prev = None
-            # unplaced alignment / wrong order
-            if ref_name is not None and ref_name_prev is not None and self._fai.pos2index(ref_name, alignment.reference_start) < self._fai.pos2index(ref_name_prev, self._prev_alignment.reference_start):
-                # safety check
-                raise IndexError('Unordered write: %s after %s' % (
-                    self.alignment2str(alignment),
-                    self.alignment2str(self._prev_alignment)
-                ))
-        
         bam_file.write(alignment)
         self.alignment_counter += 1
-        self._prev_alignment = alignment
         
-        if self._verbose and self.alignment_counter % 1000 == 0:
-            print("%d alignments processed" % self.alignment_counter)
+        if self._verbose and self.alignment_counter % 10000 == 0:
+            print("%d alignments done" % self.alignment_counter)
     
     def __init_counters(self):
         self.alignment_counter = 0  # written alignments
@@ -102,13 +83,12 @@ class Mutator:
         
         alignment_queue = []
         alignment = next(bam_iter)
-
+        
         # TODO optimization: seek to first alignment covering vac to skip all preceding records
         vac = next(vac_iter)
         
         if self._verbose:
             print('first vac: %s' % vac)
-            print('first alignment: %s' % self.alignment2str(alignment))
         
         bdiff_io = bdiff.BdiffIO()
         while True:
@@ -136,7 +116,7 @@ class Mutator:
                     alignment = next(bam_iter)
                 
                 if self._verbose:
-                    print("total of %d alignments processed" % self.alignment_counter)
+                    print("total of %d alignments done" % self.alignment_counter)
                 
                 break
             
@@ -157,7 +137,7 @@ class Mutator:
                 # done with this vac, read next
                 prev_vac = vac
                 vac = next(vac_iter)
-                if self._verbose and vac_iter.counter % 100000 == 0:
+                if self._verbose and vac_iter.counter % 10000 == 0:
                     print('%d VAC records done' % vac_iter.counter)
                 # not the end of VAC file
                 if vac is not None:
@@ -165,18 +145,13 @@ class Mutator:
                     self.__write_before_index(mut_bam_file, alignment_queue, vac.index)
                     # update alignment queue
                     for i in range(len(alignment_queue)):
-                        if not alignment_queue[i].alignment.is_unmapped:
-                            alignment_variant = cmn.vac_aligned_variant(alignment_queue[i].alignment, vac, True)
-                            if alignment_variant is not None:
-                                alignment_queue[i] = alignment_variant
+                        alignment_queue[i] = self.create_aligned_variant(alignment_queue[i].alignment, vac, True)
                 
                 elif self._verbose:
                     print('last vac: %s' % prev_vac)
             
             else:  # alignment is covering vac position
-                alignment_variant = cmn.vac_aligned_variant(alignment, vac, True)
-                if alignment_variant is not None:
-                    alignment_queue.append(alignment_variant)
+                alignment_queue.append(self.create_aligned_variant(alignment, vac, True))
                 alignment = next(bam_iter)
                 self.covering_counter += 1
         
@@ -209,7 +184,6 @@ class Mutator:
         
         if self._verbose:
             print('first diff: %s' % diff)
-            print('first alignment: %s' % self.alignment2str(alignment))
         
         while True:
             if diff is None or alignment is None:
@@ -236,9 +210,7 @@ class Mutator:
                     alignment = next(bam_iter)
                 
                 if self._verbose:
-                    if alignment is not None:
-                        print('last alignment: %s' % self.alignment2str(self._prev_alignment))
-                    print("total of %d alignments processed" % self.alignment_counter)
+                    print("total of %d alignments done" % self.alignment_counter)
                 
                 break
             
@@ -258,24 +230,29 @@ class Mutator:
                 # done with this diff, read next
                 prev_diff = diff
                 diff = next(bdiff_iter)
-                if self._verbose and bdiff_iter.counter % 100000 == 0:
+                if self._verbose and bdiff_iter.counter % 10000 == 0:
                     print('%d DIFF records done' % bdiff_iter.counter)
                 if diff is not None:
                     # not the end of DIFF file
                     self.__write_before_index(out_bam_file, alignment_queue, diff.index)
                     # update alignment queue
                     for i in range(len(alignment_queue)):
-                        if not alignment_queue[i].alignment.is_unmapped:
-                            alignment_variant = cmn.vac_aligned_variant(alignment_queue[i].alignment, diff, False)
-                            if alignment_variant is not None:
-                                alignment_queue[i] = alignment_variant
+                        # if not alignment_queue[i].alignment.is_unmapped:
+                        #     alignment_variant = cmn.create_aligned_variant(alignment_queue[i].alignment, diff, False)
+                        #     if alignment_variant is not None:
+                        #         alignment_queue[i] = alignment_variant
+                        
+                        alignment_queue[i] = self.create_aligned_variant(alignment_queue[i].alignment, diff, False)
+                
                 elif self._verbose:
                     print('last diff: %s' % prev_diff)
             
             else:  # alignment is covering diff position
-                alignment_variant = cmn.vac_aligned_variant(alignment, diff, False)
-                if alignment_variant is not None:
-                    alignment_queue.append(alignment_variant)
+                # alignment_variant = cmn.create_aligned_variant(alignment, diff, False)
+                # if alignment_variant is not None:
+                #     alignment_queue.append(alignment_variant)
+                
+                alignment_queue.append(self.create_aligned_variant(alignment, diff, False))
                 alignment = next(bam_iter)
                 self.covering_counter += 1
         
@@ -290,16 +267,16 @@ class Mutator:
                 # done with current vac
                 variant.clear()
     
-    def alignment2str(self, alignment) -> str:
-        if alignment is None:
-            return "None"
-        if cmn.is_placed_alignment(alignment):
-            ref_name = alignment.reference_name
-            ref_start = alignment.reference_start
-            # unplaced alignment
-            return '#%d %s:%d' % (self._fai.pos2index(ref_name, ref_start), ref_name, ref_start)
-        else:
-            return alignment.query_sequence
+    # def alignment2str(self, alignment) -> str:
+    #     if alignment is None:
+    #         return "None"
+    #     if cmn.is_placed_alignment(alignment):
+    #         ref_name = alignment.reference_name
+    #         ref_start = alignment.reference_start
+    #         return '#%d %s:%d' % (self._fai.pos2index(ref_name, ref_start), ref_name, ref_start)
+    #     else:
+    #         # unplaced alignment
+    #         return alignment.query_sequence
     
     @staticmethod
     def __encrypt_unmapped(alignment: pysam.AlignedSegment, secret: bytes):
@@ -319,7 +296,7 @@ class Mutator:
             sha512 = hashlib.sha512()
             sha512.update(secret + alignment.query_name.encode())
             mut_seq = cmn.stream_cipher(alignment.query_sequence, sha512.digest())
-
+            
             # change and preserve quality TODO: maybe do something else with the quality?
             quality = alignment.query_qualities
             alignment.query_sequence = mut_seq
@@ -411,9 +388,7 @@ class Mutator:
         """
         is_mutated = False
         
-        # alignment is mapped at variant position
         mut_seq = mut_map[variant.seq]
-        
         if variant.seq != mut_seq:
             # non-synonymous mutation
             self.mut_counter += 1
@@ -442,3 +417,55 @@ class Mutator:
             self.__write_alignment(out_bam_file, variant.alignment)
             # remove written alignment
             variant_queue.remove(variant)
+    
+    def create_aligned_variant(
+            self,
+            alignment: pysam.AlignedSegment,
+            vac: typing.Union[po.VariantPosition, po.VariantDiff],
+            vac_occurrence: bool
+    ):
+        """
+        Factory that creates AlignedVariant from pysam alignment and VAC record.
+        Alignment and VAC are assumed to be of the same reference.
+        :param alignment: aligned read
+        :param vac: variant position of diff record if vac_occurrence is False
+        :param vac_occurrence: if we compare to Snv/IndelOccurrence (encrypt) or to Snv/IndelDiff (decrpyt)
+        """
+        assert alignment.reference_name == vac.ref_name
+        
+        SnpCompare = po.SnvOccurrence
+        IndelCompare = po.IndelOccurrence
+        if not vac_occurrence:
+            SnpCompare = po.SnvDiff
+            IndelCompare = po.IndelDiff
+        
+        if alignment.is_unmapped or (vac.ref_pos >= alignment.reference_end or vac.ref_pos < alignment.reference_start):
+            # variant is unmapped or either after or before the alignment
+            variant = AlignedVariant(alignment)
+        else:
+            pos = cmn.ref_pos2seq_pos(alignment, vac.ref_pos)
+            if pos is None:
+                # message = "WARNING: reference position %d on alignment with range <%d,%d> not found (possible deletion in bam read)" \
+                #           % (vac.ref_pos, alignment.reference_start, alignment.reference_end - 1)
+                # print(message)
+                variant = AlignedVariant(alignment)
+            elif isinstance(vac, SnpCompare):
+                variant = AlignedVariant(alignment, pos)
+            elif isinstance(vac, IndelCompare):
+                words = vac.seqs if vac_occurrence else list(vac.mut_map.values())
+                end_pos = pos + cmn.max_match_cigar(alignment, pos, vac.ref_pos, words, vac.ref_seq)
+                if end_pos > pos:
+                    # indel was found
+                    if vac_occurrence:
+                        assert len(vac.seqs)
+                    # import sys
+                    # print("INDEL:", pos, end_pos, vac.ref_pos, vac.ref_seq, words, alignment.query_sequence, file=sys.stderr)
+                    variant = AlignedVariant(alignment, pos, end_pos, vac.ref_seq, words)
+                else:
+                    # match not found or at least one variant exceeds alignment end
+                    variant = AlignedVariant(alignment)
+            else:
+                raise ValueError("%s is not %s/%s record instance" % (
+                    type(vac).__name__, type(SnpCompare).__name__, type(IndelCompare).__name__,))
+        
+        return variant

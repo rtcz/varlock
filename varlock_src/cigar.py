@@ -12,8 +12,20 @@ class Cigar:
     # custom OPs, not part of CIGAR specification
     OP_DEL_INS = 9  # deletion and insertion at one place
     
+    OP_MAP = {
+        'M': OP_MATCH,
+        'I': OP_INS,
+        'D': OP_DEL,
+        'N': OP_REF_SKIP,
+        'S': OP_SOFT_CLIP,
+        'H': OP_HARD_CLIP,
+        'P': OP_PAD,
+        '=': OP_EQUAL,
+        'X': OP_DIFF
+    }
+    
     @classmethod
-    def _safe_append(cls, cigar: list, op_type: int, op_length: int):
+    def _merge_append(cls, cigar: list, op_type: int, op_length: int):
         """
         Merging new OP with last OP from cigar
         when OPs are of the same type.
@@ -38,7 +50,7 @@ class Cigar:
         and ending right before end_pos.
         CIGAR tuples inside the range are deleted and lengths
         of intersecting tuples are lowered respectively.
-        :param cigar: [<op_type, op_length>, ...]
+        :param cigar: [(op_type, op_length), ...]
         :param start_pos: position in AlignedSegment.query_sequence
         :param end_pos: position in AlignedSegment.query_sequence
         :return: new CIGAR tuples
@@ -68,7 +80,9 @@ class Cigar:
                 # started but not ended
                 if started == i:
                     # current OP contains start_pos only
-                    new_cigar.append((curr_type, start_pos - prev_pos))
+                    new_length = start_pos - prev_pos
+                    if new_length:
+                        new_cigar.append((curr_type, new_length))
                 else:
                     # current OP is omitted
                     pass
@@ -84,7 +98,7 @@ class Cigar:
                 # current OP contains end_pos only
                 new_length = curr_pos - end_pos
                 if new_length:
-                    cls._safe_append(new_cigar, curr_type, new_length)
+                    cls._merge_append(new_cigar, curr_type, new_length)
                 else:
                     # current OP is omitted
                     normalize = True
@@ -93,7 +107,7 @@ class Cigar:
                 normalize = True
             elif normalize:
                 normalize = False
-                cls._safe_append(new_cigar, curr_type, curr_length)
+                cls._merge_append(new_cigar, curr_type, curr_length)
             else:
                 new_cigar.append((curr_type, curr_length))
         
@@ -123,66 +137,69 @@ class Cigar:
             curr_type, curr_length = cigar[i]
             # OP_HARD_CLIP is not contained in cigar_tuples nor query_sequence
             prev_pos = curr_pos
-            if curr_type not in [cls.OP_DEL, cls.OP_REF_SKIP]:
-                curr_pos += curr_length
-            
-            if prev_pos == op_pos:
-                # place the OP before current OP
-                if op_type == curr_type:
-                    # merge the OP
-                    new_cigar.append((curr_type, curr_length + op_length))
-                else:
-                    cls._safe_append(new_cigar, op_type, op_length)
-                    new_cigar.append((curr_type, curr_length))
-            
-            elif prev_pos < op_pos < curr_pos:
-                # place the OP inside current OP
-                if op_type == curr_type:
-                    # merge the OP
-                    new_cigar.append((curr_type, curr_length + op_length))
-                else:
-                    new_cigar.append((curr_type, op_pos - prev_pos))
-                    new_cigar.append((op_type, op_length))
-                    new_cigar.append((curr_type, curr_pos - op_pos))
-            else:
+            if curr_type in [cls.OP_DEL, cls.OP_REF_SKIP]:
                 new_cigar.append((curr_type, curr_length))
+            else:
+                curr_pos += curr_length
+                if prev_pos == op_pos:
+                    # the OP is in place of current OP
+                    if op_type == curr_type:
+                        # merge OPs
+                        new_cigar.append((curr_type, curr_length + op_length))
+                    else:
+                        # place the OP and shift current OP
+                        cls._merge_append(new_cigar, op_type, op_length)
+                        new_cigar.append((curr_type, curr_length))
+                
+                elif prev_pos < op_pos < curr_pos:
+                    # place the OP inside current OP
+                    if op_type == curr_type:
+                        # merge the OP
+                        new_cigar.append((curr_type, curr_length + op_length))
+                    else:
+                        new_cigar.append((curr_type, op_pos - prev_pos))
+                        new_cigar.append((op_type, op_length))
+                        new_cigar.append((curr_type, curr_pos - op_pos))
+                else:
+                    # continue
+                    new_cigar.append((curr_type, curr_length))
         
         if op_pos == curr_pos:
             # place the OP at the end of CIGAR
-            cls._safe_append(new_cigar, op_type, op_length)
+            cls._merge_append(new_cigar, op_type, op_length)
         
         return new_cigar
     
     @classmethod
-    def variant(cls, ref_seq: str, var_seq: str):
+    def compute(cls, ref_seq: str, alt_seq: str):
         """
         Computes variant CIGAR with respect to the reference.
         Cigar can contain only insert, delete and match operations.
         :param ref_seq:
-        :param var_seq:
+        :param alt_seq:
         :return: [<op_type, op_length>, ...]
         """
-        assert len(var_seq) > 0 or len(ref_seq) > 0
+        assert len(alt_seq) > 0 or len(ref_seq) > 0
         cigar = []
         match_len = ins_len = del_len = 0
         
-        if ref_seq == var_seq:
+        if ref_seq == alt_seq:
             # reference variant
-            cigar.append((Cigar.OP_MATCH, len(var_seq)))
+            cigar.append((Cigar.OP_MATCH, len(alt_seq)))
         else:
-            for i in range(max(len(ref_seq), len(var_seq))):
+            for i in range(max(len(ref_seq), len(alt_seq))):
                 match_op = ins_op = del_op = False
                 if i >= len(ref_seq):
-                    # seq is longer
+                    # alt_seq is longer
                     ins_op = True
                 
-                elif i >= len(var_seq):
+                elif i >= len(alt_seq):
                     # ref_seq is longer
                     del_op = True
                 
                 else:
                     # TODO treat [X, =] OP cases
-                    if ref_seq[i] == var_seq[i]:
+                    if ref_seq[i] == alt_seq[i]:
                         match_op = True
                     else:
                         del_op = True
@@ -194,8 +211,8 @@ class Cigar:
                 
                 if match_op:
                     if del_len == ins_len == 1:
-                        # treat as a match
-                        cls._safe_append(cigar, cls.OP_MATCH, 1)
+                        # treat 1D1I as a match
+                        cls._merge_append(cigar, cls.OP_MATCH, 1)
                     else:
                         if ins_len:
                             cigar.append((cls.OP_INS, ins_len))
@@ -206,14 +223,15 @@ class Cigar:
                 
                 if ins_op or del_op:
                     if match_len:
-                        cls._safe_append(cigar, cls.OP_MATCH, match_len)
+                        cls._merge_append(cigar, cls.OP_MATCH, match_len)
                     
                     match_len = 0
             
+            # finalize cigar
             if match_len:
-                cls._safe_append(cigar, cls.OP_MATCH, match_len)
+                cls._merge_append(cigar, cls.OP_MATCH, match_len)
             elif del_len == ins_len == 1:
-                cls._safe_append(cigar, cls.OP_MATCH, 1)
+                cls._merge_append(cigar, cls.OP_MATCH, 1)
             else:
                 if del_len:
                     cigar.append((cls.OP_DEL, del_len))

@@ -1,6 +1,8 @@
+import gzip
 import io
 import struct
 
+import pyfaidx
 import pysam
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.Hash import MD5
@@ -11,13 +13,10 @@ from varlock_src.aes import FileAES
 from varlock_src.bam import open_bam
 from varlock_src.bam_mutator import BamMutator
 from varlock_src.bdiff import BdiffIO
-from varlock_src.common import open_vcf
 from varlock_src.fasta_index import FastaIndex
 from varlock_src.random import VeryRandom
 from varlock_src.vac import Vac
 
-import gzip
-import pyfaidx
 
 class Varlocker:
     """
@@ -32,7 +31,8 @@ class Varlocker:
     def __init__(self, verbose=False):
         self._verbose = verbose
     
-    def create_vac(self, bam_filename: str, vcf_filename: str, out_vac_filename: str, ref_fasta_filename: str, skip_indels: bool):
+    def create_vac(self, bam_filename: str, vcf_filename: str, out_vac_filename: str, ref_fasta_filename: str,
+                   skip_indels: bool):
         """
         BAM and VCF should use same reference genome.
         VCF must contain INFO column with sub-fields AC and AN.
@@ -43,22 +43,24 @@ class Varlocker:
         :param skip_indels: whether to skip indels and keep only SNPs
         """
         # TODO verify that BAM and VCF share the same reference genome ?
-
+        
+        
         # load the reference FASTA
         ref_fasta = None
         if ref_fasta_filename is not None:
             if self._verbose:
                 print('--- Loading Reference Fasta ---')
             ref_fasta = pyfaidx.Fasta(ref_fasta_filename)
-
+        
         # is VCF gzipped?
         is_gzipped = vcf_filename.endswith('.gz')
-
+        
         # open all files and create the VAC file
         if self._verbose:
             print('--- Processing VCF %s (gzipped: %s) ---' % (vcf_filename, is_gzipped))
         with io.BufferedReader(gzip.open(vcf_filename)) if is_gzipped else open(vcf_filename, 'rt') as vcf_file, \
-                open_bam(bam_filename, 'rb') as sam_file, open(out_vac_filename, 'wb') as out_vac_file:
+                open_bam(bam_filename, 'rb') as sam_file, \
+                open(out_vac_filename, 'wb') as out_vac_file:
             vac = Vac(FastaIndex(sam_file.header), self._verbose)
             vac.vcf2vac(vcf_file, out_vac_file, ref_fasta, skip_indels)
     
@@ -91,7 +93,8 @@ class Varlocker:
         if self._verbose:
             print('--- Mutating BAM ---')
         
-        rnd = VeryRandom(seed)
+        rnd = VeryRandom.create(seed)
+        
         aes_key = rnd.rand_bytes(self.AES_KEY_LENGTH)
         mut = BamMutator(filename=bam_filename, verbose=self._verbose)
         
