@@ -31,6 +31,7 @@ class TestUnmutate(unittest.TestCase):
         self.assertEqual(15, self.mut.stat(BamMutator.STAT_COVERING_COUNT))
         self.assertEqual(16, self.mut.stat(BamMutator.STAT_MUT_COUNT))
         self.assertEqual(6, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
+        self.assertEqual(14, self.mut.stat(BamMutator.STAT_ALIGNMENT_MUT_COUNT))
         
         bam2sam(self.RESOURCE_PATH + 'output_01.bam', self.RESOURCE_PATH + 'output_01.sam')
         is_equal = filecmp.cmp(self.RESOURCE_PATH + 'desired_01.sam', self.RESOURCE_PATH + 'output_01.sam')
@@ -52,6 +53,7 @@ class TestUnmutate(unittest.TestCase):
         self.assertEqual(9, self.mut.stat(BamMutator.STAT_COVERING_COUNT))
         self.assertEqual(8, self.mut.stat(BamMutator.STAT_MUT_COUNT))
         self.assertEqual(3, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
+        self.assertEqual(8, self.mut.stat(BamMutator.STAT_ALIGNMENT_MUT_COUNT))
         
         bam2sam(self.RESOURCE_PATH + 'output_03.bam', self.RESOURCE_PATH + 'output_03.sam')
         self.assertTrue(filecmp.cmp(
@@ -73,6 +75,7 @@ class TestUnmutate(unittest.TestCase):
         self.assertEqual(15, self.mut.stat(BamMutator.STAT_COVERING_COUNT))
         self.assertEqual(16, self.mut.stat(BamMutator.STAT_MUT_COUNT))
         self.assertEqual(6, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
+        self.assertEqual(14, self.mut.stat(BamMutator.STAT_ALIGNMENT_MUT_COUNT))
         
         bam2sam(self.RESOURCE_PATH + 'output_05.bam', self.RESOURCE_PATH + 'output_05.sam')
         self.assertTrue(filecmp.cmp(
@@ -97,6 +100,7 @@ class TestUnmutate(unittest.TestCase):
         self.assertEqual(9, self.mut.stat(BamMutator.STAT_COVERING_COUNT))
         self.assertEqual(8, self.mut.stat(BamMutator.STAT_MUT_COUNT))
         self.assertEqual(3, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
+        self.assertEqual(8, self.mut.stat(BamMutator.STAT_ALIGNMENT_MUT_COUNT))
         
         bam2sam(self.RESOURCE_PATH + 'output_06.bam', self.RESOURCE_PATH + 'output_06.sam')
         self.assertTrue(filecmp.cmp(
@@ -118,6 +122,7 @@ class TestUnmutate(unittest.TestCase):
         self.assertEqual(0, self.mut.stat(BamMutator.STAT_MUT_COUNT))
         # only the first diff record is read
         self.assertEqual(1, self.mut.stat(BamMutator.STAT_DIFF_COUNT))
+        self.assertEqual(0, self.mut.stat(BamMutator.STAT_ALIGNMENT_MUT_COUNT))
         
         bam2sam(self.RESOURCE_PATH + 'output_07.bam', self.RESOURCE_PATH + 'output_07.sam')
         self.assertTrue(filecmp.cmp(

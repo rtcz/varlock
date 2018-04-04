@@ -25,14 +25,14 @@ class AlignedVariant:
             pos: int = None,
             end_pos: int = None,
             ref_seq: str = None,
-            # TODO temporary
-            words=None
+            is_mutated: bool = False
     ):
         """
         :param alignment:
         :param pos: position of variation in AlignedSegment.query_sequence in alternative sequence
         :param end_pos: position one base after INDEL variation in AlignedSegment.query_sequence in alternative sequence
         :param ref_seq: reference sequence of the variant
+        :param is_mutated: True if alignment has been already mutated
         """
         self.alignment = alignment
         self._pos = pos
@@ -40,6 +40,7 @@ class AlignedVariant:
         self._is_snv = False
         self._is_indel = False
         self._ref_seq = ref_seq
+        self._is_mutated = is_mutated
         
         if self._pos is not None:
             if self._end_pos is not None:
@@ -49,11 +50,13 @@ class AlignedVariant:
             else:
                 self._is_snv = True
                 self._end_pos = self._pos + 1
-        
-        self._words = words
     
     def is_present(self):
         return self._is_snv or self._is_indel
+    
+    @property
+    def is_mutated(self):
+        return self._is_mutated
     
     # TODO try to remove, pos and end_pos should be immutable (so as variant presence)
     def clear(self):
@@ -78,6 +81,11 @@ class AlignedVariant:
         Set variant sequence.
         :param seq: new sequence
         """
+        if seq == self.seq:
+            return
+        
+        self._is_mutated = True
+        
         # save quality
         quality_seq = copy(self.alignment.query_qualities)
         if self._is_indel:

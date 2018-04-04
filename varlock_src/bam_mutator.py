@@ -23,6 +23,9 @@ class BamMutator:
     # total number of non-synonymously mutated variants (for each alignment)
     STAT_MUT_COUNT = 'mut_count'
     
+    # number of mutated / unmutated alignments (not including unmapped)
+    STAT_ALIGNMENT_MUT_COUNT = 'alignment_mut_count'
+    
     # number of DIFF records written / read
     STAT_DIFF_COUNT = 'diff_count'
     
@@ -128,7 +131,8 @@ class BamMutator:
             self.STAT_COVERING_COUNT: mut.covering_counter,
             self.STAT_VAC_COUNT: mut.vac_counter,
             self.STAT_MUT_COUNT: mut.mut_counter,
-            self.STAT_DIFF_COUNT: mut.diff_counter
+            self.STAT_DIFF_COUNT: mut.diff_counter,
+            self.STAT_ALIGNMENT_MUT_COUNT: mut.alignment_mut_counter
         }
         
         # TODO resolve difference between mutated and converted (bam->sam->bam) and bam
@@ -225,7 +229,8 @@ class BamMutator:
                 self.STAT_ALIGNMENT_COUNT: mut.alignment_counter,
                 self.STAT_COVERING_COUNT: mut.covering_counter,
                 self.STAT_MUT_COUNT: mut.mut_counter,
-                self.STAT_DIFF_COUNT: mut.diff_counter
+                self.STAT_DIFF_COUNT: mut.diff_counter,
+                self.STAT_ALIGNMENT_MUT_COUNT: mut.alignment_mut_counter
             }
     
     # TODO refactor

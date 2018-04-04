@@ -20,29 +20,29 @@ class VariantIterator:
         """
         self._iter1 = VacFileIterator(vac_filename, fai)
         self._iter2 = RandomSnvIterator(fai, mut_p, rnd)
-
+        
         # initialize current values
         self._curr1 = next(self._iter1)
         self._curr2 = next(self._iter2)
-
+    
     @property
     def counter(self):
         return self._iter1.counter + self._iter2.counter
-
+    
     def __iter__(self):
         return self
-
+    
     def __enter__(self):
         return self
-
+    
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._iter1.__exit__(exc_type, exc_val, exc_tb)
-
+    
     def _next1(self) -> po.VariantOccurrence:
         curr = self._curr1
         self._curr1 = next(self._iter1)
         return curr
-
+    
     def _next2(self) -> po.VariantOccurrence:
         curr = self._curr2
         self._curr2 = next(self._iter2)
@@ -52,10 +52,10 @@ class VariantIterator:
         if self._curr1 is None and self._curr2 is None:
             # noinspection PyTypeChecker
             return None
-        elif self._curr1 is None:
-            return self._next2()
         elif self._curr2 is None:
             return self._next1()
+        elif self._curr1 is None:
+            return self._next2()
         elif self._curr1.index <= self._curr2.index:
             # vac_file originated variants have precedence
             return self._next1()
@@ -187,7 +187,7 @@ class RandomSnvIterator:
         :param mut_p: random variant (mutation) probability per genome base
         :param rnd:
         """
-        assert 0 <= mut_p < 0.1
+        assert 0 <= mut_p <= 0.001
         self._fai = fai
         self._rnd = rnd
         length = fai.last_index() - fai.first_index()
@@ -201,18 +201,18 @@ class RandomSnvIterator:
     @property
     def counter(self):
         return self._counter
-
+    
     def __iter__(self):
         return self
-
+    
     def __next__(self) -> po.VariantOccurrence:
         if self._counter >= len(self._indices):
             # noinspection PyTypeChecker
             return None
-
+        
         index = self._indices[self._counter]
         self._counter += 1
-
+        
         ref_name, ref_pos = self._fai.index2pos(index)
         return po.SnvOccurrence(
             index=index,

@@ -334,7 +334,8 @@ class Vac:
                 is_snv = self.is_snv(allele_list)
                 is_indel = self.is_indel(allele_list)
                 
-                # skip if the first position is different:
+                # check consistency of alleles
+                # skip INDEL if first base of an alternative allele differs:
                 if is_indel:
                     incorrect = False
                     for allele in allele_list[1:]:

@@ -42,13 +42,14 @@ class Mutator:
         alignment_start = self._fai.pos2index(alignment.reference_name, alignment.reference_start)
         return alignment_start > index
     
-    def __write_alignment(self, bam_file, alignment: pysam.AlignedSegment):
+    def __write_alignment(self, bam_file, alignment: pysam.AlignedSegment, is_mutated: bool):
         """
         :param alignment: pysam.AlignedSegment
         :return:
         """
         bam_file.write(alignment)
         self.alignment_counter += 1
+        self.alignment_mut_counter += is_mutated
         
         if self._verbose and self.alignment_counter % 10000 == 0:
             print("%d alignments done" % self.alignment_counter)
@@ -57,9 +58,10 @@ class Mutator:
         self.alignment_counter = 0  # written alignments
         self.diff_counter = 0  # processed diff records
         self.mut_counter = 0  # all mutations
+        self.alignment_mut_counter = 0  # mutated alignments
         self.vac_counter = 0  # read vac records (variants)
         
-        self.covering_counter = 0  # mutated alignments
+        self.covering_counter = 0  # alignments with variant positions
         self.max_coverage = 0  # maximum alignments overlapping single SNV
     
     def mutate(
@@ -105,14 +107,14 @@ class Mutator:
                     # noinspection PyTypeChecker
                     self.__mutate_pos(bdiff_io, alignment_queue, vac, rnd)
                 
-                for snv_alignment in alignment_queue:
+                for variant_alignment in alignment_queue:  # type: AlignedVariant
                     # unmapped alignments in queue are already encrypted
-                    self.__write_alignment(mut_bam_file, snv_alignment.alignment)
+                    self.__write_alignment(mut_bam_file, variant_alignment.alignment, variant_alignment.is_mutated)
                 
                 # write remaining alignments (in EOF VAC case only)
                 while alignment is not None:
                     self.__encrypt_unmapped(alignment, secret)
-                    self.__write_alignment(mut_bam_file, alignment)
+                    self.__write_alignment(mut_bam_file, alignment, False)
                     alignment = next(bam_iter)
                 
                 if self._verbose:
@@ -124,7 +126,7 @@ class Mutator:
                 self.__encrypt_unmapped(alignment, secret)
                 if len(alignment_queue) == 0:
                     # good to go, all preceding alignments are written
-                    self.__write_alignment(mut_bam_file, alignment)
+                    self.__write_alignment(mut_bam_file, alignment, False)
                 else:
                     # append to queue
                     alignment_queue.append(AlignedVariant(alignment))
@@ -145,7 +147,12 @@ class Mutator:
                     self.__write_before_index(mut_bam_file, alignment_queue, vac.index)
                     # update alignment queue
                     for i in range(len(alignment_queue)):
-                        alignment_queue[i] = self.create_aligned_variant(alignment_queue[i].alignment, vac, True)
+                        alignment_queue[i] = self.create_aligned_variant(
+                            alignment_queue[i].alignment,
+                            vac,
+                            True,
+                            alignment_queue[i].is_mutated
+                        )
                 
                 elif self._verbose:
                     print('last vac: %s' % prev_vac)
@@ -199,14 +206,14 @@ class Mutator:
                     # noinspection PyTypeChecker
                     self.__unmutate_pos(alignment_queue, diff.mut_map)
                 
-                for snv_alignment in alignment_queue:
+                for variant_alignment in alignment_queue:
                     # unmapped alignments in queue are already encrypted
-                    self.__write_alignment(out_bam_file, snv_alignment.alignment)
+                    self.__write_alignment(out_bam_file, variant_alignment.alignment, variant_alignment.is_mutated)
                 
                 # write remaining alignments (in EOF DIFF case only)
                 while alignment is not None:
                     self.__encrypt_unmapped(alignment, secret)
-                    self.__write_alignment(out_bam_file, alignment)
+                    self.__write_alignment(out_bam_file, alignment, False)
                     alignment = next(bam_iter)
                 
                 if self._verbose:
@@ -218,7 +225,7 @@ class Mutator:
                 self.__encrypt_unmapped(alignment, secret)
                 if len(alignment_queue) == 0:
                     # good to go, all preceding alignments are written
-                    self.__write_alignment(out_bam_file, alignment)
+                    self.__write_alignment(out_bam_file, alignment, False)
                 else:
                     # append to queue
                     alignment_queue.append(AlignedVariant(alignment))
@@ -237,21 +244,17 @@ class Mutator:
                     self.__write_before_index(out_bam_file, alignment_queue, diff.index)
                     # update alignment queue
                     for i in range(len(alignment_queue)):
-                        # if not alignment_queue[i].alignment.is_unmapped:
-                        #     alignment_variant = cmn.create_aligned_variant(alignment_queue[i].alignment, diff, False)
-                        #     if alignment_variant is not None:
-                        #         alignment_queue[i] = alignment_variant
-                        
-                        alignment_queue[i] = self.create_aligned_variant(alignment_queue[i].alignment, diff, False)
+                        alignment_queue[i] = self.create_aligned_variant(
+                            alignment_queue[i].alignment,
+                            diff,
+                            False,
+                            alignment_queue[i].is_mutated
+                        )
                 
                 elif self._verbose:
                     print('last diff: %s' % prev_diff)
             
             else:  # alignment is covering diff position
-                # alignment_variant = cmn.create_aligned_variant(alignment, diff, False)
-                # if alignment_variant is not None:
-                #     alignment_queue.append(alignment_variant)
-                
                 alignment_queue.append(self.create_aligned_variant(alignment, diff, False))
                 alignment = next(bam_iter)
                 self.covering_counter += 1
@@ -337,6 +340,21 @@ class Mutator:
         alt_freqs = cmn.base_freqs(variant_seqs)
         mut_map = cmn.snv_mut_map(alt_freqs=alt_freqs, ref_freqs=vac.freqs, rnd=rnd)
         
+        # # TODO temp
+        # if vac.ref_pos == (1074105 - 1):
+        #     print()
+        #     print(dict(zip(vac.seqs, vac.freqs)))
+        #     print(mut_map)
+        #
+        #     for variant in variant_queue:
+        #         if variant.is_present():
+        #             print(variant.seq)
+        #
+        #             # self._mutate_variant(variant, mut_map)
+        #             # print(variant.seq)
+        #
+        #     exit(0)
+        
         for variant in variant_queue:  # type: AlignedVariant
             if variant.is_present():
                 # alignment has vac to mutate
@@ -407,22 +425,24 @@ class Mutator:
         """
         # TODO optimize, search for index, then cut the array
         tmp_queue = variant_queue[:]
-        for variant in tmp_queue:
+        for variant in tmp_queue:  # type: AlignedVariant
             is_mapped = not variant.alignment.is_unmapped
             if is_mapped and not self.__is_before_index(variant.alignment, index):
                 # break to keep alignments in order
                 # otherwise shorter alignment could be written before longer alignment
                 break
             
-            self.__write_alignment(out_bam_file, variant.alignment)
+            self.__write_alignment(out_bam_file, variant.alignment, variant.is_mutated)
             # remove written alignment
             variant_queue.remove(variant)
     
+    # TODO move back to commons?
     def create_aligned_variant(
             self,
             alignment: pysam.AlignedSegment,
             vac: typing.Union[po.VariantPosition, po.VariantDiff],
-            vac_occurrence: bool
+            vac_occurrence: bool,
+            is_mutated: bool = False
     ):
         """
         Factory that creates AlignedVariant from pysam alignment and VAC record.
@@ -430,6 +450,7 @@ class Mutator:
         :param alignment: aligned read
         :param vac: variant position of diff record if vac_occurrence is False
         :param vac_occurrence: if we compare to Snv/IndelOccurrence (encrypt) or to Snv/IndelDiff (decrpyt)
+        :param is_mutated:
         """
         assert alignment.reference_name == vac.ref_name
         
@@ -441,16 +462,16 @@ class Mutator:
         
         if alignment.is_unmapped or (vac.ref_pos >= alignment.reference_end or vac.ref_pos < alignment.reference_start):
             # variant is unmapped or either after or before the alignment
-            variant = AlignedVariant(alignment)
+            variant = AlignedVariant(alignment, is_mutated=is_mutated)
         else:
             pos = cmn.ref_pos2seq_pos(alignment, vac.ref_pos)
             if pos is None:
                 # message = "WARNING: reference position %d on alignment with range <%d,%d> not found (possible deletion in bam read)" \
                 #           % (vac.ref_pos, alignment.reference_start, alignment.reference_end - 1)
                 # print(message)
-                variant = AlignedVariant(alignment)
+                variant = AlignedVariant(alignment, is_mutated=is_mutated)
             elif isinstance(vac, SnpCompare):
-                variant = AlignedVariant(alignment, pos)
+                variant = AlignedVariant(alignment, pos, is_mutated=is_mutated)
             elif isinstance(vac, IndelCompare):
                 words = vac.seqs if vac_occurrence else list(vac.mut_map.values())
                 end_pos = pos + cmn.max_match_cigar(alignment, pos, vac.ref_pos, words, vac.ref_seq)
@@ -460,10 +481,10 @@ class Mutator:
                         assert len(vac.seqs)
                     # import sys
                     # print("INDEL:", pos, end_pos, vac.ref_pos, vac.ref_seq, words, alignment.query_sequence, file=sys.stderr)
-                    variant = AlignedVariant(alignment, pos, end_pos, vac.ref_seq, words)
+                    variant = AlignedVariant(alignment, pos, end_pos, vac.ref_seq, is_mutated)
                 else:
                     # match not found or at least one variant exceeds alignment end
-                    variant = AlignedVariant(alignment)
+                    variant = AlignedVariant(alignment, is_mutated=is_mutated)
             else:
                 raise ValueError("%s is not %s/%s record instance" % (
                     type(vac).__name__, type(SnpCompare).__name__, type(IndelCompare).__name__,))

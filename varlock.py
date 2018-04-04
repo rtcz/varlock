@@ -11,7 +11,9 @@ from varlock_src.varlocker import Varlocker
 def main():
     # print start time
     start_time = datetime.now()
-    print('VarLock = "Variant Locker" genome data anonymization tool \nVarLock Starting : {start: %Y-%m-%d %H:%M:%S}'.format(start=start_time))
+    print(
+        'VarLock = "Variant Locker" genome data anonymization tool \nVarLock Starting : {start: %Y-%m-%d %H:%M:%S}'.format(
+            start=start_time))
     
     try:
         command, args = parse_command()
@@ -260,10 +262,10 @@ def is_mut_p(value):
     except ValueError:
         raise argparse.ArgumentTypeError("Value %s is not a float." % value)
     
-    if 0 <= float_val < 0.1:
+    if 0 <= float_val <= 0.001:
         return float_val
     else:
-        raise argparse.ArgumentTypeError("Value %s is not from interval <0, 0.1)." % value)
+        raise argparse.ArgumentTypeError("Value %s is not from interval <0, 0.001>." % value)
 
 
 class InvalidCommandError(Exception):

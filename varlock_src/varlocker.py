@@ -72,7 +72,7 @@ class Varlocker:
             vac_filename: str,
             out_bam_filename: str,
             out_enc_diff_filename: str,
-            mut_p: float,
+            mut_p: float = None,
             seed: int = None
     ):
         """
