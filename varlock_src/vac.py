@@ -213,7 +213,6 @@ class Vac:
         # print('ws', index, ac_tuple)
         # assert 0 <= ref_id < len(BASES)
         snv_file.write(struct.pack(cls.SNV_FORMAT, index, ref_id, *ac_tuple))
-        return index
     
     @classmethod
     def read_indel_record(cls, indel_file):
@@ -265,7 +264,6 @@ class Vac:
             record += seq2bytes(sequence)
         
         indel_file.write(record)
-        return index
     
     @staticmethod
     def find_reference_allele(reference: pyfaidx.Sequence, allele_list: list, start_pos: int) \
@@ -375,6 +373,7 @@ class Vac:
                     
                     # skip same position variants:
                     if last_index == index:
+                        # TODO merge them
                         # if self.verbose:
                         #   print("WARNING: skipping record (equal positions %d with previous record)" % index)
                         same_pos_records += 1
@@ -385,23 +384,25 @@ class Vac:
                         # allele count map
                         count_map = self.snv_count_map(allele_list, count_list)
                         count_tuple = (count_map['A'], count_map['T'], count_map['G'], count_map['C'])
-                        last_index = self._write_snv_record(
+                        self._write_snv_record(
                             snv_file=snv_file,
                             index=index,
                             ref_id=BASES.index(data[self.VCF_REF_ID]),
                             ac_tuple=count_tuple
                         )
+                        last_index = index
                         snv_count += 1
                     
                     else:  # is indel
                         if not skip_indels:
                             indel_map = self._indel_count_map(allele_list, count_list)
                             try:
-                                last_index = self._write_indel_record(
+                                self._write_indel_record(
                                     indel_file=indel_file,
                                     index=index,
                                     indel_map=indel_map
                                 )
+                                last_index = index
                                 indel_count += 1
                             except IndelError as e:
                                 print('skipping INDEL %s:%d cause: %s' % (chrom, pos, e))

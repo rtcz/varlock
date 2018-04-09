@@ -83,7 +83,9 @@ def indel_mut_map(alt_freq_map: dict, ref_freq_map: dict, rnd: VeryRandom):
     alt_freqs = [0] * len(ref_freq_map)
     ref_freqs = [0] * len(ref_freq_map)
     i = 0
-    for seq, freq in ref_freq_map.items():
+    
+    # dict needs to be sorted so that order of its items is deterministic
+    for seq, freq in sorted(ref_freq_map.items(), key=lambda item: item[0]):
         seqs[i] = seq
         alt_freqs[i] = alt_freq_map.get(seq, 0) + rnd.random()
         ref_freqs[i] = freq
