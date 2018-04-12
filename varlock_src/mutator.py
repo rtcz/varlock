@@ -340,21 +340,6 @@ class Mutator:
         alt_freqs = cmn.base_freqs(variant_seqs)
         mut_map = cmn.snv_mut_map(alt_freqs=alt_freqs, ref_freqs=vac.freqs, rnd=rnd)
         
-        # # TODO temp
-        # if vac.ref_pos == (1074105 - 1):
-        #     print()
-        #     print(dict(zip(vac.seqs, vac.freqs)))
-        #     print(mut_map)
-        #
-        #     for variant in variant_queue:
-        #         if variant.is_present():
-        #             print(variant.seq)
-        #
-        #             # self._mutate_variant(variant, mut_map)
-        #             # print(variant.seq)
-        #
-        #     exit(0)
-        
         for variant in variant_queue:  # type: AlignedVariant
             if variant.is_present():
                 # alignment has vac to mutate
@@ -479,8 +464,17 @@ class Mutator:
                     # indel was found
                     if vac_occurrence:
                         assert len(vac.seqs)
-                    # import sys
-                    # print("INDEL:", pos, end_pos, vac.ref_pos, vac.ref_seq, words, alignment.query_sequence, file=sys.stderr)
+                    
+                    if alignment.query_name == 'ERR015528.13775373' and alignment.reference_start == 1421565:
+                        print('YYY')
+                        print('vac_pos: %s' % vac.ref_pos)
+                        print('vac_seqs: %s' % vac.seqs)
+                        # print('infer_query_length %d' % alignment.infer_query_length())
+                        # print('query length %d' % len(alignment.query_sequence))
+                        # print(alignment.cigarstring)
+                        # print(alignment.query_sequence)
+                        print('YYY')
+                    
                     variant = AlignedVariant(alignment, pos, end_pos, vac.ref_seq, is_mutated)
                 else:
                     # match not found or at least one variant exceeds alignment end

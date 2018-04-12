@@ -34,6 +34,8 @@ class AlignedVariant:
         :param ref_seq: reference sequence of the variant
         :param is_mutated: True if alignment has been already mutated
         """
+        # TODO check if pos is a cigar match
+        
         self.alignment = alignment
         self._pos = pos
         self._end_pos = end_pos
@@ -84,6 +86,20 @@ class AlignedVariant:
         if seq == self.seq:
             return
         
+        if self.alignment.query_name == 'ERR015528.13775373' and self.alignment.reference_start == 1421565:
+            print('xxx')
+            print(self.alignment.query_name)
+            print(self.alignment.reference_name)
+            print(self.alignment.reference_start)
+            print(self.alignment.query_sequence)
+            print(self.alignment.cigarstring)
+            print('pos %d' % self._pos)
+            print('end_pos %d' % self._end_pos)
+            print('reference allele %s' % self._ref_seq)
+            print('alternative allele %s' % self.seq)
+            print('masking allele %s' % seq)
+            print('xxx')
+        
         self._is_mutated = True
         
         # save quality
@@ -104,10 +120,10 @@ class AlignedVariant:
                       qual_array2str(self.alignment.query_qualities[self._end_pos:]), qual_array2str(quality_seq))'''
                 # print(len(quality_seq), len(self.alignment.query_qualities[:self._pos + len_overlap]), len(self.alignment.query_qualities[:self._end_pos]))
         
-        # TODO
-        old_sequence = self.alignment.query_sequence
-        old_sequence_len = len(self.alignment.query_sequence)
-        old_cigar_len = self.alignment.infer_query_length()
+        # # TODO
+        # old_sequence = self.alignment.query_sequence
+        # old_sequence_len = len(self.alignment.query_sequence)
+        # old_cigar_len = self.alignment.infer_query_length()
         
         # update sequence
         mut_seq = self.alignment.query_sequence[:self._pos]
@@ -135,9 +151,9 @@ class AlignedVariant:
             # else:
             #     tmp_end_pos = self._end_pos
             
-            # TODO
-            old_cigar_tuples = self.alignment.cigartuples
-            old_cigar_str = self.alignment.cigarstring
+            # # TODO
+            # old_cigar_tuples = self.alignment.cigartuples
+            # old_cigar_str = self.alignment.cigarstring
             
             # remove point of mutation
             tmp_cigar = Cigar.del_subrange(
@@ -152,35 +168,37 @@ class AlignedVariant:
             for cigar_op, op_length in variant_cigar:
                 tmp_cigar = Cigar.place_op(tmp_cigar, pos, cigar_op, op_length)
                 # consumes query?
-                if cigar_op not in [Cigar.OP_DEL, Cigar.OP_REF_SKIP]:
+                if cigar_op not in [Cigar.OP_DEL_ID, Cigar.OP_REF_SKIP_ID]:
                     pos += op_length
             
             self.alignment.cigartuples = tmp_cigar
             
-            if len(self.alignment.query_sequence) != self.alignment.infer_query_length():
-                print(self.alignment.query_name)
-                print(self.alignment.reference_name)
-                print(self.alignment.reference_start)
-                
-                print("pos %s" % self._pos)
-                print("end_pos %s" % self._end_pos)
-                print("masking allele %s" % seq)
-                print("alternative allele %s" % old_sequence[self._pos:self._end_pos])
-                print("reference allele %s" % self._ref_seq)
-                print("words %s" % self._words)
-                
-                print('OLD')
-                print(old_sequence)
-                print(old_sequence_len)
-                print(old_cigar_str)
-                print(old_cigar_len)
-                
-                print('NEW')
-                print(self.alignment.query_sequence)
-                print(len(self.alignment.query_sequence))
-                print(self.alignment.cigarstring)
-                print(self.alignment.infer_query_length())
-                exit(0)
+            assert len(self.alignment.query_sequence) == self.alignment.infer_query_length()
+            
+            # if len(self.alignment.query_sequence) != self.alignment.infer_query_length():
+            #     print(self.alignment.query_name)
+            #     print(self.alignment.reference_name)
+            #     print(self.alignment.reference_start)
+            #
+            #     print("pos %s" % self._pos)
+            #     print("end_pos %s" % self._end_pos)
+            #     print("masking allele %s" % seq)
+            #     print("alternative allele %s" % old_sequence[self._pos:self._end_pos])
+            #     print("reference allele %s" % self._ref_seq)
+            #     print("words %s" % self._words)
+            #
+            #     print('OLD')
+            #     print(old_sequence)
+            #     print(old_sequence_len)
+            #     print(old_cigar_str)
+            #     print(old_cigar_len)
+            #
+            #     print('NEW')
+            #     print(self.alignment.query_sequence)
+            #     print(len(self.alignment.query_sequence))
+            #     print(self.alignment.cigarstring)
+            #     print(self.alignment.infer_query_length())
+            #     exit(0)
     
     @staticmethod
     def _first_bases_match(seqs: list):

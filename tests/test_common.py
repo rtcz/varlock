@@ -39,12 +39,12 @@ class TestCommon(unittest.TestCase):
         alignment.query_sequence = "ATGC" * 10
         alignment.reference_start = 1000
         alignment.cigartuples = (
-            (Cigar.OP_MATCH, 10),
-            (Cigar.OP_DEL, 1),
-            (Cigar.OP_EQUAL, 3),
-            (Cigar.OP_DIFF, 3),
-            (Cigar.OP_INS, 1),
-            (Cigar.OP_MATCH, 20)
+            (Cigar.OP_MATCH_ID, 10),
+            (Cigar.OP_DEL_ID, 1),
+            (Cigar.OP_EQUAL_ID, 3),
+            (Cigar.OP_DIFF_ID, 3),
+            (Cigar.OP_INS_ID, 1),
+            (Cigar.OP_MATCH_ID, 20)
         )
         return alignment
     
@@ -61,13 +61,13 @@ class TestCommon(unittest.TestCase):
         alignment.query_sequence = "X" * 10 + "ATGC" * 10 + "X" * 10
         alignment.reference_start = 1000
         alignment.cigartuples = (
-            (Cigar.OP_SOFT_CLIP, 10),
-            (Cigar.OP_MATCH, 10),
-            (Cigar.OP_DEL, 1),
-            (Cigar.OP_MATCH, 9),
-            (Cigar.OP_INS, 1),
-            (Cigar.OP_MATCH, 20),
-            (Cigar.OP_SOFT_CLIP, 10)
+            (Cigar.OP_SOFT_CLIP_ID, 10),
+            (Cigar.OP_MATCH_ID, 10),
+            (Cigar.OP_DEL_ID, 1),
+            (Cigar.OP_MATCH_ID, 9),
+            (Cigar.OP_INS_ID, 1),
+            (Cigar.OP_MATCH_ID, 20),
+            (Cigar.OP_SOFT_CLIP_ID, 10)
         )
         return alignment
     

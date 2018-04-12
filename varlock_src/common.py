@@ -214,9 +214,8 @@ def ref_pos2seq_pos(alignment: pysam.AlignedSegment, ref_pos: int):
     Alignment and ref_pos are assumed to be of the same reference.
     :param alignment: pysam.AlignedSegment
     :param ref_pos: reference position of base
-    :return: 0-based position of base mapped to reference position
-    in AlignedSegment.query_sequence.
-    None if alignment is not mapped at ref_pos (deletion)
+    :return: AlignedSegment.query_sequence position matched to ref_pos.
+    None is returned if matching position is not found.
     """
     # TODO optimalize: (try matches_only=True)
     # TODO optimalize: case when alignment is full matched based on CIGAR (e.g. 30M)
@@ -245,7 +244,6 @@ def variant_seqs(variants: list):
             # if len(variant.seq) == 0:
             #     print(variant.alignment)
             #     print(variant.alignment.query_name)
-            #     print(variant.alignment.query_alignment_start)
             #     print(variant.alignment.query_sequence)
             #     print(variant._pos)
             #     print(variant._end_pos)
