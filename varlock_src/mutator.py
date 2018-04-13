@@ -465,15 +465,17 @@ class Mutator:
                     if vac_occurrence:
                         assert len(vac.seqs)
                     
-                    if alignment.query_name == 'ERR015528.13775373' and alignment.reference_start == 1421565:
+                    if alignment.query_name == 'ERR015528.28046840' and alignment.reference_start == 356649:
                         print('YYY')
                         print('vac_pos: %s' % vac.ref_pos)
                         print('vac_seqs: %s' % vac.seqs)
+                        print('ref_seq: %s' % vac.ref_seq)
                         # print('infer_query_length %d' % alignment.infer_query_length())
                         # print('query length %d' % len(alignment.query_sequence))
                         # print(alignment.cigarstring)
                         # print(alignment.query_sequence)
                         print('YYY')
+                        # exit(0)
                     
                     variant = AlignedVariant(alignment, pos, end_pos, vac.ref_seq, is_mutated)
                 else:
