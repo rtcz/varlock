@@ -1,5 +1,4 @@
 import hashlib
-import typing
 
 import pysam
 
@@ -147,7 +146,7 @@ class Mutator:
                     self.__write_before_index(mut_bam_file, alignment_queue, vac.index)
                     # update alignment queue
                     for i in range(len(alignment_queue)):
-                        alignment_queue[i] = self.create_aligned_variant(
+                        alignment_queue[i] = cmn.create_aligned_variant(
                             alignment_queue[i].alignment,
                             vac,
                             True,
@@ -158,7 +157,7 @@ class Mutator:
                     print('last vac: %s' % prev_vac)
             
             else:  # alignment is covering vac position
-                alignment_queue.append(self.create_aligned_variant(alignment, vac, True))
+                alignment_queue.append(cmn.create_aligned_variant(alignment, vac, True))
                 alignment = next(bam_iter)
                 self.covering_counter += 1
         
@@ -244,7 +243,7 @@ class Mutator:
                     self.__write_before_index(out_bam_file, alignment_queue, diff.index)
                     # update alignment queue
                     for i in range(len(alignment_queue)):
-                        alignment_queue[i] = self.create_aligned_variant(
+                        alignment_queue[i] = cmn.create_aligned_variant(
                             alignment_queue[i].alignment,
                             diff,
                             False,
@@ -255,7 +254,7 @@ class Mutator:
                     print('last diff: %s' % prev_diff)
             
             else:  # alignment is covering diff position
-                alignment_queue.append(self.create_aligned_variant(alignment, diff, False))
+                alignment_queue.append(cmn.create_aligned_variant(alignment, diff, False))
                 alignment = next(bam_iter)
                 self.covering_counter += 1
         
@@ -420,69 +419,3 @@ class Mutator:
             self.__write_alignment(out_bam_file, variant.alignment, variant.is_mutated)
             # remove written alignment
             variant_queue.remove(variant)
-    
-    # TODO move back to commons?
-    def create_aligned_variant(
-            self,
-            alignment: pysam.AlignedSegment,
-            vac: typing.Union[po.VariantPosition, po.VariantDiff],
-            vac_occurrence: bool,
-            is_mutated: bool = False
-    ):
-        """
-        Factory that creates AlignedVariant from pysam alignment and VAC record.
-        Alignment and VAC are assumed to be of the same reference.
-        :param alignment: aligned read
-        :param vac: variant position of diff record if vac_occurrence is False
-        :param vac_occurrence: if we compare to Snv/IndelOccurrence (encrypt) or to Snv/IndelDiff (decrpyt)
-        :param is_mutated:
-        """
-        assert alignment.reference_name == vac.ref_name
-        
-        SnpCompare = po.SnvOccurrence
-        IndelCompare = po.IndelOccurrence
-        if not vac_occurrence:
-            SnpCompare = po.SnvDiff
-            IndelCompare = po.IndelDiff
-        
-        if alignment.is_unmapped or (vac.ref_pos >= alignment.reference_end or vac.ref_pos < alignment.reference_start):
-            # variant is unmapped or either after or before the alignment
-            variant = AlignedVariant(alignment, is_mutated=is_mutated)
-        else:
-            pos = cmn.ref_pos2seq_pos(alignment, vac.ref_pos)
-            if pos is None:
-                # message = "WARNING: reference position %d on alignment with range <%d,%d> not found (possible deletion in bam read)" \
-                #           % (vac.ref_pos, alignment.reference_start, alignment.reference_end - 1)
-                # print(message)
-                variant = AlignedVariant(alignment, is_mutated=is_mutated)
-            elif isinstance(vac, SnpCompare):
-                variant = AlignedVariant(alignment, pos, is_mutated=is_mutated)
-            elif isinstance(vac, IndelCompare):
-                words = vac.seqs if vac_occurrence else list(vac.mut_map.values())
-                end_pos = pos + cmn.max_match_cigar(alignment, pos, vac.ref_pos, words, vac.ref_seq)
-                if end_pos > pos:
-                    # indel was found
-                    if vac_occurrence:
-                        assert len(vac.seqs)
-                    
-                    if alignment.query_name == 'ERR015528.28046840' and alignment.reference_start == 356649:
-                        print('YYY')
-                        print('vac_pos: %s' % vac.ref_pos)
-                        print('vac_seqs: %s' % vac.seqs)
-                        print('ref_seq: %s' % vac.ref_seq)
-                        # print('infer_query_length %d' % alignment.infer_query_length())
-                        # print('query length %d' % len(alignment.query_sequence))
-                        # print(alignment.cigarstring)
-                        # print(alignment.query_sequence)
-                        print('YYY')
-                        # exit(0)
-                    
-                    variant = AlignedVariant(alignment, pos, end_pos, vac.ref_seq, is_mutated)
-                else:
-                    # match not found or at least one variant exceeds alignment end
-                    variant = AlignedVariant(alignment, is_mutated=is_mutated)
-            else:
-                raise ValueError("%s is not %s/%s record instance" % (
-                    type(vac).__name__, type(SnpCompare).__name__, type(IndelCompare).__name__,))
-        
-        return variant
