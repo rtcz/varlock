@@ -255,29 +255,6 @@ def variant_seqs(variants: list):
     return pileup_col
 
 
-# def max_match_len(sequence: str, pos: int, words: list):
-#     """
-#     :param sequence:
-#     :param pos: position of matching
-#     :param words: words to match
-#     :return: Length of longest matching word in a string starting
-#     at specified position.
-#     When at least one word exceeds sequence length, zero is returned.
-#     """
-#     max_length = 0
-#     for word in words:
-#         end_pos = pos + len(word)
-#         if end_pos > len(sequence):
-#             max_length = 0
-#             break
-#
-#         if word == sequence[pos:end_pos]:
-#             # matching
-#             max_length = max(len(word), max_length)
-#
-#     return max_length
-
-
 def max_match_cigar(alignment: pysam.AlignedSegment, pos: int, ref_pos: int, words: list, reference: str):
     """
     Find longest matching sequence in the alignment with respect to the CIGAR string.

@@ -69,9 +69,9 @@ class Cigar:
         result = ''
         for count, op in re.findall(re.compile('([0-9]+)([A-Z]+)'), cigar_str):
             result += op * int(count)
-
+        
         return result
-
+    
     @staticmethod
     def shrink(exp_cigar: str):
         """
@@ -87,12 +87,12 @@ class Cigar:
             else:
                 result += str(op_count) + prev_op
                 op_count = 1
-
+            
             prev_op = op
-
+        
         if op_count > 0:
             result += str(op_count) + prev_op
-
+        
         return result
     
     @staticmethod
@@ -150,14 +150,17 @@ class Cigar:
         :param ref_seq:
         :return: expanded CIGAR of variant
         """
-        max_shared_len = min(len(seq), len(ref_seq))
-        cigar = cls.OP_MATCH * max_shared_len
-        
-        len_diff = len(seq) - len(ref_seq)
-        if len_diff > 0:
-            cigar += cls.OP_INS * len_diff
-        elif len_diff < 0:
-            cigar += cls.OP_DEL * -len_diff
+        if len(seq) == len(ref_seq):
+            cigar = cls.OP_MATCH * len(seq)
+        else:
+            max_shared_len = min(len(seq), len(ref_seq))
+            cigar = cls.OP_MATCH * max_shared_len
+            
+            len_diff = len(seq) - len(ref_seq)
+            if len_diff > 0:
+                cigar += cls.OP_INS * len_diff
+            elif len_diff < 0:
+                cigar += cls.OP_DEL * -len_diff
         
         return cigar
     
@@ -178,49 +181,100 @@ class Cigar:
         return result
     
     @classmethod
-    def mask(cls, exp_cigar: str, pos: int, seq: str, ref_seq: str) -> str:
+    def mask(cls, exp_cigar: str, seq_pos: int, alt_seq: str, ref_seq: str) -> str:
         """
         :param exp_cigar: expanded CIGAR string of alternative sequence
-        :param pos: masking position within or right after sequence associated with cigar
-        :param seq: masking sequence
-        :param ref_seq: reference sequence corresponding to masking sequence
+        :param seq_pos: masking position within or right after alternative sequence associated with cigar
+        :param alt_seq: allele sequence
+        :param ref_seq: reference allele sequence
         :return:
         """
-        alt_pos = 0
-        ref_pos = 0
-        i = 0
+        # if
+        cigar_pos = cls.seq_pos2cigar_pos(exp_cigar, seq_pos)
+        if cigar_pos is None:
+            raise ValueError('sequence position %d not found in CIGAR %s' % (seq_pos, exp_cigar))
         
-        pre_cigar = ''
-        for i in range(len(exp_cigar) + 1):
-            if alt_pos == pos:
-                pre_cigar = exp_cigar[:i]
-                break
-            if i == len(exp_cigar):
-                raise ValueError('position %d exceeded sequence length %d' % (pos, cls.alt_len(exp_cigar)))
-            
-            alt_pos += cls._consumes_alt(exp_cigar[i])
-            
-            # TODO is this needed?
-            ref_pos += cls._consumes_ref(exp_cigar[i])
-        
-        masking_cigar = cls.variant(seq, ref_seq)
+        pre_cigar = exp_cigar[:cigar_pos]
+        ref_pos = cls.ref_len(pre_cigar)
+        masking_cigar = cls.variant(alt_seq, ref_seq)
         ending_ref_pos = ref_pos + cls.ref_len(masking_cigar)
         
         post_cigar = ''
-        for j in range(i, len(exp_cigar)):
+        for i in range(cigar_pos, len(exp_cigar)):
             if ref_pos > ending_ref_pos:
                 break
             elif ref_pos == ending_ref_pos:
-                post_cigar = exp_cigar[j:]
+                # move further on cigar if ref_seq was not consumed
+                post_cigar = exp_cigar[i:]
             
-            ref_pos += cls._consumes_ref(exp_cigar[j])
+            ref_pos += cls._consumes_ref(exp_cigar[i])
         
         return pre_cigar + masking_cigar + post_cigar
     
     @classmethod
-    def match(cls, exp_cigar, pos: int, seqs: list, ref_seq) -> str:
-        # TODO
-
-
-
-        return ''
+    def ref_pos2cigar_pos(cls, exp_cigar: str, ref_pos: int):
+        pass
+    
+    @classmethod
+    def seq_pos2cigar_pos(cls, exp_cigar: str, seq_pos: int) -> int:
+        """
+        :param exp_cigar: expanded CIGAR string
+        :param seq_pos: alternative sequence position
+        :return: CIGAR position of seq_pos
+        """
+        result = None
+        alt_pos = -1
+        
+        for i in range(len(exp_cigar)):
+            alt_pos += cls._consumes_alt(exp_cigar[i])
+            if alt_pos == seq_pos:
+                result = i
+                break
+        
+        return result
+    
+    # TODO merge match_allele() and mask() methods
+    @classmethod
+    def replace_allele(
+            cls,
+            alt_seq: str,
+            exp_cigar: str,
+            seq_pos: int,
+            alleles: list,
+            alt_allele_id: int,
+            ref_allele_id: int
+    ) -> (str, str):
+        """
+        :param alt_seq:
+        :param exp_cigar:
+        :param seq_pos:
+        :param alleles:
+        :param alt_allele_id:
+        :param ref_allele_id:
+        :return:
+        """
+        pass
+    
+    @classmethod
+    def match_allele(cls, exp_cigar: str, seq_pos: int, alleles: list, ref_allele_id: int) -> str:
+        """
+        :param exp_cigar:
+        :param seq_pos:
+        :param alleles:
+        :param ref_allele_id:
+        :return:
+        """
+        assert 0 < ref_allele_id < len(alleles)
+        matched_allele = None
+        
+        cigar_pos = cls.seq_pos2cigar_pos(exp_cigar, seq_pos)
+        if cigar_pos is None:
+            raise ValueError('sequence position %d not found in CIGAR %s' % (seq_pos, exp_cigar))
+        
+        for i in range(len(alleles)):
+            allele_cigar = cls.variant(alleles[i], alleles[ref_allele_id])
+            if exp_cigar[cigar_pos:len(allele_cigar)] == allele_cigar:
+                matched_allele = alleles[i]
+                break
+        
+        return matched_allele

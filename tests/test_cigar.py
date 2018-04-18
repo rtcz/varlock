@@ -58,18 +58,26 @@ class TestCigar(unittest.TestCase):
             Cigar.exp_str2tuples('MMMMDDDMIMM')
         )
     
+    def test_seq_pos2cigar_pos(self):
+        self.assertEqual(1, Cigar.seq_pos2cigar_pos('HM', 0))
+        self.assertEqual(0, Cigar.seq_pos2cigar_pos('M', 0))
+        self.assertEqual(None, Cigar.seq_pos2cigar_pos('HHM', 1))
+        self.assertEqual(1, Cigar.seq_pos2cigar_pos('MM', 1))
+        self.assertEqual(3, Cigar.seq_pos2cigar_pos('SSMMM', 3))
+        self.assertEqual(None, Cigar.seq_pos2cigar_pos('M', 1))
+        self.assertEqual(5, Cigar.seq_pos2cigar_pos('MIIMDMM', 4))
+    
     def test_mask(self):
-        # TODO test INDEL place
-        
         self.assertEqual('MMMIMIMM', Cigar.mask('MMMMIMM', 2, 'CG', 'C'))
         
         self.assertEqual('MMMDMM', Cigar.mask('MMMMIMM', 2, 'C', 'CG'))
         self.assertEqual('SSMMMDMM', Cigar.mask('SSMMMMIMM', 4, 'C', 'CG'))
+        self.assertEqual('HMIM', Cigar.mask('HMM', 0, 'CG', 'C'))
         self.assertEqual('IIMMMDMM', Cigar.mask('IIMMMMIMM', 4, 'C', 'CG'))
         self.assertEqual('MDDMMMDMM', Cigar.mask('MDDMMMMIMM', 3, 'C', 'CG'))
         self.assertEqual('MMMDDMMM', Cigar.mask('MMMMDMMM', 2, 'C', 'CG'))
         
-        self.assertEqual('MD', Cigar.mask('', 0, 'C', 'CG'))
+        self.assertRaises(ValueError, lambda: Cigar.mask('', 0, 'C', 'CG'))
         
         self.assertEqual('MD', Cigar.mask('MM', 0, 'C', 'CG'))
         self.assertEqual('MIM', Cigar.mask('MM', 0, 'CG', 'C'))
@@ -79,13 +87,13 @@ class TestCigar(unittest.TestCase):
         self.assertEqual('MMI', Cigar.mask('MM', 1, 'CG', 'C'))
         self.assertEqual('MMM', Cigar.mask('MM', 1, 'CG', 'CG'))
         
-        self.assertEqual('MMMD', Cigar.mask('MM', 2, 'C', 'CG'))
-        self.assertEqual('MIMD', Cigar.mask('MI', 2, 'C', 'CG'))
-        self.assertEqual('MMMI', Cigar.mask('MM', 2, 'CG', 'C'))
-        self.assertEqual('MMMM', Cigar.mask('MM', 2, 'CG', 'CG'))
+        self.assertEqual('MDMD', Cigar.mask('MDM', 1, 'C', 'CG'))
+        self.assertEqual('MDMI', Cigar.mask('MDM', 1, 'CG', 'C'))
+        self.assertEqual('MDMM', Cigar.mask('MDM', 1, 'CG', 'CG'))
         
-        self.assertRaises(ValueError, lambda: Cigar.mask('MD', 2, 'C', 'CG'))
-        self.assertRaises(ValueError, lambda: Cigar.mask('MM', 3, 'C', 'CG'))
+        self.assertRaises(ValueError, lambda: Cigar.mask('MM', 2, 'CG', 'CG'))
+        self.assertRaises(ValueError, lambda: Cigar.mask('MD', 1, 'CG', 'CG'))
+        self.assertRaises(ValueError, lambda: Cigar.mask('MI', 2, 'CG', 'CG'))
     
     def test_variant(self):
         self.assertEqual('', Cigar.variant('', ''))
