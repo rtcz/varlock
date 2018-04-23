@@ -101,39 +101,16 @@ class AlignedVariant:
         #     print('xxx')
         
         self._is_mutated = True
-
+        
         # TODO
         old_sequence = self.alignment.query_sequence
         old_sequence_len = len(self.alignment.query_sequence)
         old_cigar_len = self.alignment.infer_query_length()
         old_cigar_str = self.alignment.cigarstring
         
-        # update sequence
-        mut_seq = self.alignment.query_sequence[:self._pos]
-        mut_seq += seq
-        mut_seq += self.alignment.query_sequence[self._end_pos:]
-        self.alignment.query_sequence = mut_seq
-        
         # save quality
         # TODO update quality string, save deleted qualities
-        # quality_seq = copy(self.alignment.query_qualities)
-        # if self._is_indel:
-        #     mean_qual = 34  # TODO!!! this is bulgarian constant which is relevant only to one sequencer type
-        #     if self.alignment.query_qualities is not None:
-        #         if len(self.alignment.query_qualities) > 0:
-        #             mean_qual = int(np.round(np.mean(self.alignment.query_qualities) + 0.5))
-        #         len_seq = len(seq)
-        #         len_var = self._end_pos - self._pos
-        #         len_overlap = min(len_var, len_seq)
-        #         quality_seq = self.alignment.query_qualities[:self._pos + len_overlap] + array('B', [mean_qual] * (
-        #             len_seq - len_var)) + self.alignment.query_qualities[self._end_pos:]
-        #         '''print(array('B', [mean_qual] * (len(seq) - self._end_pos + self._pos)), mean_qual, seq, len(seq), self.alignment.query_sequence, self._pos, self._end_pos,
-        #               self.alignment.query_sequence[:self._pos],
-        #               self.alignment.query_sequence[self._end_pos:], qual_array2str(self.alignment.query_qualities), qual_array2str(self.alignment.query_qualities[:self._pos]),
-        #               qual_array2str(self.alignment.query_qualities[self._end_pos:]), qual_array2str(quality_seq))'''
-        #
-        # # fix vanishing quality:
-        # self.alignment.query_qualities = quality_seq
+        # assigning to query_sequence removes query_qualities
         
         # TODO do something about MD string if present
         
@@ -141,15 +118,27 @@ class AlignedVariant:
             # TODO treat extended CIGAR opearations (=, X)
             # TODO at least assert that corresponding cigar letter is M
             # expecting only M OP now - it does not change with different SNV
-            pass
+            query_qualities = self.alignment.query_qualities
+            mut_seq = self.alignment.query_sequence[:self._pos] + seq + self.alignment.query_sequence[self._end_pos:]
+            self.alignment.query_sequence = mut_seq
+            self.alignment.query_qualities = query_qualities
+        
         elif self._is_indel:
-            exp_cigar = Cigar.mask(
-                Cigar.tuples2exp_str(self.alignment.cigartuples),
-                self._pos,
-                seq,
-                self._ref_seq
+            
+            seq, exp_cigar = Cigar.replace_allele(
+                seq=self.alignment.query_sequence,
+                exp_cigar=Cigar.tuples2exp_str(self.alignment.cigartuples),
+                alleles=None,  # TODO
+                allele_id=0,
+                ref_allele_id=0,
+                seq_pos=self._pos
             )
             self.alignment.cigartuples = Cigar.exp_str2tuples(exp_cigar)
+            self.alignment.query_sequence = seq
+            
+            # if len(self.alignment.query_sequence) == self.alignment.infer_query_length():
+            #     print(self.alignment.reference_start)
+            #     exit(0)
             
             # assert len(self.alignment.query_sequence) == self.alignment.infer_query_length()
             
@@ -157,19 +146,19 @@ class AlignedVariant:
                 print(self.alignment.query_name)
                 print(self.alignment.reference_name)
                 print(self.alignment.reference_start)
-
+                
                 print("pos %s" % self._pos)
                 print("end_pos %s" % self._end_pos)
                 print("masking allele %s" % seq)
                 print("alternative allele %s" % old_sequence[self._pos:self._end_pos])
                 print("reference allele %s" % self._ref_seq)
-
+                
                 print('OLD')
                 print(old_sequence)
                 print(old_sequence_len)
                 print(old_cigar_str)
                 print(old_cigar_len)
-
+                
                 print('NEW')
                 print(self.alignment.query_sequence)
                 print(len(self.alignment.query_sequence))

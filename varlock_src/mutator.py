@@ -363,6 +363,12 @@ class Mutator:
         variant_seqs = cmn.variant_seqs(variant_queue)
         
         alt_freq_map = cmn.freq_map(variant_seqs)
+        
+        # if vac.ref_pos == 106700:
+        #     print(alt_freq_map)
+        #     print(dict(zip(vac.seqs, vac.freqs)))
+        #     exit(0)
+        
         mut_map = cmn.indel_mut_map(
             alt_freq_map=alt_freq_map,
             ref_freq_map=dict(zip(vac.seqs, vac.freqs)),

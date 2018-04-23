@@ -10,6 +10,7 @@ import numpy as np
 import pysam
 
 from varlock_src import po
+from varlock_src.cigar import Cigar
 from varlock_src.random import VeryRandom
 from varlock_src.variant import AlignedVariant
 
@@ -417,29 +418,77 @@ def create_aligned_variant(
         elif isinstance(vac, SnpCompare):
             variant = AlignedVariant(alignment, pos, is_mutated=is_mutated)
         elif isinstance(vac, IndelCompare):
-            words = vac.seqs if vac_occurrence else list(vac.mut_map.values())
-            end_pos = pos + max_match_cigar(alignment, pos, vac.ref_pos, words, vac.ref_seq)
-            if end_pos > pos:
-                # indel was found
-                if vac_occurrence:
-                    assert len(vac.seqs)
-                
-                if alignment.query_name == 'ERR015528.28046840' and alignment.reference_start == 356649:
-                    print('YYY')
-                    print('vac_pos: %s' % vac.ref_pos)
-                    print('vac_seqs: %s' % vac.seqs)
-                    print('ref_seq: %s' % vac.ref_seq)
-                    # print('infer_query_length %d' % alignment.infer_query_length())
-                    # print('query length %d' % len(alignment.query_sequence))
-                    # print(alignment.cigarstring)
-                    # print(alignment.query_sequence)
-                    print('YYY')
-                    # exit(0)
-                
-                variant = AlignedVariant(alignment, pos, end_pos, vac.ref_seq, is_mutated)
-            else:
+            alleles = vac.seqs if vac_occurrence else list(vac.mut_map.values())
+            
+            # find matching alleles with respect to CIGAR string
+            cigar_alleles = Cigar.matching_alleles(
+                Cigar.tuples2exp_str(alignment.cigartuples),
+                pos,
+                alleles,
+                vac.ref_id
+            )
+            matched_allele = None
+            # find matching allele
+            for allele in cigar_alleles:
+                if alignment.query_sequence[pos:pos + len(allele)] == allele:
+                    matched_allele = allele
+            
+            if matched_allele is None:
                 # match not found or at least one variant exceeds alignment end
                 variant = AlignedVariant(alignment, is_mutated=is_mutated)
+                
+                # with open('test', 'r+') as test_file:
+                #     data = test_file.read()
+                #     if len(data):
+                #         new_data = int(data) + 1
+                #     else:
+                #         new_data = 1
+                #     test_file.seek(0)
+                #     test_file.write(str(new_data))
+                #     test_file.truncate()
+            
+            else:
+                # allele was matched
+                end_pos = pos + len(matched_allele)
+                
+                assert alignment.query_sequence[pos:end_pos] == matched_allele
+                
+                # if alignment.query_sequence[pos:end_pos] != matched_allele:
+                #     if vac.ref_pos == 106700:
+                #         print(alignment.cigarstring)
+                #         print(pos)
+                #         print(alleles)
+                #         print(matched_allele)
+                #         exit(0)
+                
+                # print(matched_allele)
+                #     print(alignment.query_sequence[pos:end_pos])
+                #     print(pos)
+                #     print(end_pos)
+                #     print(alignment.query_sequence)
+                #     print(alleles)
+                #     print(alignment.cigarstring)
+                #     print(vac.ref_id)
+                #     print(vac.ref_pos)
+                #     exit(0)
+                
+                # if vac_occurrence:
+                #     assert len(vac.seqs)
+                
+                # if alignment.query_name == 'ERR015528.10911176' and alignment.reference_start == 133718:
+                #     print('YYY')
+                #     print('vac_pos: %s' % vac.ref_pos)
+                #     print('vac_seqs: %s' % vac.seqs)
+                #     print('vac_freqs: %s' % vac.freqs)
+                #     print('ref_seq: %s' % vac.ref_seq)
+                #     # print('infer_query_length %d' % alignment.infer_query_length())
+                #     # print('query length %d' % len(alignment.query_sequence))
+                #     # print(alignment.cigarstring)
+                #     # print(alignment.query_sequence)
+                #     print('YYY')
+                #     # exit(0)
+                
+                variant = AlignedVariant(alignment, pos, end_pos, vac.ref_seq, is_mutated)
         else:
             raise ValueError("%s is not %s/%s record instance" % (
                 type(vac).__name__, type(SnpCompare).__name__, type(IndelCompare).__name__,))

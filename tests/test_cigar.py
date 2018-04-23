@@ -67,6 +67,7 @@ class TestCigar(unittest.TestCase):
         self.assertEqual(None, Cigar.seq_pos2cigar_pos('M', 1))
         self.assertEqual(5, Cigar.seq_pos2cigar_pos('MIIMDMM', 4))
     
+    # TODO deprecated
     def test_mask(self):
         self.assertEqual('MMMIMIMM', Cigar.mask('MMMMIMM', 2, 'CG', 'C'))
         
@@ -91,6 +92,9 @@ class TestCigar(unittest.TestCase):
         self.assertEqual('MDMI', Cigar.mask('MDM', 1, 'CG', 'C'))
         self.assertEqual('MDMM', Cigar.mask('MDM', 1, 'CG', 'CG'))
         
+        self.assertEqual('MIISS', Cigar.mask('MSS', 0, 'CAT', 'C'))
+        self.assertEqual('MIIII', Cigar.mask('MII', 0, 'CAT', 'C'))
+        
         self.assertRaises(ValueError, lambda: Cigar.mask('MM', 2, 'CG', 'CG'))
         self.assertRaises(ValueError, lambda: Cigar.mask('MD', 1, 'CG', 'CG'))
         self.assertRaises(ValueError, lambda: Cigar.mask('MI', 2, 'CG', 'CG'))
@@ -114,3 +118,33 @@ class TestCigar(unittest.TestCase):
         self.assertEqual('MDD', Cigar.variant('C', 'CTT'))
         self.assertEqual('MD', Cigar.variant('C', 'CG'))
         self.assertEqual('MM', Cigar.variant('CG', 'CG'))
+    
+    def test_matching_allele(self):
+        self.assertTupleEqual(('A', 'M'), Cigar._matching_allele('TTAAAC', 'MMMMMM', ['A', 'AAAC'], 0, 2))
+        self.assertTupleEqual(('AAAC', 'MIII'), Cigar._matching_allele('TTAAAC', 'MMMIII', ['A', 'AAAC'], 0, 2))
+        
+        # TODO resolve partial match
+        # self.assertTupleEqual(('AAAC', 'MIII'), Cigar._matching_allele('TTAAA', 'MMMII', ['A', 'AAAC'], 0, 2))
+        # temporary solution
+        self.assertRaises(ValueError, lambda: Cigar._matching_allele('TTAAA', 'MMMII', ['A', 'AAAC'], 0, 2))
+        
+        self.assertTupleEqual(('AA', 'MI'), Cigar._matching_allele('AA', 'MI', ['A', 'AA', 'AC'], 0, 0))
+        self.assertTupleEqual(('AC', 'MI'), Cigar._matching_allele('AC', 'MI', ['A', 'AA', 'AC'], 0, 0))
+    
+    def test_replace_allele(self):
+        self.assertTupleEqual(('TTAAAC', 'MMMMMM'), Cigar.replace_allele('TTAAAC', 'MMMMMM', ['A', 'AAAC'], 0, 0, 2))
+        self.assertTupleEqual(('TTA', 'MMM'), Cigar.replace_allele('TTAAAC', 'MMMIII', ['A', 'AAAC'], 0, 0, 2))
+        
+        self.assertTupleEqual(('TTA', 'MMM'), Cigar.replace_allele('TTAAAC', 'MMMIII', ['A', 'AAAC'], 0, 0, 2))
+    
+    # TODO deprecated
+    def test_matching_alleles(self):
+        self.assertListEqual(['A'], Cigar.matching_alleles(Cigar.expand('6M'), 2, ['A', 'AAAC'], 0))
+        self.assertListEqual(['AAAC'], Cigar.matching_alleles(Cigar.expand('3M3I'), 2, ['A', 'AAAC'], 0))
+        
+        # temporary solution
+        self.assertListEqual(['AAAC'], Cigar.matching_alleles(Cigar.expand('1M3I'), 0, ['A', 'AAAC'], 0))
+        self.assertListEqual([], Cigar.matching_alleles(Cigar.expand('1M2I'), 0, ['A', 'AAAC'], 0))
+        
+        # result has descending order
+        self.assertListEqual(['AC', 'AA'], Cigar.matching_alleles(Cigar.expand('1M1I'), 0, ['A', 'AA', 'AC'], 0))
