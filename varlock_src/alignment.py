@@ -24,10 +24,8 @@ class AlleleAlignment:
         
         if variant is not None:
             assert alignment.reference_name == variant.pos.ref_name
-            is_mapped = not alignment.is_unmapped
-            is_covering = alignment.reference_start <= variant.pos.ref_pos < alignment.reference_end
-            
-            if is_mapped and is_covering:
+            if not alignment.is_unmapped and alignment.reference_start <= variant.pos.ref_pos < alignment.reference_end:
+                # alignment is mapped and is covering variant
                 self._seq_pos = self._ref_pos2seq_pos(alignment, variant.pos.ref_pos)
                 if self._seq_pos is not None:
                     # find matching alleles with respect to CIGAR string

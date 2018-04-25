@@ -50,7 +50,7 @@ class Mutator:
         self.alignment_counter += 1
         self.alignment_mut_counter += is_mutated
         
-        if self._verbose and self.alignment_counter % 10000 == 0:
+        if self._verbose and self.alignment_counter % 100000 == 0:
             print("%d alignments done" % self.alignment_counter)
     
     def __init_counters(self):
@@ -138,7 +138,7 @@ class Mutator:
                 # done with this variant, read next
                 prev_vac = variant
                 variant = next(vac_iter)
-                if self._verbose and vac_iter.counter % 10000 == 0:
+                if self._verbose and vac_iter.counter % 100000 == 0:
                     print('%d VAC records done' % vac_iter.counter)
                 # not the end of VAC file
                 if variant is not None:

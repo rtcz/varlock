@@ -20,10 +20,10 @@ class BamMutator:
     # number of vac records read (variants)
     STAT_VAC_COUNT = 'vac_count'
     
-    # total number of non-synonymously mutated variants (for each alignment)
+    # total number of altered (non-synonymously mutated) variants (for each alignment)
     STAT_MUT_COUNT = 'mut_count'
     
-    # number of mutated / unmutated alignments (not including unmapped)
+    # number of altered alignments (not including unmapped)
     STAT_ALIGNMENT_MUT_COUNT = 'alignment_mut_count'
     
     # number of DIFF records written / read

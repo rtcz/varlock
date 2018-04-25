@@ -57,6 +57,9 @@ class Variant:
     @property
     def ref_allele(self):
         return self._ref_allele
+    
+    def __str__(self):
+        return '%s %s' % (self._position, self._vtype)
 
 
 class VariantDiff(Variant):
