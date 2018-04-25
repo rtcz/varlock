@@ -9,7 +9,7 @@ import numpy as np
 import pysam
 
 from varlock_src.random import VeryRandom
-from varlock_src.variant import AlignmentAllele
+from varlock_src.alignment import AlleleAlignment
 
 BASES = ("A", "T", "G", "C")
 UNKNOWN_BASE = "N"
@@ -214,7 +214,7 @@ def variant_seqs(variants: list):
     :return: list of bases at specific position
     """
     pileup_col = []
-    for variant in variants:  # type: AlignmentAllele
+    for variant in variants:  # type: AlleleAlignment
         if variant.is_known:
             # alignment is mapped at snv position
             pileup_col.append(variant.allele)

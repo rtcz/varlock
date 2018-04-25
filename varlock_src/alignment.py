@@ -6,7 +6,7 @@ from varlock_src.cigar import Cigar, NotFoundError
 from varlock_src.po import Variant, VariantType
 
 
-class AlignmentAllele:
+class AlleleAlignment:
     def __init__(
             self,
             alignment: pysam.AlignedSegment,

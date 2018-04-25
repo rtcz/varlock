@@ -3,7 +3,7 @@ import unittest
 import pysam
 
 from varlock_src.cigar import Cigar
-from varlock_src.variant import AlignmentAllele
+from varlock_src.alignment import AlleleAlignment
 
 
 class TestVariant(unittest.TestCase):
@@ -47,12 +47,12 @@ class TestVariant(unittest.TestCase):
     
     def test_pos_conversion(self):
         alignment = self.build_alignment()
-        self.assertIsNone(AlignmentAllele._ref_pos2seq_pos(alignment=alignment, ref_pos=1010))
-        self.assertEqual(9, AlignmentAllele._ref_pos2seq_pos(alignment=alignment, ref_pos=1009))
+        self.assertIsNone(AlleleAlignment._ref_pos2seq_pos(alignment=alignment, ref_pos=1010))
+        self.assertEqual(9, AlleleAlignment._ref_pos2seq_pos(alignment=alignment, ref_pos=1009))
         
         alignment = self.build_flanked_alignment()
-        self.assertIsNone(AlignmentAllele._ref_pos2seq_pos(alignment=alignment, ref_pos=1010))
-        self.assertEqual(19, AlignmentAllele._ref_pos2seq_pos(alignment=alignment, ref_pos=1009))
+        self.assertIsNone(AlleleAlignment._ref_pos2seq_pos(alignment=alignment, ref_pos=1010))
+        self.assertEqual(19, AlleleAlignment._ref_pos2seq_pos(alignment=alignment, ref_pos=1009))
         
         # def test_replace_allele(self):
         #     self.assertTupleEqual(('TTAAAC', 'MMMMMM'), Cigar.replace_allele('TTAAAC', 'MMMMMM', ['A', 'AAAC'], 0, 0, 2))
