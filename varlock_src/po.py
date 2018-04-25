@@ -1,53 +1,107 @@
 # TODO refactor, use @property, etc
-class VariantPosition(object):
+from enum import Enum
+
+
+class VariantType(Enum):
+    SNV = 1
+    INDEL = 2
+
+
+class GenomicPosition(object):
     def __init__(self, index: int, ref_name: str, ref_pos: int):
-        self.index = index
-        self.ref_name = ref_name
-        self.ref_pos = ref_pos
+        self._index = index
+        self._ref_name = ref_name
+        self._ref_pos = ref_pos
+    
+    @property
+    def index(self) -> int:
+        return self._index
+    
+    @property
+    def ref_name(self) -> str:
+        return self._ref_name
+    
+    @property
+    def ref_pos(self) -> int:
+        return self._ref_pos
     
     def __str__(self):
         return '#%d %s:%d' % (self.index, self.ref_name, self.ref_pos)
 
 
-class VariantDiff(VariantPosition):
-    def __init__(self, index: int, ref_name: str, ref_pos: int, mut_map: dict, ref_seq: str):
-        super().__init__(index, ref_name, ref_pos)
-        self.mut_map = mut_map
-        self.ref_seq = ref_seq
-
-
-class SnvDiff(VariantDiff):
-    pass
-
-
-class IndelDiff(VariantDiff):
-    pass
-
-
-class VariantOccurrence(VariantPosition):
-    def __init__(self, index: int, ref_name: str, ref_pos: int, freqs: list, seqs: list, ref_id: int):
-        super().__init__(index, ref_name, ref_pos)
-        self.freqs = freqs
-        self.seqs = seqs
-        self.ref_id = ref_id
+class Variant:
+    def __init__(
+            self,
+            position: GenomicPosition,
+            vtype: VariantType,
+            alleles: list,
+            ref_allele: str
+    ):
+        assert ref_allele in alleles
+        self._position = position
+        self._alleles = alleles
+        self._ref_allele = ref_allele
+        self._vtype = vtype
     
     @property
-    def ref_freq(self):
-        return self.freqs[self.ref_id]
+    def pos(self):
+        return self._position
+    
+    def is_type(self, vtype: VariantType) -> bool:
+        return self._vtype == vtype
     
     @property
-    def ref_seq(self):
-        return self.seqs[self.ref_id]
+    def alleles(self) -> list:
+        return self._alleles
+    
+    @property
+    def ref_allele(self):
+        return self._ref_allele
 
 
-class SnvOccurrence(VariantOccurrence):
-    def __str__(self):
-        return '#%d %s:%d SNP' % (self.index, self.ref_name, self.ref_pos)
+class VariantDiff(Variant):
+    def __init__(
+            self,
+            position: GenomicPosition,
+            vtype: VariantType,
+            mut_map: dict,
+            ref_allele: str
+    ):
+        super().__init__(
+            position,
+            vtype,
+            list(mut_map.values()),
+            ref_allele
+        )
+        assert ref_allele in mut_map.values()
+        self._mut_map = mut_map
+    
+    @property
+    def mut_map(self) -> dict:
+        return self._mut_map
 
 
-class IndelOccurrence(VariantOccurrence):
-    def __str__(self):
-        return '#%d %s:%d INDEL' % (self.index, self.ref_name, self.ref_pos)
+class VariantOccurrence(Variant):
+    def __init__(
+            self,
+            position: GenomicPosition,
+            vtype: VariantType,
+            freqs: list,
+            alleles: list,
+            ref_allele: str
+    ):
+        super().__init__(
+            position,
+            vtype,
+            alleles,
+            ref_allele
+        )
+        assert len(freqs) == len(alleles)
+        self._freqs = freqs
+    
+    @property
+    def freqs(self) -> list:
+        return self._freqs
 
 
 class FaiRecord:

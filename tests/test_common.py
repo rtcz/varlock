@@ -1,13 +1,11 @@
 import unittest
 from random import Random
 
-import pysam
 from bitarray import bitarray
 from bitstring import BitArray
 
 import varlock_src.common as cmn
 from tests.random import RandomMockup
-from varlock_src.cigar import Cigar
 from varlock_src.random import VeryRandom
 
 
@@ -33,53 +31,6 @@ class TestCommon(unittest.TestCase):
         self.assertListEqual([3, 2, 1, 1], cmn.base_freqs(['A', 'A', 'G', 'T', 'C', 'T', 'A']))
         self.assertListEqual([0, 0, 2, 1], cmn.base_freqs(['G', 'C', 'G']))
     
-    @staticmethod
-    def build_alignment():
-        alignment = pysam.AlignedSegment()
-        alignment.query_sequence = "ATGC" * 10
-        alignment.reference_start = 1000
-        alignment.cigartuples = (
-            (Cigar.OP_MATCH_ID, 10),
-            (Cigar.OP_DEL_ID, 1),
-            (Cigar.OP_EQUAL_ID, 3),
-            (Cigar.OP_DIFF_ID, 3),
-            (Cigar.OP_INS_ID, 1),
-            (Cigar.OP_MATCH_ID, 20)
-        )
-        return alignment
-    
-    @staticmethod
-    def build_flanked_alignment():
-        """
-        SAM/BAM files may include extra flanking bases that are not part of the alignment.
-        These bases may be the result of the Smith-Waterman or other algorithms,
-        which may not require alignments that begin at the first residue or end at the last.
-        In addition, extra sequencing adapters, multiplex identifiers,
-        and low-quality bases that were not considered for alignment may have been retained.
-        """
-        alignment = pysam.AlignedSegment()
-        alignment.query_sequence = "X" * 10 + "ATGC" * 10 + "X" * 10
-        alignment.reference_start = 1000
-        alignment.cigartuples = (
-            (Cigar.OP_SOFT_CLIP_ID, 10),
-            (Cigar.OP_MATCH_ID, 10),
-            (Cigar.OP_DEL_ID, 1),
-            (Cigar.OP_MATCH_ID, 9),
-            (Cigar.OP_INS_ID, 1),
-            (Cigar.OP_MATCH_ID, 20),
-            (Cigar.OP_SOFT_CLIP_ID, 10)
-        )
-        return alignment
-    
-    def test_pos_conversion(self):
-        alignment = self.build_alignment()
-        self.assertIsNone(cmn.ref_pos2seq_pos(alignment=alignment, ref_pos=1010))
-        self.assertEqual(9, cmn.ref_pos2seq_pos(alignment=alignment, ref_pos=1009))
-        
-        alignment = self.build_flanked_alignment()
-        self.assertIsNone(cmn.ref_pos2seq_pos(alignment=alignment, ref_pos=1010))
-        self.assertEqual(19, cmn.ref_pos2seq_pos(alignment=alignment, ref_pos=1009))
-    
     def test_snv_mut_map(self):
         mut_map = cmn.snv_mut_map(alt_freqs=[1, 1, 1, 1], ref_freqs=[1, 1, 1, 1], rnd=VeryRandom(Random(0)))
         self.assertDictEqual({'A': 'G', 'T': 'T', 'G': 'C', 'C': 'A', 'N': 'N'}, mut_map)
@@ -89,7 +40,7 @@ class TestCommon(unittest.TestCase):
     
     def test_indel_mut_map(self):
         mut_map = cmn.indel_mut_map(
-
+            
             alt_freq_map={'G': 2},
             ref_freq_map={'GCG': 1, 'G': 0},
             rnd=VeryRandom(RandomMockup(0.5))

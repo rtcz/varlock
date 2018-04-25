@@ -1,6 +1,10 @@
 import re
 
 
+class NotFoundError(Exception):
+    pass
+
+
 class Cigar:
     OP_MATCH = 'M'  # match (does not have to be equal to the refrence)
     OP_INS = 'I'  # insertion
@@ -142,8 +146,9 @@ class Cigar:
         return cigar_op in [cls.OP_MATCH, cls.OP_EQUAL, cls.OP_DIFF, cls.OP_DEL, cls.OP_REF_SKIP]
     
     # TODO extended CIGAR operations (=,X)
+    # TODO deprecated
     @classmethod
-    def variant(cls, seq: str, ref_seq: str) -> str:
+    def allele(cls, seq: str, ref_seq: str) -> str:
         """
         :param seq:
         :param ref_seq:
@@ -178,39 +183,6 @@ class Cigar:
             result += cls._consumes_alt(op)
         
         return result
-
-    # TODO deprecated
-    @classmethod
-    def mask(cls, exp_cigar: str, seq_pos: int, alt_seq: str, ref_seq: str) -> str:
-        """
-        :param exp_cigar: expanded CIGAR string of alternative sequence
-        :param seq_pos: masking position within or right after alternative sequence associated with cigar
-        :param alt_seq: allele sequence
-        :param ref_seq: reference allele sequence
-        :return:
-        """
-        # if
-        cigar_pos = cls.seq_pos2cigar_pos(exp_cigar, seq_pos)
-        if cigar_pos is None:
-            raise ValueError('sequence position %d not found in CIGAR %s' % (seq_pos, exp_cigar))
-        
-        pre_cigar = exp_cigar[:cigar_pos]
-        ref_pos = cls.ref_len(pre_cigar)
-        masking_cigar = cls.variant(alt_seq, ref_seq)
-        ending_ref_pos = ref_pos + cls.ref_len(masking_cigar)
-        
-        post_cigar = ''
-        for i in range(cigar_pos, len(exp_cigar)):
-            if ref_pos > ending_ref_pos:
-                break
-            elif ref_pos == ending_ref_pos:
-                # move further on cigar if ref_seq was not consumed
-                post_cigar = exp_cigar[i:]
-                break
-            
-            ref_pos += cls._consumes_ref(exp_cigar[i])
-        
-        return pre_cigar + masking_cigar + post_cigar
     
     @classmethod
     def ref_pos2cigar_pos(cls, exp_cigar: str, ref_pos: int):
@@ -235,12 +207,12 @@ class Cigar:
         return result
     
     @classmethod
-    def _matching_allele(
+    def matching_allele(
             cls,
             seq: str,
             exp_cigar: str,
             alleles: list,
-            ref_allele_id: int,
+            ref_allele: str,
             seq_pos: int,
             cigar_pos: int = None,
     ) -> (str, str):
@@ -248,11 +220,12 @@ class Cigar:
         :param seq:
         :param exp_cigar:
         :param alleles:
-        :param ref_allele_id:
+        :param ref_allele:
         :param seq_pos:
         :param cigar_pos:
         :return:
         """
+        assert ref_allele in alleles
         if cigar_pos is None:
             cigar_pos = cls.seq_pos2cigar_pos(exp_cigar, seq_pos)
         
@@ -266,99 +239,11 @@ class Cigar:
             if not is_seq_match:
                 continue
             
-            allele_cigar = cls.variant(allele, alleles[ref_allele_id])
+            allele_cigar = cls.allele(allele, ref_allele)
             assert cigar_pos + len(allele_cigar) <= len(exp_cigar)
-            
-            # if cigar_pos + len(allele_cigar) > len(exp_cigar):
-            #     breakNerr
             
             is_cigar_match = exp_cigar[cigar_pos:cigar_pos + len(allele_cigar)] == allele_cigar
             if is_seq_match and is_cigar_match:
                 return allele, allele_cigar
         
-        # TODO
-        raise ValueError
-    
-    # TODO merge match_allele() and mask() methods
-    @classmethod
-    def replace_allele(
-            cls,
-            seq: str,
-            exp_cigar: str,
-            alleles: list,
-            allele_id: int,
-            ref_allele_id: int,
-            seq_pos: int
-    ) -> (str, str):
-        """
-        Replace allele present in the sequence with another allele.
-        Allele is replaced only if some allele from the list is present in the sequence.
-        :param seq: sequence
-        :param exp_cigar: expanded CIGAR string of the sequence
-        :param seq_pos: position of alleles within sequence
-        :param alleles: list of known alleles for the position
-        :param allele_id: ID of desired allele within the list
-        :param ref_allele_id: ID of reference allele within the list
-        :return:tuple of sequence and exp_cigar
-        """
-        assert 0 <= allele_id < len(alleles)
-        
-        cigar_pos = cls.seq_pos2cigar_pos(exp_cigar, seq_pos)
-        if cigar_pos is None:
-            raise ValueError('sequence position %d not found in CIGAR %s' % (seq_pos, exp_cigar))
-        
-        matched_allele, matched_allele_cigar = cls._matching_allele(
-            seq,
-            exp_cigar,
-            alleles,
-            ref_allele_id,
-            seq_pos,
-            cigar_pos
-        )
-        
-        if alleles[allele_id] != matched_allele:
-            # allele was found and is different from desired allele
-            
-            # update sequence
-            result_seq = seq[:seq_pos] + alleles[allele_id] + seq[seq_pos + len(matched_allele):]
-            
-            # update CIGAR string
-            allele_cigar = cls.variant(alleles[allele_id], alleles[ref_allele_id])
-            result_cigar = exp_cigar[:cigar_pos] + allele_cigar + exp_cigar[cigar_pos + len(matched_allele_cigar):]
-            
-            return result_seq, result_cigar
-        else:
-            return seq, exp_cigar
-    
-    # TODO deprecated
-    @classmethod
-    def matching_alleles(cls, exp_cigar: str, allele_pos: int, alleles: list, ref_allele_id: int) -> list:
-        """
-        :param exp_cigar:
-        :param allele_pos:
-        :param alleles:
-        :param ref_allele_id:
-        :return: list of CIGAR matched alleles with the biggest possible length
-        """
-        assert 0 <= ref_allele_id < len(alleles)
-        matches = []
-        
-        cigar_pos = cls.seq_pos2cigar_pos(exp_cigar, allele_pos)
-        if cigar_pos is None:
-            raise ValueError('sequence position %d not found in CIGAR %s' % (allele_pos, exp_cigar))
-        
-        for allele in reversed(sorted(alleles, key=len)):  # type: str
-            if len(matches) and len(matches[-1]) > len(allele):
-                # previously matched allele is longer
-                break
-            
-            allele_cigar = cls.variant(allele, alleles[ref_allele_id])
-            if cigar_pos + len(allele_cigar) > len(exp_cigar):
-                # allele exceedes CIGAR end
-                # TODO treat partialy matched alleles
-                break
-            
-            if exp_cigar[cigar_pos:cigar_pos + len(allele_cigar)] == allele_cigar:
-                matches.append(allele)
-        
-        return matches
+        raise NotFoundError

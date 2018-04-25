@@ -10,5 +10,5 @@ class RandomMockup(Random):
         return self._value
     
     @staticmethod
-    def randint(a, b):
+    def randint(a, b, **kwargs):
         return 0

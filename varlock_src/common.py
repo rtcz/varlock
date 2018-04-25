@@ -4,15 +4,12 @@ import hashlib
 import json
 import math
 import os
-import typing
 
 import numpy as np
 import pysam
 
-from varlock_src import po
-from varlock_src.cigar import Cigar
 from varlock_src.random import VeryRandom
-from varlock_src.variant import AlignedVariant
+from varlock_src.variant import AlignmentAllele
 
 BASES = ("A", "T", "G", "C")
 UNKNOWN_BASE = "N"
@@ -211,38 +208,16 @@ def checksum(filepath: str, as_bytes=False):
         return bytes2hex(checksum_bytes)
 
 
-def ref_pos2seq_pos(alignment: pysam.AlignedSegment, ref_pos: int):
-    """
-    Retrieve base position in sequence string at refence position.
-    Alignment and ref_pos are assumed to be of the same reference.
-    :param alignment: pysam.AlignedSegment
-    :param ref_pos: reference position of base
-    :return: AlignedSegment.query_sequence position matched to ref_pos.
-    None is returned if matching position is not found.
-    """
-    # TODO optimalize: (try matches_only=True)
-    # TODO optimalize: case when alignment is full matched based on CIGAR (e.g. 30M)
-    
-    seq_pos = None
-    for current_seq_pos, current_ref_pos in alignment.get_aligned_pairs(matches_only=False, with_seq=False):
-        # search for base in snv position
-        if current_ref_pos == ref_pos:
-            seq_pos = current_seq_pos
-            break
-    
-    return seq_pos
-
-
 def variant_seqs(variants: list):
     """
     :param variants: list of po.AlignedVariant
     :return: list of bases at specific position
     """
     pileup_col = []
-    for variant in variants:  # type: AlignedVariant
-        if variant.is_present():
+    for variant in variants:  # type: AlignmentAllele
+        if variant.is_known:
             # alignment is mapped at snv position
-            pileup_col.append(variant.seq)
+            pileup_col.append(variant.allele)
             
             # if len(variant.seq) == 0:
             #     print(variant.alignment)
@@ -254,61 +229,6 @@ def variant_seqs(variants: list):
             #     exit(0)
     
     return pileup_col
-
-
-def max_match_cigar(alignment: pysam.AlignedSegment, pos: int, ref_pos: int, words: list, reference: str):
-    """
-    Find longest matching sequence in the alignment with respect to the CIGAR string.
-    :param alignment: aligned read
-    :param pos: starting position in the read
-    :param ref_pos: reference position of the starting position
-    :param words: list of sequences to match
-    :param reference: reference sequence
-    :return: the length of longest matching word
-    """
-    max_length = 0
-    
-    longest = max(len(word) for word in words)
-    
-    # skip those that span more than the sequence TODO: upgrade
-    if alignment.reference_end < ref_pos + longest:
-        return 0
-    
-    # create how the sequence should look like: (this can be faster, but INDELS are uncommon, so maybe it does not matter?)
-    full_cigar = ''
-    ref_seq = ''
-    writing = False
-    for current_seq_pos, current_ref_pos in alignment.get_aligned_pairs():
-        if not writing and current_seq_pos == pos:
-            # position of the indel is reached
-            writing = True
-        if writing:
-            if current_seq_pos is None:  # deletion
-                full_cigar += 'D'
-                ref_seq += 'N'
-                break
-            elif current_ref_pos is None:  # insertion
-                full_cigar += 'I'
-                ref_seq += alignment.query_sequence[current_seq_pos]
-            else:  # match
-                full_cigar += 'M'
-                ref_seq += alignment.query_sequence[current_seq_pos]
-            if len(full_cigar) == longest:
-                break
-    
-    # check reference sequence
-    if full_cigar[:len(reference)] == 'M' * len(reference) and ref_seq[:len(reference)] == reference:
-        max_length = max(len(reference), max_length)
-    
-    # check alternative sequences
-    for word in words:
-        if word != reference:
-            # check if this word is available in alignment (insert is inside or it ends with the deletion)
-            if ref_seq[:len(word)] == word \
-                    and ('I' in full_cigar[:len(word)] or 'D' == full_cigar[len(word):len(word) + 1]):
-                max_length = max(len(word), max_length)
-    
-    return max_length
 
 
 def is_placed_alignment(alignment: pysam.AlignedSegment):
@@ -381,116 +301,3 @@ def dict2bytes(value: dict):
 
 def bytes2dict(value: bytes):
     return json.loads(value.decode())
-
-
-def create_aligned_variant(
-        alignment: pysam.AlignedSegment,
-        vac: typing.Union[po.VariantPosition, po.VariantDiff],
-        vac_occurrence: bool,
-        is_mutated: bool = False
-):
-    """
-    Factory that creates AlignedVariant from pysam alignment and VAC record.
-    Alignment and VAC are assumed to be of the same reference.
-    :param alignment: aligned read
-    :param vac: variant position of diff record if vac_occurrence is False
-    :param vac_occurrence: if we compare to Snv/IndelOccurrence (encrypt) or to Snv/IndelDiff (decrpyt)
-    :param is_mutated:
-    """
-    assert alignment.reference_name == vac.ref_name
-    
-    SnpCompare = po.SnvOccurrence
-    IndelCompare = po.IndelOccurrence
-    if not vac_occurrence:
-        SnpCompare = po.SnvDiff
-        IndelCompare = po.IndelDiff
-    
-    if alignment.is_unmapped or (vac.ref_pos >= alignment.reference_end or vac.ref_pos < alignment.reference_start):
-        # variant is unmapped or either after or before the alignment
-        variant = AlignedVariant(alignment, is_mutated=is_mutated)
-    else:
-        pos = ref_pos2seq_pos(alignment, vac.ref_pos)
-        if pos is None:
-            # message = "WARNING: reference position %d on alignment with range <%d,%d> not found (possible deletion in bam read)" \
-            #           % (vac.ref_pos, alignment.reference_start, alignment.reference_end - 1)
-            # print(message)
-            variant = AlignedVariant(alignment, is_mutated=is_mutated)
-        elif isinstance(vac, SnpCompare):
-            variant = AlignedVariant(alignment, pos, is_mutated=is_mutated)
-        elif isinstance(vac, IndelCompare):
-            alleles = vac.seqs if vac_occurrence else list(vac.mut_map.values())
-            
-            # find matching alleles with respect to CIGAR string
-            cigar_alleles = Cigar.matching_alleles(
-                Cigar.tuples2exp_str(alignment.cigartuples),
-                pos,
-                alleles,
-                vac.ref_id
-            )
-            matched_allele = None
-            # find matching allele
-            for allele in cigar_alleles:
-                if alignment.query_sequence[pos:pos + len(allele)] == allele:
-                    matched_allele = allele
-            
-            if matched_allele is None:
-                # match not found or at least one variant exceeds alignment end
-                variant = AlignedVariant(alignment, is_mutated=is_mutated)
-                
-                # with open('test', 'r+') as test_file:
-                #     data = test_file.read()
-                #     if len(data):
-                #         new_data = int(data) + 1
-                #     else:
-                #         new_data = 1
-                #     test_file.seek(0)
-                #     test_file.write(str(new_data))
-                #     test_file.truncate()
-            
-            else:
-                # allele was matched
-                end_pos = pos + len(matched_allele)
-                
-                assert alignment.query_sequence[pos:end_pos] == matched_allele
-                
-                # if alignment.query_sequence[pos:end_pos] != matched_allele:
-                #     if vac.ref_pos == 106700:
-                #         print(alignment.cigarstring)
-                #         print(pos)
-                #         print(alleles)
-                #         print(matched_allele)
-                #         exit(0)
-                
-                # print(matched_allele)
-                #     print(alignment.query_sequence[pos:end_pos])
-                #     print(pos)
-                #     print(end_pos)
-                #     print(alignment.query_sequence)
-                #     print(alleles)
-                #     print(alignment.cigarstring)
-                #     print(vac.ref_id)
-                #     print(vac.ref_pos)
-                #     exit(0)
-                
-                # if vac_occurrence:
-                #     assert len(vac.seqs)
-                
-                # if alignment.query_name == 'ERR015528.10911176' and alignment.reference_start == 133718:
-                #     print('YYY')
-                #     print('vac_pos: %s' % vac.ref_pos)
-                #     print('vac_seqs: %s' % vac.seqs)
-                #     print('vac_freqs: %s' % vac.freqs)
-                #     print('ref_seq: %s' % vac.ref_seq)
-                #     # print('infer_query_length %d' % alignment.infer_query_length())
-                #     # print('query length %d' % len(alignment.query_sequence))
-                #     # print(alignment.cigarstring)
-                #     # print(alignment.query_sequence)
-                #     print('YYY')
-                #     # exit(0)
-                
-                variant = AlignedVariant(alignment, pos, end_pos, vac.ref_seq, is_mutated)
-        else:
-            raise ValueError("%s is not %s/%s record instance" % (
-                type(vac).__name__, type(SnpCompare).__name__, type(IndelCompare).__name__,))
-    
-    return variant

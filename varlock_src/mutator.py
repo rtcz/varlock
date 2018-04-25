@@ -8,7 +8,7 @@ import varlock_src.iters as iters
 import varlock_src.po as po
 from varlock_src.fasta_index import FastaIndex
 from varlock_src.random import VeryRandom
-from varlock_src.variant import AlignedVariant
+from varlock_src.variant import AlignmentAllele
 
 
 class Mutator:
@@ -85,28 +85,28 @@ class Mutator:
         alignment_queue = []
         alignment = next(bam_iter)
         
-        # TODO optimization: seek to first alignment covering vac to skip all preceding records
-        vac = next(vac_iter)
+        # TODO optimization: seek to first alignment covering variant to skip all preceding records
+        variant = next(vac_iter)  # type: po.VariantOccurrence
         
         if self._verbose:
-            print('first vac: %s' % vac)
+            print('first variant: %s' % variant)
         
         bdiff_io = bdiff.BdiffIO()
         while True:
-            if vac is None or alignment is None:
+            if variant is None or alignment is None:
                 # finish
                 if self._verbose:
-                    if vac is None:
+                    if variant is None:
                         print("EOF VAC")
                     else:
                         print("EOF BAM")
                 
                 # last mutation
-                if vac is not None:
+                if variant is not None:
                     # noinspection PyTypeChecker
-                    self.__mutate_pos(bdiff_io, alignment_queue, vac, rnd)
+                    self.__mutate_pos(bdiff_io, alignment_queue, variant, rnd)
                 
-                for variant_alignment in alignment_queue:  # type: AlignedVariant
+                for variant_alignment in alignment_queue:  # type: AlignmentAllele
                     # unmapped alignments in queue are already encrypted
                     self.__write_alignment(mut_bam_file, variant_alignment.alignment, variant_alignment.is_mutated)
                 
@@ -121,43 +121,42 @@ class Mutator:
                 
                 break
             
-            elif alignment.is_unmapped or self.__is_before_index(alignment, vac.index):
+            elif alignment.is_unmapped or self.__is_before_index(alignment, variant.pos.index):
                 self.__encrypt_unmapped(alignment, secret)
                 if len(alignment_queue) == 0:
                     # good to go, all preceding alignments are written
                     self.__write_alignment(mut_bam_file, alignment, False)
                 else:
                     # append to queue
-                    alignment_queue.append(AlignedVariant(alignment))
+                    alignment_queue.append(AlignmentAllele(alignment))
                 
                 alignment = next(bam_iter)
             
-            elif self.__is_after_index(alignment, vac.index):
+            elif self.__is_after_index(alignment, variant.pos.index):
                 # apply the variant to alignment
-                self.__mutate_pos(bdiff_io, alignment_queue, vac, rnd)
-                # done with this vac, read next
-                prev_vac = vac
-                vac = next(vac_iter)
+                self.__mutate_pos(bdiff_io, alignment_queue, variant, rnd)
+                # done with this variant, read next
+                prev_vac = variant
+                variant = next(vac_iter)
                 if self._verbose and vac_iter.counter % 10000 == 0:
                     print('%d VAC records done' % vac_iter.counter)
                 # not the end of VAC file
-                if vac is not None:
+                if variant is not None:
                     # write alignments to mutated BAM
-                    self.__write_before_index(mut_bam_file, alignment_queue, vac.index)
+                    self.__write_before_index(mut_bam_file, alignment_queue, variant.pos.index)
                     # update alignment queue
                     for i in range(len(alignment_queue)):
-                        alignment_queue[i] = cmn.create_aligned_variant(
+                        alignment_queue[i] = AlignmentAllele(
                             alignment_queue[i].alignment,
-                            vac,
-                            True,
+                            variant,
                             alignment_queue[i].is_mutated
                         )
                 
                 elif self._verbose:
-                    print('last vac: %s' % prev_vac)
+                    print('last variant: %s' % prev_vac)
             
-            else:  # alignment is covering vac position
-                alignment_queue.append(cmn.create_aligned_variant(alignment, vac, True))
+            else:  # alignment is covering variant position
+                alignment_queue.append(AlignmentAllele(alignment, variant))
                 alignment = next(bam_iter)
                 self.covering_counter += 1
         
@@ -186,24 +185,24 @@ class Mutator:
         
         alignment_queue = []
         alignment = next(bam_iter)
-        diff = next(bdiff_iter)
+        variant = next(bdiff_iter)  # type: po.VariantDiff
         
         if self._verbose:
-            print('first diff: %s' % diff)
+            print('first variant: %s' % variant)
         
         while True:
-            if diff is None or alignment is None:
+            if variant is None or alignment is None:
                 # finish
                 if self._verbose:
-                    if diff is None:
+                    if variant is None:
                         print("EOF DIFF")
                     if alignment is None:
                         print("EOF BAM")
                 
                 # last mutation
-                if diff is not None:
+                if variant is not None:
                     # noinspection PyTypeChecker
-                    self.__unmutate_pos(alignment_queue, diff.mut_map)
+                    self.__unmutate_pos(alignment_queue, variant.mut_map)
                 
                 for variant_alignment in alignment_queue:
                     # unmapped alignments in queue are already encrypted
@@ -220,54 +219,54 @@ class Mutator:
                 
                 break
             
-            elif alignment.is_unmapped or self.__is_before_index(alignment, diff.index):
+            elif alignment.is_unmapped or self.__is_before_index(alignment, variant.pos.index):
                 self.__encrypt_unmapped(alignment, secret)
                 if len(alignment_queue) == 0:
                     # good to go, all preceding alignments are written
                     self.__write_alignment(out_bam_file, alignment, False)
                 else:
                     # append to queue
-                    alignment_queue.append(AlignedVariant(alignment))
+                    alignment_queue.append(AlignmentAllele(alignment))
                 
                 alignment = next(bam_iter)
             
-            elif self.__is_after_index(alignment, diff.index):
-                self.__unmutate_pos(alignment_queue, diff.mut_map)
-                # done with this diff, read next
-                prev_diff = diff
-                diff = next(bdiff_iter)
+            elif self.__is_after_index(alignment, variant.pos.index):
+                self.__unmutate_pos(alignment_queue, variant.mut_map)
+                # done with this variant, read next
+                prev_diff = variant
+                variant = next(bdiff_iter)
                 if self._verbose and bdiff_iter.counter % 10000 == 0:
                     print('%d DIFF records done' % bdiff_iter.counter)
-                if diff is not None:
+                if variant is not None:
                     # not the end of DIFF file
-                    self.__write_before_index(out_bam_file, alignment_queue, diff.index)
+                    self.__write_before_index(out_bam_file, alignment_queue, variant.pos.index)
                     # update alignment queue
                     for i in range(len(alignment_queue)):
-                        alignment_queue[i] = cmn.create_aligned_variant(
+                        alignment_queue[i] = AlignmentAllele(
                             alignment_queue[i].alignment,
-                            diff,
-                            False,
+                            variant,
                             alignment_queue[i].is_mutated
                         )
                 
                 elif self._verbose:
-                    print('last diff: %s' % prev_diff)
+                    print('last variant: %s' % prev_diff)
             
-            else:  # alignment is covering diff position
-                alignment_queue.append(cmn.create_aligned_variant(alignment, diff, False))
+            else:  # alignment is covering variant position
+                alignment_queue.append(AlignmentAllele(alignment, variant))
                 alignment = next(bam_iter)
                 self.covering_counter += 1
         
         # noinspection PyAttributeOutsideInit
         self.diff_counter = bdiff_iter.counter
     
-    def __unmutate_pos(self, variant_queue: list, mut_map: dict):
-        for variant in variant_queue:
-            if variant.is_present():
+    def __unmutate_pos(self, allele_queue: list, mut_map: dict):
+        for allele in allele_queue:  # type: AlignmentAllele
+            if allele.is_known:
                 # alignment has vac to mutate
-                self._mutate_variant(variant, mut_map)
+                self._mutate_allele(allele, mut_map)
                 # done with current vac
-                variant.clear()
+                # TODO
+                # variant.clear()
     
     # def alignment2str(self, alignment) -> str:
     #     if alignment is None:
@@ -307,60 +306,62 @@ class Mutator:
     def __mutate_pos(
             self,
             bdiff_io: bdiff.BdiffIO,
-            variant_queue: list,
-            vac: po.VariantPosition,
+            allele_queue: list,
+            variant: po.VariantOccurrence,
             rnd: VeryRandom
     ) -> bool:
         """
         Mutate alignments at the variant allele count position.
-        :param variant_queue: list of SnvAlignment
-        :param vac: variant allele count list
+        :param allele_queue:
+        :param variant: variant allele count list
         :return: True if NS mutation has occured
         """
-        if isinstance(vac, po.SnvOccurrence):
-            is_mutated = self._mutate_snv_pos(bdiff_io, variant_queue, vac, rnd)
-        elif isinstance(vac, po.IndelOccurrence):
-            is_mutated = self._mutate_indel_pos(bdiff_io, variant_queue, vac, rnd)
+        if variant.is_type(po.VariantType.SNV):
+            is_mutated = self._mutate_snv_pos(bdiff_io, allele_queue, variant, rnd)
+        elif variant.is_type(po.VariantType.INDEL):
+            is_mutated = self._mutate_indel_pos(bdiff_io, allele_queue, variant, rnd)
         else:
-            raise ValueError("%s is not VAC record instance" % type(vac).__name__)
+            raise ValueError("unnknown variant type")
         
         return is_mutated
     
     def _mutate_snv_pos(
             self,
             bdiff_io: bdiff.BdiffIO,
-            variant_queue: list,
-            vac: po.SnvOccurrence,
+            allele_queue: list,
+            variant: po.VariantOccurrence,
             rnd: VeryRandom
     ) -> bool:
         is_mutated = False
-        variant_seqs = cmn.variant_seqs(variant_queue)
+        variant_seqs = cmn.variant_seqs(allele_queue)
         
         alt_freqs = cmn.base_freqs(variant_seqs)
-        mut_map = cmn.snv_mut_map(alt_freqs=alt_freqs, ref_freqs=vac.freqs, rnd=rnd)
+        mut_map = cmn.snv_mut_map(alt_freqs=alt_freqs, ref_freqs=variant.freqs, rnd=rnd)
         
-        for variant in variant_queue:  # type: AlignedVariant
-            if variant.is_present():
+        for allele in allele_queue:  # type: AlignmentAllele
+            if allele.is_known:
                 # alignment has vac to mutate
-                is_mutated |= self._mutate_variant(variant, mut_map)
+                is_mutated |= self._mutate_allele(allele, mut_map)
                 # done with current vac
-                variant.clear()
+                # TODO
+                # variant.clear()
         
         if is_mutated:
             # at least one alignment has been mutated
-            bdiff_io.write_snv(vac.index, vac.ref_id, mut_map)
+            # TODO ref_allele_id
+            bdiff_io.write_snv(variant.pos.index, cmn.BASES.index(variant.ref_allele), mut_map)
         
         return is_mutated
     
     def _mutate_indel_pos(
             self,
             bdiff_io: bdiff.BdiffIO,
-            variant_queue: list,
-            vac: po.IndelOccurrence,
+            allele_queue: list,
+            variant: po.VariantOccurrence,
             rnd: VeryRandom
     ) -> bool:
         is_mutated = False
-        variant_seqs = cmn.variant_seqs(variant_queue)
+        variant_seqs = cmn.variant_seqs(allele_queue)
         
         alt_freq_map = cmn.freq_map(variant_seqs)
         
@@ -371,23 +372,24 @@ class Mutator:
         
         mut_map = cmn.indel_mut_map(
             alt_freq_map=alt_freq_map,
-            ref_freq_map=dict(zip(vac.seqs, vac.freqs)),
+            ref_freq_map=dict(zip(variant.alleles, variant.freqs)),
             rnd=rnd
         )
         
-        for variant in variant_queue:  # type: AlignedVariant
-            if variant.is_present():
+        for allele in allele_queue:  # type: AlignmentAllele
+            if allele.is_known:
                 # alignment has vac to mutate
-                is_mutated |= self._mutate_variant(variant, mut_map)
+                is_mutated |= self._mutate_allele(allele, mut_map)
                 # done with current vac
-                variant.clear()
+                # TODO
+                # variant.clear()
         
         if is_mutated:
-            bdiff_io.write_indel(vac.index, vac.ref_seq, mut_map)
+            bdiff_io.write_indel(variant.pos.index, variant.ref_allele, mut_map)
         
         return is_mutated
     
-    def _mutate_variant(self, variant: AlignedVariant, mut_map: dict) -> bool:
+    def _mutate_allele(self, variant: AlignmentAllele, mut_map: dict) -> bool:
         """
         Mutate alignment by mutation map at SNV position.
         :param variant:
@@ -396,12 +398,12 @@ class Mutator:
         """
         is_mutated = False
         
-        mut_seq = mut_map[variant.seq]
-        if variant.seq != mut_seq:
+        mut_seq = mut_map[variant.allele]
+        if variant.allele != mut_seq:
             # non-synonymous mutation
             self.mut_counter += 1
             is_mutated = True
-            variant.seq = mut_seq
+            variant.allele = mut_seq
         
         return is_mutated
     
@@ -415,7 +417,7 @@ class Mutator:
         """
         # TODO optimize, search for index, then cut the array
         tmp_queue = variant_queue[:]
-        for variant in tmp_queue:  # type: AlignedVariant
+        for variant in tmp_queue:  # type: AlignmentAllele
             is_mapped = not variant.alignment.is_unmapped
             if is_mapped and not self.__is_before_index(variant.alignment, index):
                 # break to keep alignments in order

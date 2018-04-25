@@ -253,14 +253,15 @@ class BdiffIO:
         """
         index, ref_id, alts = self._read_record()
         if isinstance(alts, tuple):
-            # is SNV
-            # TODO it is unknown if we need UNKNOWN base
+            # SNV: it is assumed that record was saved as:
+            # BASES -> permuted(BASES)
             return index, False, cmn.BASES[ref_id], dict(zip(
                 alts + (cmn.UNKNOWN_BASE,),
                 cmn.BASES + (cmn.UNKNOWN_BASE,))
             )
         else:
-            # is INDEL
+            # INDEL it is assumed that record was saved as:
+            # sorted(alts) -> permuted(alts)
             return index, True, alts[ref_id], dict(zip(alts, sorted(alts)))
     
     def _read_snv_alts(self):

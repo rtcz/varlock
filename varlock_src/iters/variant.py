@@ -88,58 +88,63 @@ class VacFileIterator:
         self._counter = 0
         
         # init iteration
-        self._read_snv()
-        self._read_indel()
+        self._snv_variant = self._read_snv()
+        self._indel_variant = self._read_indel()
     
     @property
     def counter(self):
         return self._counter
     
-    def _read_snv(self):
+    def _read_snv(self) -> po.VariantOccurrence:
         if self._snv_count > 0:
             self._snv_count -= 1
             index, ref_id, freqs = Vac.read_snv_record(self._snv_file)
             ref_name, ref_pos = self._fai.index2pos(index)
-            self._snv_record = po.SnvOccurrence(
-                index=index,
-                ref_name=ref_name,
-                ref_pos=ref_pos,
+            
+            variant = po.VariantOccurrence(
+                position=po.GenomicPosition(index, ref_name, ref_pos),
+                vtype=po.VariantType.SNV,
                 freqs=freqs,
-                seqs=BASES,
-                ref_id=ref_id
+                alleles=BASES,
+                ref_allele=BASES[ref_id]
             )
         else:
-            self._snv_record = None
+            variant = None
             self._snv_file.close()
+        
+        return variant
     
-    def _read_indel(self):
+    def _read_indel(self) -> po.VariantOccurrence:
         if self._indel_count > 0:
             self._indel_count -= 1
             index, counts, seqs = Vac.read_indel_record(self._indel_file)
             ref_name, ref_pos = self._fai.index2pos(index)
-            self._indel_record = po.IndelOccurrence(
-                index=index,
-                ref_name=ref_name,
-                ref_pos=ref_pos,
+            
+            variant = po.VariantOccurrence(
+                position=po.GenomicPosition(index, ref_name, ref_pos),
+                vtype=po.VariantType.INDEL,
                 freqs=counts,
-                seqs=seqs,
-                ref_id=0
+                alleles=seqs,
+                ref_allele=seqs[0]
             )
+        
         else:
-            self._indel_record = None
+            variant = None
             self._indel_file.close()
+        
+        return variant
     
     def next_snv(self):
         self._counter += 1
-        snv_record = self._snv_record
-        self._read_snv()
-        return snv_record
+        snv_variant = self._snv_variant
+        self._snv_variant = self._read_snv()
+        return snv_variant
     
     def next_indel(self):
         self._counter += 1
-        indel_list = self._indel_record
-        self._read_indel()
-        return indel_list
+        indel_variant = self._indel_variant
+        self._indel_variant = self._read_indel()
+        return indel_variant
     
     def __iter__(self):
         return self
@@ -152,19 +157,19 @@ class VacFileIterator:
         self._indel_file.close()
     
     def __next__(self) -> po.VariantOccurrence:
-        if self._snv_record is not None and self._indel_record is not None:
-            if self._snv_record.index == self._indel_record.index:
-                raise ValueError("SNV and INDEL have the same position (%s)" % str(self._snv_record.index))
-            elif self._snv_record.index < self._indel_record.index:
+        if self._snv_variant is not None and self._indel_variant is not None:
+            if self._snv_variant.pos.index == self._indel_variant.pos.index:
+                raise ValueError("SNV and INDEL have the same position (%s)" % str(self._snv_variant.pos.index))
+            elif self._snv_variant.pos.index < self._indel_variant.pos.index:
                 return self.next_snv()
             else:
                 return self.next_indel()
         
-        elif self._snv_record is not None:
+        elif self._snv_variant is not None:
             # INDELs depleted
             self._indel_file.close()
             return self.next_snv()
-        elif self._indel_record is not None:
+        elif self._indel_variant is not None:
             # SNVs depleted
             self._snv_file.close()
             return self.next_indel()
@@ -214,13 +219,11 @@ class RandomSnvIterator:
         self._counter += 1
         
         ref_name, ref_pos = self._fai.index2pos(index)
-        return po.SnvOccurrence(
-            index=index,
-            ref_name=ref_name,
-            ref_pos=ref_pos,
-            freqs=[3, 3, 2, 2],  # approximate GC content in human genome
-            seqs=BASES,
-            # TODO use real value based on genome fasta via pyfaidx
-            # this could be later utilized in CIGAR edit
-            ref_id=0
+        
+        return po.VariantOccurrence(
+            position=po.GenomicPosition(index, ref_name, ref_pos),
+            vtype=po.VariantType.SNV,
+            freqs=[3, 3, 2, 2],  # approximate GC content in human genome,
+            alleles=BASES,
+            ref_allele=BASES[0]  # TODO use real value based on genome fasta via pyfaidx
         )
