@@ -42,8 +42,7 @@ class Varlocker:
         :param ref_fasta_filename: filename to reference FASTA file
         :param skip_indels: whether to skip indels and keep only SNPs
         """
-        # TODO verify that BAM and VCF share the same reference genome ?
-        
+        # TODO verify that BAM and VCF are based on same reference genome ?
         
         # load the reference FASTA
         ref_fasta = None
@@ -78,6 +77,8 @@ class Varlocker:
         """
         Mutate BAM file and store it along with encrypted DIFF file.
         !!! BAM and VAC (VCF derived file) should be derived from the same reference genome !!!
+        Using the same input, encrypted DIFF file changes on each call,
+        although its length and contained information remain the same.
         Output formats:
         .mut.bam
         .diff.enc
@@ -145,7 +146,7 @@ class Varlocker:
         :param include_unmapped: Include all unplaced unmapped reads.
         :param unmapped_only: Only unmapped reads - both placed and unplaced.
          Overrides other parameters.
-        :param rsa_ver_key: RSA key with public key to verify DIFF
+        :param rsa_ver_key: optional public key to verify DIFF
         """
         # TODO verify if bam_filename is mutated
         # TODO compare mutated BAM checksum to checksum stored in DIFF header
@@ -174,6 +175,9 @@ class Varlocker:
                 include_unmapped,
                 unmapped_only
             )
+            
+            if self._verbose:
+                print('stats: %s' % mut.stats)
     
     def reencrypt(
             self,
@@ -280,7 +284,7 @@ class Varlocker:
         if self._verbose:
             print('--- Signing DIFF ---')
         
-        # must use Crypto hash object
+        # using Crypto hash MD5
         hash_obj = MD5.new()
         diff.seek(0)
         hash_obj.update(diff.read())
@@ -298,7 +302,7 @@ class Varlocker:
             if self._verbose:
                 print('--- Verifying DIFF ---')
             
-            # must use Crypto hash object
+            # using Crypto hash MD5
             hash_obj = MD5.new()
             diff.seek(0)
             hash_obj.update(diff.read())
@@ -325,6 +329,7 @@ class Varlocker:
         :param aes_key: AES key to write
         :param rsa_key: RSA key with public key for encryption of AES key
         """
+        # this method produces different ciphers between calls with the same input
         enc_aes_key = PKCS1_OAEP.new(rsa_key).encrypt(aes_key)
         enc_diff.write(struct.pack('<I', len(enc_aes_key)))
         enc_diff.write(enc_aes_key)

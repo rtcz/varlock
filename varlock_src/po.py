@@ -26,7 +26,7 @@ class GenomicPosition(object):
         return self._ref_pos
     
     def __str__(self):
-        return '#%d %s:%d' % (self.index, self.ref_name, self.ref_pos)
+        return '#%d %s:%d' % (self.index, self.ref_name, self.ref_pos + 1)
 
 
 class Variant:

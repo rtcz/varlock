@@ -67,10 +67,18 @@ class TestCigar(unittest.TestCase):
         self.assertTupleEqual(('A', 'M'), Cigar.matching_allele('TTAAAC', 'MMMMMM', ['A', 'AAAC'], 'A', 2))
         self.assertTupleEqual(('AAAC', 'MIII'), Cigar.matching_allele('TTAAAC', 'MMMIII', ['A', 'AAAC'], 'A', 2))
         
-        # TODO resolve partial match
-        # self.assertTupleEqual(('AAAC', 'MIII'), Cigar._matching_allele('TTAAA', 'MMMII', ['A', 'AAAC'], 0, 2))
-        # temporary solution
-        self.assertRaises(NotFoundError, lambda: Cigar.matching_allele('TTAAA', 'MMMII', ['A', 'AAAC'], 'A', 2))
-        
         self.assertTupleEqual(('AA', 'MI'), Cigar.matching_allele('AA', 'MI', ['A', 'AA', 'AC'], 'A', 0))
         self.assertTupleEqual(('AC', 'MI'), Cigar.matching_allele('AC', 'MI', ['A', 'AA', 'AC'], 'A', 0))
+        
+        # one allele is only partially covered by CIGAR
+        self.assertRaises(NotFoundError, lambda: Cigar.matching_allele('AA', 'MI', ['A', 'AAC'], 'A', 0))
+        
+        # all alleles are covered by CIGAR
+        self.assertTupleEqual(('A', 'MD'), Cigar.matching_allele(
+            seq='A',
+            exp_cigar='MD',
+            alleles=['A', 'AT'],
+            ref_allele='AT',
+            seq_pos=0,
+            cigar_pos=0
+        ))

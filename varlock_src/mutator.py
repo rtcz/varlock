@@ -6,9 +6,9 @@ import varlock_src.bdiff as bdiff
 import varlock_src.common as cmn
 import varlock_src.iters as iters
 import varlock_src.po as po
+from varlock_src.alignment import AlleleAlignment
 from varlock_src.fasta_index import FastaIndex
 from varlock_src.random import VeryRandom
-from varlock_src.alignment import AlleleAlignment
 
 
 class Mutator:
@@ -264,20 +264,6 @@ class Mutator:
             if allele.is_known:
                 # alignment has vac to mutate
                 self._mutate_allele(allele, mut_map)
-                # done with current vac
-                # TODO
-                # variant.clear()
-    
-    # def alignment2str(self, alignment) -> str:
-    #     if alignment is None:
-    #         return "None"
-    #     if cmn.is_placed_alignment(alignment):
-    #         ref_name = alignment.reference_name
-    #         ref_start = alignment.reference_start
-    #         return '#%d %s:%d' % (self._fai.pos2index(ref_name, ref_start), ref_name, ref_start)
-    #     else:
-    #         # unplaced alignment
-    #         return alignment.query_sequence
     
     @staticmethod
     def __encrypt_unmapped(alignment: pysam.AlignedSegment, secret: bytes):
@@ -342,9 +328,6 @@ class Mutator:
             if allele.is_known:
                 # alignment has vac to mutate
                 is_mutated |= self._mutate_allele(allele, mut_map)
-                # done with current vac
-                # TODO
-                # variant.clear()
         
         if is_mutated:
             # at least one alignment has been mutated
@@ -362,13 +345,7 @@ class Mutator:
     ) -> bool:
         is_mutated = False
         variant_seqs = cmn.variant_seqs(allele_queue)
-        
         alt_freq_map = cmn.freq_map(variant_seqs)
-        
-        # if vac.ref_pos == 106700:
-        #     print(alt_freq_map)
-        #     print(dict(zip(vac.seqs, vac.freqs)))
-        #     exit(0)
         
         mut_map = cmn.indel_mut_map(
             alt_freq_map=alt_freq_map,
@@ -380,30 +357,27 @@ class Mutator:
             if allele.is_known:
                 # alignment has vac to mutate
                 is_mutated |= self._mutate_allele(allele, mut_map)
-                # done with current vac
-                # TODO
-                # variant.clear()
         
         if is_mutated:
             bdiff_io.write_indel(variant.pos.index, variant.ref_allele, mut_map)
         
         return is_mutated
     
-    def _mutate_allele(self, variant: AlleleAlignment, mut_map: dict) -> bool:
+    def _mutate_allele(self, alignment: AlleleAlignment, mut_map: dict) -> bool:
         """
         Mutate alignment by mutation map at SNV position.
-        :param variant:
+        :param alignment:
         :param mut_map: mutation map
         :return: True if variant mutation is non-synonymous
         """
         is_mutated = False
         
-        mut_seq = mut_map[variant.allele]
-        if variant.allele != mut_seq:
+        mut_seq = mut_map[alignment.allele]
+        if alignment.allele != mut_seq:
             # non-synonymous mutation
             self.mut_counter += 1
             is_mutated = True
-            variant.allele = mut_seq
+            alignment.allele = mut_seq
         
         return is_mutated
     

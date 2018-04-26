@@ -31,48 +31,9 @@ class AlleleAlignment:
                     # find matching alleles with respect to CIGAR string
                     self._exp_cigar = Cigar.tuples2exp_str(alignment.cigartuples)
                     self._cigar_pos = Cigar.seq_pos2cigar_pos(self._exp_cigar, self._seq_pos)
-                    
                     assert self._cigar_pos is not None
                     
-                    # if self._cigar_pos is None:
-                    #     raise ValueError('sequence position %d not found in CIGAR %s' % (self._seq_pos, self._exp_cigar))
-                    
                     self._allele, self._allele_cigar = self._find_allele()
-                    
-                    # if alignment.query_sequence[pos:end_pos] != matched_allele:
-                    #     if vac.ref_pos == 106700:
-                    #         print(alignment.cigarstring)
-                    #         print(pos)
-                    #         print(alleles)
-                    #         print(matched_allele)
-                    #         exit(0)
-                    
-                    # print(matched_allele)
-                    #     print(alignment.query_sequence[pos:end_pos])
-                    #     print(pos)
-                    #     print(end_pos)
-                    #     print(alignment.query_sequence)
-                    #     print(alleles)
-                    #     print(alignment.cigarstring)
-                    #     print(vac.ref_id)
-                    #     print(vac.ref_pos)
-                    #     exit(0)
-                    
-                    # if vac_occurrence:
-                    #     assert len(vac.seqs)
-                    
-                    # if alignment.query_name == 'ERR015528.10911176' and alignment.reference_start == 133718:
-                    #     print('YYY')
-                    #     print('vac_pos: %s' % vac.ref_pos)
-                    #     print('vac_seqs: %s' % vac.seqs)
-                    #     print('vac_freqs: %s' % vac.freqs)
-                    #     print('ref_seq: %s' % vac.ref_seq)
-                    #     # print('infer_query_length %d' % alignment.infer_query_length())
-                    #     # print('query length %d' % len(alignment.query_sequence))
-                    #     # print(alignment.cigarstring)
-                    #     # print(alignment.query_sequence)
-                    #     print('YYY')
-                    #     # exit(0)
     
     def _find_allele(self) -> (str, str):
         allele = None
@@ -85,6 +46,17 @@ class AlleleAlignment:
         
         elif self.is_indel:
             try:
+                # if self._alignment.query_name == 'ERR015528.8550980' and self._alignment.reference_start == 1118859:
+                #     print()
+                #     print(self._alignment.query_sequence)
+                #     print(self._exp_cigar)
+                #     print(self._variant.alleles)
+                #     print(self._variant.ref_allele)
+                #     print(self._seq_pos)
+                #     print(self._cigar_pos)
+                #     print()
+                
+                
                 allele, allele_cigar = Cigar.matching_allele(
                     seq=self._alignment.query_sequence,
                     exp_cigar=self._exp_cigar,
@@ -175,18 +147,19 @@ class AlleleAlignment:
         
         self._is_mutated = True
         
-        # if self.alignment.query_name == 'ERR015528.13775373' and self.alignment.reference_start == 1421565:
+        # if self.alignment.query_name == 'ERR015528.8550980' and self.alignment.reference_start == 1118859:
         #     print('xxx')
         #     print(self.alignment.query_name)
         #     print(self.alignment.reference_name)
         #     print(self.alignment.reference_start)
         #     print(self.alignment.query_sequence)
         #     print(self.alignment.cigarstring)
-        #     print('pos %d' % self._pos)
-        #     print('end_pos %d' % self._end_pos)
-        #     print('reference allele %s' % self._ref_seq)
-        #     print('alternative allele %s' % self.seq)
-        #     print('masking allele %s' % seq)
+        #     print('seq_pos %d' % self._seq_pos)
+        #     print('reference allele %s' % self._variant.ref_allele)
+        #     print('alternative allele %s' % self._allele)
+        #     print('masking allele %s' % allele)
+        #     print('alleles %s' % self._variant.alleles)
+        #     print('variant %s' % self._variant)
         #     print('xxx')
         
         # TODO do something about MD string if present
@@ -211,6 +184,12 @@ class AlleleAlignment:
             self._alignment.query_sequence = seq
             
             assert len(self._alignment.query_sequence) == self._alignment.infer_query_length()
+        
+        # if self.alignment.query_name == 'ERR015528.8550980' and self.alignment.reference_start == 1118859:
+        #     print('xxx')
+        #     print(self.alignment.query_sequence)
+        #     print(self.alignment.cigarstring)
+        #     print('xxx')
     
     def _replace_indel(self, allele: str, matched_allele: str, matched_allele_cigar: str) -> (str, str):
         # TODO extended CIGAR operations (=,X)

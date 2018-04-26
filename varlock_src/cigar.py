@@ -230,17 +230,15 @@ class Cigar:
             cigar_pos = cls.seq_pos2cigar_pos(exp_cigar, seq_pos)
         
         for allele in reversed(sorted(alleles, key=len)):  # type: str
-            if seq_pos + len(allele) > len(seq):
-                # allele exceeds sequence
-                # TODO treat partialy matched alleles
+            
+            allele_cigar = cls.allele(allele, ref_allele)
+            if cigar_pos + len(allele_cigar) > len(exp_cigar):
+                # considering only variants with all alleles covered by CIGAR
                 break
             
             is_seq_match = seq[seq_pos: seq_pos + len(allele)] == allele
             if not is_seq_match:
                 continue
-            
-            allele_cigar = cls.allele(allele, ref_allele)
-            assert cigar_pos + len(allele_cigar) <= len(exp_cigar)
             
             is_cigar_match = exp_cigar[cigar_pos:cigar_pos + len(allele_cigar)] == allele_cigar
             if is_seq_match and is_cigar_match:

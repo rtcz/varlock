@@ -364,6 +364,7 @@ class BdiffIO:
     
     @classmethod
     def _write_header(cls, diff_file: io.BytesIO, header: dict):
+        # same items of dict can be written in different order between calls
         meta_bytes = cmn.dict2bytes(header)
         diff_file.write(struct.pack('<I', len(meta_bytes)))
         diff_file.write(meta_bytes)
