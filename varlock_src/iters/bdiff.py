@@ -45,6 +45,7 @@ class BdiffIterator:
                 mut_map=mut_map,
                 ref_allele=ref_seq
             )
+            
+            self._counter += 1
         
-        self._counter += 1
         return record

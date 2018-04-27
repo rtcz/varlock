@@ -157,8 +157,8 @@ class Cigar:
         if len(seq) == len(ref_seq):
             cigar = cls.OP_MATCH * len(seq)
         else:
-            max_shared_len = min(len(seq), len(ref_seq))
-            cigar = cls.OP_MATCH * max_shared_len
+            mutual_len = min(len(seq), len(ref_seq))
+            cigar = cls.OP_MATCH * mutual_len
             
             len_diff = len(seq) - len(ref_seq)
             if len_diff > 0:
@@ -232,8 +232,11 @@ class Cigar:
         for allele in reversed(sorted(alleles, key=len)):  # type: str
             
             allele_cigar = cls.allele(allele, ref_allele)
+            mutual_len = min(len(allele_cigar), len(exp_cigar) - cigar_pos)
+            if allele_cigar[:mutual_len] != exp_cigar[cigar_pos: cigar_pos + mutual_len]:
+                continue
+            
             if cigar_pos + len(allele_cigar) > len(exp_cigar):
-                # considering only variants with all alleles covered by CIGAR
                 break
             
             is_seq_match = seq[seq_pos: seq_pos + len(allele)] == allele

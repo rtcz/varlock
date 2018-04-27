@@ -70,10 +70,7 @@ class TestCigar(unittest.TestCase):
         self.assertTupleEqual(('AA', 'MI'), Cigar.matching_allele('AA', 'MI', ['A', 'AA', 'AC'], 'A', 0))
         self.assertTupleEqual(('AC', 'MI'), Cigar.matching_allele('AC', 'MI', ['A', 'AA', 'AC'], 'A', 0))
         
-        # one allele is only partially covered by CIGAR
-        self.assertRaises(NotFoundError, lambda: Cigar.matching_allele('AA', 'MI', ['A', 'AAC'], 'A', 0))
-        
-        # all alleles are covered by CIGAR
+        # both alleles are covered by CIGAR while one is not covered by sequence
         self.assertTupleEqual(('A', 'MD'), Cigar.matching_allele(
             seq='A',
             exp_cigar='MD',
@@ -82,3 +79,31 @@ class TestCigar(unittest.TestCase):
             seq_pos=0,
             cigar_pos=0
         ))
+        
+        # longest allele can be ruled out due to partial CIGAR mismatch
+        self.assertTupleEqual(('C', 'M'), Cigar.matching_allele(
+            seq='CA',
+            exp_cigar='MM',
+            alleles=['C', 'CAT'],
+            ref_allele='C',
+            seq_pos=0,
+            cigar_pos=0
+        ))
+        
+        # longest allele can not be ruled out due to partial CIGAR match
+        self.assertRaises(NotFoundError, lambda: Cigar.matching_allele(
+            seq='C',
+            exp_cigar='M',
+            alleles=['C', 'CAT'],
+            ref_allele='C',
+            seq_pos=0,
+            cigar_pos=0
+        ))
+        
+        # ERR015528.25489857 1272715
+        
+        # TGCTTGTTTAAACCATTGTATTACCAACAGTTGTGTGTTGATTGTGTTTGTTTTTATGAAGTTTCCCAGGGGATGGTGTTCCCTGAGTTTTAGTCTAAGGCATAGATA
+        # 101M4I3M
+        
+        # TGCTTGTTTAAACCATTGTATTACCAACAGTTGTGTGTTGATTGTGTTTGTTTTTATGAAGTTTCCCAGGGGATGGTGTTCCCTGAGTTTTAGTCTAAGGCATA
+        # 104M
