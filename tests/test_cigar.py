@@ -100,10 +100,29 @@ class TestCigar(unittest.TestCase):
             cigar_pos=0
         ))
         
-        # ERR015528.25489857 1272715
+        self.assertRaises(NotFoundError, lambda: Cigar.matching_allele(
+            seq='TTTTT',
+            exp_cigar='MMDMM',
+            alleles=['TTA', 'T'],
+            ref_allele='TTA',
+            seq_pos=0,
+            cigar_pos=0
+        ))
         
-        # TGCTTGTTTAAACCATTGTATTACCAACAGTTGTGTGTTGATTGTGTTTGTTTTTATGAAGTTTCCCAGGGGATGGTGTTCCCTGAGTTTTAGTCTAAGGCATAGATA
-        # 101M4I3M
+        self.assertTupleEqual(('T', 'MD'), Cigar.matching_allele(
+            seq='TTTT',
+            exp_cigar='MDMM',
+            alleles=['TA', 'T'],  # T -> TA
+            ref_allele='TA',
+            seq_pos=0,
+            cigar_pos=0
+        ))
         
-        # TGCTTGTTTAAACCATTGTATTACCAACAGTTGTGTGTTGATTGTGTTTGTTTTTATGAAGTTTCCCAGGGGATGGTGTTCCCTGAGTTTTAGTCTAAGGCATA
-        # 104M
+        self.assertTupleEqual(('AT', 'MM'), Cigar.matching_allele(
+            seq='ATT',
+            exp_cigar='MMM',
+            alleles=['AT', 'A'],  # AT -> A
+            ref_allele='AT',
+            seq_pos=0,
+            cigar_pos=0
+        ))

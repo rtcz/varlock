@@ -150,9 +150,9 @@ class Cigar:
     @classmethod
     def allele(cls, seq: str, ref_seq: str) -> str:
         """
-        :param seq:
-        :param ref_seq:
-        :return: expanded CIGAR of variant
+        :param seq: allele sequence
+        :param ref_seq:  reference allele sequence
+        :return: expanded CIGAR of the allele
         """
         if len(seq) == len(ref_seq):
             cigar = cls.OP_MATCH * len(seq)
@@ -183,10 +183,6 @@ class Cigar:
             result += cls._consumes_alt(op)
         
         return result
-    
-    @classmethod
-    def ref_pos2cigar_pos(cls, exp_cigar: str, ref_pos: int):
-        pass
     
     @classmethod
     def seq_pos2cigar_pos(cls, exp_cigar: str, seq_pos: int) -> int:

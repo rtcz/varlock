@@ -120,7 +120,7 @@ class BamMutator:
             mut = Mutator(fai=self._fai, verbose=self._verbose)
             bdiff_io = mut.mutate(
                 mut_bam_file=mut_bam_file,
-                vac_iter=vac_iter,
+                variant_iter=vac_iter,
                 bam_iter=bam_iter,
                 secret=secret,
                 rnd=rnd

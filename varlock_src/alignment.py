@@ -47,7 +47,7 @@ class AlleleAlignment:
         
         elif self.is_indel:
             try:
-                # if self._alignment.query_name == 'ERR015528.7173436' and self._alignment.reference_start == 1664944:
+                # if self._alignment.query_name == 'ERR013136.13215553' and self._alignment.reference_start == 10365830:
                 #     print()
                 #     print(self._alignment.query_sequence)
                 #     print('alleles %s' % str(self._variant.alleles))
@@ -67,6 +67,7 @@ class AlleleAlignment:
                     seq_pos=self._seq_pos,
                     cigar_pos=self._cigar_pos
                 )
+                
                 if self._cigar_pos + len(allele_cigar) >= len(self._exp_cigar):
                     # Only with CIGAR after an allele it is guranteed
                     # that replacement allele can be found too.
@@ -153,8 +154,8 @@ class AlleleAlignment:
             return
         
         self._is_mutated = True
-        
-        # if self.alignment.query_name == 'ERR015528.25489857' and self.alignment.reference_start == 1272714:
+
+        # if self._alignment.query_name == 'ERR013136.13215553' and self._alignment.reference_start == 10365830:
         #     print()
         #     print(self.alignment.query_name)
         #     print(self.alignment.reference_name)
@@ -192,7 +193,7 @@ class AlleleAlignment:
             
             assert len(self._alignment.query_sequence) == self._alignment.infer_query_length()
             
-            # if self.alignment.query_name == 'ERR015528.25489857' and self.alignment.reference_start == 1272714:
+            # if self._alignment.query_name == 'ERR013136.13215553' and self._alignment.reference_start == 10365830:
             #     print()
             #     print(seq)
             #     print(exp_cigar)

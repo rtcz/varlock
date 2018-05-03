@@ -66,27 +66,26 @@ class Mutator:
     def mutate(
             self,
             mut_bam_file: pysam.AlignmentFile,
-            vac_iter: iters.VariantIterator,
+            variant_iter: iters.VariantIterator,
             bam_iter: iters.FullBamIterator,
             secret: bytes,
             rnd: VeryRandom
     ) -> bdiff.BdiffIO:
         """
         :param mut_bam_file:
-        :param vac_iter:
+        :param variant_iter:
         :param bam_iter:
         :param secret:
         :param rnd: (secure) random generator
         :return: BdiffIO object
-        BDIFF records are written only if bases at VAC position differ after mutation.
+        BDIFF records are written only if bases at variant position differ after mutation.
         """
         self.__init_counters()
         
         alignment_queue = []
         alignment = next(bam_iter)
-        
         # TODO optimization: seek to first alignment covering variant to skip all preceding records
-        variant = next(vac_iter)  # type: po.VariantOccurrence
+        variant = variant_iter.next_after()
         
         if self._verbose:
             print('first variant: %s' % variant)
@@ -136,10 +135,10 @@ class Mutator:
                 # apply the variant to alignment
                 self.__mutate_pos(bdiff_io, alignment_queue, variant, rnd)
                 # done with this variant, read next
-                prev_vac = variant
-                variant = next(vac_iter)
-                if self._verbose and vac_iter.counter % 100000 == 0:
-                    print('%d VAC records done' % vac_iter.counter)
+                prev_variant = variant
+                variant = variant_iter.next_after()
+                if self._verbose and variant_iter.counter % 100000 == 0:
+                    print('%d VAC records done' % variant_iter.counter)
                 # not the end of VAC file
                 if variant is not None:
                     # write alignments to mutated BAM
@@ -153,15 +152,16 @@ class Mutator:
                         )
                 
                 elif self._verbose:
-                    print('last variant: %s' % prev_vac)
+                    print('last variant: %s' % prev_variant)
             
             else:  # alignment is covering variant position
+                
                 alignment_queue.append(AlleleAlignment(alignment, variant))
                 alignment = next(bam_iter)
                 self.covering_counter += 1
         
         # noinspection PyAttributeOutsideInit
-        self.vac_counter = vac_iter.counter
+        self.vac_counter = variant_iter.counter
         # noinspection PyAttributeOutsideInit
         self.diff_counter = bdiff_io.snv_count + bdiff_io.indel_count
         return bdiff_io
@@ -233,7 +233,7 @@ class Mutator:
             elif self.__is_after_index(alignment, variant.pos.index):
                 self.__unmutate_pos(alignment_queue, variant.mut_map)
                 # done with this variant, read next
-                prev_diff = variant
+                prev_variant = variant
                 variant = next(bdiff_iter)
                 if self._verbose and bdiff_iter.counter % 10000 == 0:
                     print('%d DIFF records done' % bdiff_iter.counter)
@@ -249,7 +249,7 @@ class Mutator:
                         )
                 
                 elif self._verbose:
-                    print('last variant: %s' % prev_diff)
+                    print('last variant: %s' % prev_variant)
             
             else:  # alignment is covering variant position
                 alignment_queue.append(AlleleAlignment(alignment, variant))

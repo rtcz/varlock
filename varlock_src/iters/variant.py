@@ -18,16 +18,17 @@ class VariantIterator:
         :param fai:
         :param mut_p: random variant (mutation) probability per genome base
         """
-        self._iter1 = VacFileIterator(vac_filename, fai)
-        self._iter2 = RandomSnvIterator(fai, mut_p, rnd)
+        self._iter = VacFileIterator(vac_filename, fai)
+        self._iter_rnd = RandomSnvIterator(fai, mut_p, rnd)
         
-        # initialize current values
-        self._curr1 = next(self._iter1)
-        self._curr2 = next(self._iter2)
+        self._last_record = None
+        
+        self._next_record = next(self._iter)  # type: po.VariantOccurrence
+        self._next_record_rnd = next(self._iter_rnd)  # type: po.VariantOccurrence
     
     @property
     def counter(self):
-        return self._iter1.counter + self._iter2.counter
+        return self._iter.counter + self._iter_rnd.counter
     
     def __iter__(self):
         return self
@@ -36,31 +37,56 @@ class VariantIterator:
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self._iter1.__exit__(exc_type, exc_val, exc_tb)
+        self._iter.__exit__(exc_type, exc_val, exc_tb)
     
-    def _next1(self) -> po.VariantOccurrence:
-        curr = self._curr1
-        self._curr1 = next(self._iter1)
-        return curr
+    def _next(self) -> po.VariantOccurrence:
+        curr_record = self._next_record
+        self._next_record = next(self._iter)
+        return curr_record
     
-    def _next2(self) -> po.VariantOccurrence:
-        curr = self._curr2
-        self._curr2 = next(self._iter2)
-        return curr
+    def _next_rnd(self) -> po.VariantOccurrence:
+        curr_record = self._next_record_rnd
+        self._next_record_rnd = next(self._iter_rnd)
+        return curr_record
     
     def __next__(self) -> po.VariantOccurrence:
-        if self._curr1 is None and self._curr2 is None:
+        if self._next_record is None and self._next_record_rnd is None:
             # noinspection PyTypeChecker
             return None
-        elif self._curr2 is None:
-            return self._next1()
-        elif self._curr1 is None:
-            return self._next2()
-        elif self._curr1.index <= self._curr2.index:
-            # vac_file originated variants have precedence
-            return self._next1()
+        elif self._next_record_rnd is None:
+            return self._next()
+        elif self._next_record is None:
+            return self._next_rnd()
+        elif self._next_record.pos.index <= self._next_record_rnd.pos.index:
+            # known variants have precedence
+            return self._next()
         else:
-            return self._next2()
+            return self._next_rnd()
+    
+    # TODO this method is used as temporary solution for overlapping variants
+    def next_after(self) -> po.VariantOccurrence:
+        """
+        :return: variant after reference span of previous variant
+        """
+        while True:
+            record = self.__next__()
+            if record is None or self._last_record is None:
+                break
+            
+            if self._last_record.pos.ref_name != record.pos.ref_name:
+                break
+            
+            ref_end = self._last_record.pos.ref_pos + len(self._last_record.ref_allele)
+            if record.pos.ref_pos >= ref_end:
+                break
+            
+            # print('prev %s' % self._last_record)
+            # print(ref_end)
+            # print('curr %s' % record)
+            # print()
+        
+        self._last_record = record
+        return record
 
 
 class VacFileIterator:
