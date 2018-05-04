@@ -155,7 +155,7 @@ class AlleleAlignment:
         
         self._is_mutated = True
 
-        # if self._alignment.query_name == 'ERR015528.20727108' and self._alignment.reference_start == 5286317:
+        # if self._alignment.query_name == 'ERR015528.5973067' and self._alignment.reference_start == 7437170:
         #     print()
         #     print(self.alignment.query_name)
         #     print(self.alignment.reference_name)
@@ -192,8 +192,8 @@ class AlleleAlignment:
             self._alignment.query_sequence = seq
             
             assert len(self._alignment.query_sequence) == self._alignment.infer_query_length()
-            
-            # if self._alignment.query_name == 'ERR015528.20727108' and self._alignment.reference_start == 5286317:
+
+            # if self._alignment.query_name == 'ERR015528.5973067' and self._alignment.reference_start == 7437170:
             #     print()
             #     print(seq)
             #     print(exp_cigar)

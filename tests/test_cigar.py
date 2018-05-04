@@ -100,39 +100,30 @@ class TestCigar(unittest.TestCase):
             cigar_pos=0
         ))
         
-        self.assertRaises(NotFoundError, lambda: Cigar.matching_allele(
-            seq='TTTTT',
-            exp_cigar='MMDMM',
-            alleles=['TTA', 'T'],
-            ref_allele='TTA',
-            seq_pos=0,
-            cigar_pos=0
-        ))
-        
-        self.assertTupleEqual(('T', 'MD'), Cigar.matching_allele(
-            seq='TTTT',
-            exp_cigar='MDMM',
-            alleles=['TA', 'T'],  # T -> TA
-            ref_allele='TA',
-            seq_pos=0,
-            cigar_pos=0
-        ))
-        
-        self.assertTupleEqual(('AT', 'MM'), Cigar.matching_allele(
-            seq='ATT',
-            exp_cigar='MMM',
-            alleles=['AT', 'A'],  # AT -> A
-            ref_allele='AT',
-            seq_pos=0,
-            cigar_pos=0
-        ))
-        
         # longest allele does not cover the whole CIGAR operation
         self.assertRaises(NotFoundError, lambda: Cigar.matching_allele(
             seq='GAA',
             exp_cigar='MII',
             alleles=['G', 'GA'],
             ref_allele='G',
+            seq_pos=0,
+            cigar_pos=0
+        ))
+        
+        self.assertRaises(NotFoundError, lambda: Cigar.matching_allele(
+            seq='TTC',
+            exp_cigar='MMMD',
+            alleles=['TTC', 'T'],
+            ref_allele='TTC',
+            seq_pos=0,
+            cigar_pos=0
+        ))
+        
+        self.assertRaises(NotFoundError, lambda: Cigar.matching_allele(
+            seq='ATA',
+            exp_cigar='MII',
+            alleles=['A', 'ATT'],
+            ref_allele='A',
             seq_pos=0,
             cigar_pos=0
         ))

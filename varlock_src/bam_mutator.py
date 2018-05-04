@@ -125,6 +125,8 @@ class BamMutator:
                 secret=secret,
                 rnd=rnd
             )
+            bdiff_io.indel_count
+            bdiff_io.snv_count
         
         self._stats = {
             self.STAT_ALIGNMENT_COUNT: mut.alignment_counter,

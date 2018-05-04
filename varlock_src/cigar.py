@@ -211,6 +211,7 @@ class Cigar:
             ref_allele: str,
             seq_pos: int,
             cigar_pos: int = None,
+            strict: bool = True
     ) -> (str, str):
         """
         :param seq:
@@ -219,6 +220,7 @@ class Cigar:
         :param ref_allele:
         :param seq_pos:
         :param cigar_pos:
+        :param strict: if True operation after an allele is checked
         :return:
         """
         assert ref_allele in alleles
@@ -237,14 +239,17 @@ class Cigar:
             if cigar_pos + len(allele_cigar) > len(exp_cigar):
                 # allele exceeds length of CIGAR
                 break
-            elif cigar_pos + len(allele_cigar) < len(exp_cigar):
+            elif strict and cigar_pos + len(allele_cigar) < len(exp_cigar):
                 # CIGAR exceeds length of allele
                 after_op = exp_cigar[cigar_pos + len(allele_cigar)]
                 if allele_cigar[-1] == cls.OP_INS and after_op == cls.OP_INS:
                     # insertion exceeds length of allele
                     break
-                if allele_cigar[-1] == cls.OP_DEL and after_op == cls.OP_DEL:
+                elif allele_cigar[-1] == cls.OP_DEL and after_op == cls.OP_DEL:
                     # deletion exceeds length of allele
+                    break
+                elif allele_cigar[-1] == cls.OP_MATCH and after_op in [cls.OP_DEL, cls.OP_INS]:
+                    # insertion or deletion after reference allele
                     break
             
             is_seq_match = seq[seq_pos: seq_pos + len(allele)] == allele
