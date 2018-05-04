@@ -125,8 +125,6 @@ class BamMutator:
                 secret=secret,
                 rnd=rnd
             )
-            bdiff_io.indel_count
-            bdiff_io.snv_count
         
         self._stats = {
             self.STAT_ALIGNMENT_COUNT: mut.alignment_counter,
@@ -189,6 +187,9 @@ class BamMutator:
             
             with bam.open_bam(out_bam_filename, 'wb', header=header) as out_bam_file:
                 bdiff_io = BdiffIO(bdiff_file)
+                if self._verbose:
+                    print('SNV diff count %d' % bdiff_io.snv_count)
+                    print('INDEL diff count %d' % bdiff_io.indel_count)
                 
                 secret = self.extract_secret_bytes(bdiff_io)
                 if (include_unmapped or unmapped_only) and secret is None:
