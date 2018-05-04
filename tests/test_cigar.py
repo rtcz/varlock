@@ -126,3 +126,13 @@ class TestCigar(unittest.TestCase):
             seq_pos=0,
             cigar_pos=0
         ))
+        
+        # longest allele does not cover the whole CIGAR operation
+        self.assertRaises(NotFoundError, lambda: Cigar.matching_allele(
+            seq='GAA',
+            exp_cigar='MII',
+            alleles=['G', 'GA'],
+            ref_allele='G',
+            seq_pos=0,
+            cigar_pos=0
+        ))

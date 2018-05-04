@@ -226,17 +226,30 @@ class Cigar:
             cigar_pos = cls.seq_pos2cigar_pos(exp_cigar, seq_pos)
         
         for allele in reversed(sorted(alleles, key=len)):  # type: str
-            
             allele_cigar = cls.allele(allele, ref_allele)
+            assert len(allele_cigar) > 0
+            
             mutual_len = min(len(allele_cigar), len(exp_cigar) - cigar_pos)
             if allele_cigar[:mutual_len] != exp_cigar[cigar_pos: cigar_pos + mutual_len]:
+                # partial CIGAR mismatch
                 continue
             
             if cigar_pos + len(allele_cigar) > len(exp_cigar):
+                # allele exceeds length of CIGAR
                 break
+            elif cigar_pos + len(allele_cigar) < len(exp_cigar):
+                # CIGAR exceeds length of allele
+                after_op = exp_cigar[cigar_pos + len(allele_cigar)]
+                if allele_cigar[-1] == cls.OP_INS and after_op == cls.OP_INS:
+                    # insertion exceeds length of allele
+                    break
+                if allele_cigar[-1] == cls.OP_DEL and after_op == cls.OP_DEL:
+                    # deletion exceeds length of allele
+                    break
             
             is_seq_match = seq[seq_pos: seq_pos + len(allele)] == allele
             if not is_seq_match:
+                # sequence mismatch
                 continue
             
             is_cigar_match = exp_cigar[cigar_pos:cigar_pos + len(allele_cigar)] == allele_cigar
