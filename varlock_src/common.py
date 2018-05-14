@@ -8,8 +8,8 @@ import os
 import numpy as np
 import pysam
 
-from varlock_src.random import VeryRandom
 from varlock_src.alignment import AlleleAlignment
+from varlock_src.random import VeryRandom
 
 BASES = ("A", "T", "G", "C")
 UNKNOWN_BASE = "N"
@@ -213,22 +213,12 @@ def variant_seqs(variants: list):
     :param variants: list of po.AlignedVariant
     :return: list of bases at specific position
     """
-    pileup_col = []
+    result = []
     for variant in variants:  # type: AlleleAlignment
         if variant.is_known:
-            # alignment is mapped at snv position
-            pileup_col.append(variant.allele)
-            
-            # if len(variant.seq) == 0:
-            #     print(variant.alignment)
-            #     print(variant.alignment.query_name)
-            #     print(variant.alignment.query_sequence)
-            #     print(variant._pos)
-            #     print(variant._end_pos)
-            #     print(variant._is_snv)
-            #     exit(0)
+            result.append(variant.allele)
     
-    return pileup_col
+    return result
 
 
 def is_placed_alignment(alignment: pysam.AlignedSegment):

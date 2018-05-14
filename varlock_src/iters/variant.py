@@ -79,11 +79,6 @@ class VariantIterator:
             ref_end = self._last_record.pos.ref_pos + len(self._last_record.ref_allele)
             if record.pos.ref_pos >= ref_end:
                 break
-            
-            # print('prev %s' % self._last_record)
-            # print(ref_end)
-            # print('curr %s' % record)
-            # print()
         
         self._last_record = record
         return record

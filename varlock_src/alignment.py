@@ -1,5 +1,7 @@
+from array import array
 from typing import Optional
 
+import numpy as np
 import pysam
 
 from varlock_src.cigar import Cigar, NotFoundError
@@ -154,7 +156,7 @@ class AlleleAlignment:
             return
         
         self._is_mutated = True
-
+        
         # if self._alignment.query_name == 'ERR015528.5973067' and self._alignment.reference_start == 7437170:
         #     print()
         #     print(self.alignment.query_name)
@@ -183,21 +185,46 @@ class AlleleAlignment:
             self._alignment.query_qualities = query_qualities
         
         elif self.is_indel:
-            # save quality
-            # TODO update quality string, save deleted qualities
-            # assigning to query_sequence removes query_qualities
+            # TODO do something about deleted qualities
+            query_qualities = self._replace_qualities(
+                allele_len=len(allele),
+                matched_allele_len=len(self._allele),
+                seq_pos=self._seq_pos,
+                qualities=self._alignment.query_qualities
+            )
             
             seq, exp_cigar = self._replace_indel(allele, self._allele, self._allele_cigar)
             self._alignment.cigartuples = Cigar.exp_str2tuples(exp_cigar)
             self._alignment.query_sequence = seq
-            
+            self._alignment.query_qualities = query_qualities
             assert len(self._alignment.query_sequence) == self._alignment.infer_query_length()
-
+            
             # if self._alignment.query_name == 'ERR015528.5973067' and self._alignment.reference_start == 7437170:
             #     print()
             #     print(seq)
             #     print(exp_cigar)
             #     print()
+    
+    @staticmethod
+    def _replace_qualities(allele_len: int, matched_allele_len: int, seq_pos: int, qualities: array) -> array:
+        result = array('B')
+        if qualities is not None and len(qualities) > 0:
+            len_diff = allele_len - matched_allele_len
+            if len_diff > 0:
+                # new allele is longer
+                mean_qual = int(np.ceil(np.mean(qualities)))
+                result = qualities[:seq_pos + matched_allele_len] + \
+                         array('B', [mean_qual]) * len_diff + \
+                         qualities[seq_pos + matched_allele_len:]
+            elif len_diff < 0:
+                # new allele is shorter
+                result = qualities[:seq_pos + matched_allele_len + len_diff] + \
+                         qualities[seq_pos + matched_allele_len:]
+            else:
+                # new allele has the same length
+                result = qualities
+        
+        return result
     
     def _replace_indel(self, allele: str, matched_allele: str, matched_allele_cigar: str) -> (str, str):
         # TODO extended CIGAR operations (=,X)
