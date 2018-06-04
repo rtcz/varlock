@@ -6,7 +6,7 @@ import varlock_src.bdiff as bdiff
 import varlock_src.common as cmn
 import varlock_src.iters as iters
 import varlock_src.po as po
-from varlock_src.alignment import AlleleAlignment
+from varlock_src.alignment import AlleleAlignment, pileup_alleles
 from varlock_src.fasta_index import FastaIndex
 from varlock_src.random import VeryRandom
 
@@ -90,6 +90,14 @@ class Mutator:
         if self._verbose:
             print('first variant: %s' % variant)
         
+        # TODO temporary code - remove
+        # self._test_counter = 0
+        # self._freqs_file = open('/home/hekel/projects/python/varlock/analysis/issue_mut/freqs.tsv', 'w')
+        # self._pos_file = open('/home/hekel/projects/python/varlock/analysis/exome/analysis/vac_cov.pos', 'w')
+        # self._freqs_file = open('/home/hekel/projects/python/varlock/analysis/exome/analysis/freqs.tsv', 'w')
+        # self._bed_file_lines = open('in/chr20.bed', 'rt').readlines()
+        # self._bed_id = 0
+        
         bdiff_io = bdiff.BdiffIO()
         while True:
             if variant is None or alignment is None:
@@ -103,7 +111,7 @@ class Mutator:
                 # last mutation
                 if variant is not None:
                     # noinspection PyTypeChecker
-                    self.__mutate_pos(bdiff_io, alignment_queue, variant, rnd)
+                    self._mutate_pos(bdiff_io, alignment_queue, variant, rnd)
                 
                 for allele_alignment in alignment_queue:  # type: AlleleAlignment
                     # unmapped alignments in queue are already encrypted
@@ -133,7 +141,10 @@ class Mutator:
             
             elif self.__is_after_index(alignment, variant.pos.index):
                 # apply the variant to alignment
-                self.__mutate_pos(bdiff_io, alignment_queue, variant, rnd)
+                # if len(alignment_queue) == 0:
+                #     self.test_counter += 1
+                
+                self._mutate_pos(bdiff_io, alignment_queue, variant, rnd)
                 # done with this variant, read next
                 prev_variant = variant
                 variant = variant_iter.next_after()
@@ -155,7 +166,6 @@ class Mutator:
                     print('last variant: %s' % prev_variant)
             
             else:  # alignment is covering variant position
-                
                 alignment_queue.append(AlleleAlignment(alignment, variant))
                 alignment = next(bam_iter)
                 self.covering_counter += 1
@@ -164,6 +174,9 @@ class Mutator:
         self.vac_counter = variant_iter.counter
         # noinspection PyAttributeOutsideInit
         self.diff_counter = bdiff_io.snv_count + bdiff_io.indel_count
+        
+        # print('TEST: %d' % self._test_counter)
+        
         return bdiff_io
     
     def unmutate(
@@ -284,12 +297,13 @@ class Mutator:
             sha512.update(secret + alignment.query_name.encode())
             mut_seq = cmn.stream_cipher(alignment.query_sequence, sha512.digest())
             
-            # change and preserve quality TODO: maybe do something else with the quality?
+            # change and preserve quality
+            # TODO: maybe something else with the quality?
             quality = alignment.query_qualities
             alignment.query_sequence = mut_seq
             alignment.query_qualities = quality
     
-    def __mutate_pos(
+    def _mutate_pos(
             self,
             bdiff_io: bdiff.BdiffIO,
             allele_queue: list,
@@ -302,12 +316,20 @@ class Mutator:
         :param variant: variant allele count list
         :return: True if NS mutation has occured
         """
-        if variant.is_type(po.VariantType.SNV):
-            is_mutated = self._mutate_snv_pos(bdiff_io, allele_queue, variant, rnd)
-        elif variant.is_type(po.VariantType.INDEL):
-            is_mutated = self._mutate_indel_pos(bdiff_io, allele_queue, variant, rnd)
-        else:
-            raise ValueError("unnknown variant type")
+        is_mutated = False
+        if any(allele.is_known for allele in allele_queue):
+            
+            # TODO temp code
+            # BEGIN temp code
+            # self._pos_file.write('%d\n' % (variant.pos.ref_pos + 1))
+            # END temp code
+            
+            if variant.is_type(po.VariantType.SNV):
+                is_mutated = self._mutate_snv_pos(bdiff_io, allele_queue, variant, rnd)
+            elif variant.is_type(po.VariantType.INDEL):
+                is_mutated = self._mutate_indel_pos(bdiff_io, allele_queue, variant, rnd)
+            else:
+                raise ValueError("unnknown variant type")
         
         return is_mutated
     
@@ -318,12 +340,60 @@ class Mutator:
             variant: po.VariantOccurrence,
             rnd: VeryRandom
     ) -> bool:
+        pileup = pileup_alleles(allele_queue)
+        private_freqs = cmn.base_freqs(pileup)
+        
+        mut_map = cmn.snv_mut_map(
+            private_freqs=private_freqs,
+            public_freqs=variant.freqs,
+            rnd=rnd
+        )
+        
+        # # TODO temp code -> rework as optional stats
+        # # BEGIN temp code
+        # personal_allele = cmn.BASES[np.argmax(private_freqs)]
+        # # personal allele is mutated
+        # ref_id = variant.alleles.index(variant.ref_allele)
+        # max_id = variant.alleles.index(personal_allele)  # type: int
+        # personal_public_freq = variant.freqs[max_id] / sum(variant.freqs)
+        # personal_private_freq = private_freqs[max_id] / sum(private_freqs)
+        #
+        # # is the most abundant personal allele masked ?
+        # is_masked = personal_allele != mut_map[personal_allele]
+        # # is the most abundant personal allele the reference one ?
+        # is_reference = ref_id == max_id
+        #
+        # ref_pos = variant.pos.ref_pos + 1
+        # while self._bed_id < len(self._bed_file_lines):
+        #     segments = self._bed_file_lines[self._bed_id].rstrip().split('\t')
+        #     start = int(segments[1])
+        #     end = int(segments[2])
+        #     if end <= ref_pos:
+        #         self._bed_id += 1
+        #         continue
+        #
+        #     if start > ref_pos:
+        #         break
+        #
+        #     public_alt_freq = sum([variant.freqs[i] for i in range(len(variant.freqs)) if i != ref_id]) / sum(
+        #         variant.freqs)
+        #     self._freqs_file.write(
+        #         '%d\t%d\t%d\t%.3f\t%.3f\t%.3f\t%d\n' %
+        #         (
+        #             ref_pos,
+        #             is_reference,
+        #             is_masked,
+        #             personal_public_freq,
+        #             personal_private_freq,
+        #             public_alt_freq,
+        #             sum(private_freqs)
+        #         )
+        #     )
+        #     self._test_counter += 1
+        #     break
+        # #END temp code
+        
         is_mutated = False
-        variant_seqs = cmn.variant_seqs(allele_queue)
-        
-        alt_freqs = cmn.base_freqs(variant_seqs)
-        mut_map = cmn.snv_mut_map(alt_freqs=alt_freqs, ref_freqs=variant.freqs, rnd=rnd)
-        
         for allele in allele_queue:  # type: AlleleAlignment
             if allele.is_known:
                 # alignment has vac to mutate
@@ -343,16 +413,32 @@ class Mutator:
             variant: po.VariantOccurrence,
             rnd: VeryRandom
     ) -> bool:
-        is_mutated = False
-        variant_seqs = cmn.variant_seqs(allele_queue)
-        alt_freq_map = cmn.freq_map(variant_seqs)
+        pileup = pileup_alleles(allele_queue)
+        alt_freq_map = cmn.freq_map(pileup)
         
         mut_map = cmn.indel_mut_map(
-            alt_freq_map=alt_freq_map,
-            ref_freq_map=dict(zip(variant.alleles, variant.freqs)),
+            private_freq_map=alt_freq_map,
+            public_freq_map=dict(zip(variant.alleles, variant.freqs)),
             rnd=rnd
         )
         
+        # # BEGIN temp code
+        # personal_allele = sorted(alt_freq_map.keys(), key=lambda key: alt_freq_map[key], reverse=True)[0]
+        # # personal allele is mutated
+        # ref_id = variant.alleles.index(variant.ref_allele)
+        # max_id = variant.alleles.index(personal_allele)  # type: int
+        # personal_freq = variant.freqs[max_id] / sum(variant.freqs)
+        #
+        # is_mutated = personal_allele != mut_map[personal_allele]
+        # is_reference = ref_id == max_id
+        #
+        # record = '%d\t%f\t%d\t%d\n' % (
+        #     variant.pos.index, personal_freq, is_reference, is_mutated
+        # )
+        # self._freqs_file.write(record)
+        # # END temp code
+        
+        is_mutated = False
         for allele in allele_queue:  # type: AlleleAlignment
             if allele.is_known:
                 # alignment has vac to mutate

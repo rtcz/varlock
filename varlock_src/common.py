@@ -8,7 +8,6 @@ import os
 import numpy as np
 import pysam
 
-from varlock_src.alignment import AlleleAlignment
 from varlock_src.random import VeryRandom
 
 BASES = ("A", "T", "G", "C")
@@ -51,43 +50,42 @@ def stream_cipher(seq: str, key: bytes):
     return mut_seq
 
 
-def snv_mut_map(alt_freqs: list, ref_freqs: list, rnd: VeryRandom):
+def snv_mut_map(private_freqs: list, public_freqs: list, rnd: VeryRandom):
     """
-    :param alt_freqs: list of alternative A,T,G,C DNA bases frequencies
-    :param ref_freqs: list of reference A,T,G,C DNA bases frequencies
+    :param private_freqs: list of private allele frequencies
+    :param public_freqs: list of public allele frequencies
     :param rnd: random number generator
     :return: Map as bijection between bases and premuted bases.
     """
-    assert len(alt_freqs) == len(ref_freqs) == len(BASES)
-    # add random value to distinguish tied values
-    alt_freqs = [ac + rnd.random() for ac in alt_freqs]
+    assert len(private_freqs) == len(public_freqs) == len(BASES)
+    
     mut_map = _mut_map(
         seqs=list(BASES),
-        alt_freqs=alt_freqs,
-        ref_freqs=list(ref_freqs),
+        private_freqs=[freq + rnd.random() for freq in private_freqs],
+        public_freqs=list(public_freqs),
         rnd=rnd
     )
-    mut_map[UNKNOWN_BASE] = UNKNOWN_BASE
     return mut_map
 
 
-def indel_mut_map(alt_freq_map: dict, ref_freq_map: dict, rnd: VeryRandom):
+# TODO use parameters: alleles, alt_freqs, ref_freqs
+def indel_mut_map(private_freq_map: dict, public_freq_map: dict, rnd: VeryRandom):
     """
     Create indel mutation mapping of reference sequences.
-    :param alt_freq_map: {seq:count, ...}
-    :param ref_freq_map: {seq:count, ...}
+    :param private_freq_map: {seq:count, ...}
+    :param public_freq_map: {seq:count, ...}
     :param rnd: random number generator
     :return: Map as bijection between indels and permuted indels.
     """
-    seqs = [None] * len(ref_freq_map)
-    alt_freqs = [0] * len(ref_freq_map)
-    ref_freqs = [0] * len(ref_freq_map)
+    seqs = [None] * len(public_freq_map)
+    alt_freqs = [0] * len(public_freq_map)
+    ref_freqs = [0] * len(public_freq_map)
     i = 0
     
     # dict needs to be sorted so that order of its items is deterministic
-    for seq, freq in sorted(ref_freq_map.items(), key=lambda item: item[0]):
+    for seq, freq in sorted(public_freq_map.items(), key=lambda item: item[0]):
         seqs[i] = seq
-        alt_freqs[i] = alt_freq_map.get(seq, 0) + rnd.random()
+        alt_freqs[i] = private_freq_map.get(seq, 0) + rnd.random()
         ref_freqs[i] = freq
         i += 1
     
@@ -95,38 +93,39 @@ def indel_mut_map(alt_freq_map: dict, ref_freq_map: dict, rnd: VeryRandom):
 
 
 # TODO rename alt_freqs to private_freqs, ref_freqs to public_freqs
-def _mut_map(seqs: list, alt_freqs: list, ref_freqs: list, rnd: VeryRandom):
+def _mut_map(seqs: list, private_freqs: list, public_freqs: list, rnd: VeryRandom):
     """
     Function tampers with parameters to avoid list copying.
     :param seqs: sequences to mutate
-    :param alt_freqs: alternative sequences frequencies
-    :param ref_freqs: reference sequences frequencies
+    :param private_freqs: private allele frequencies
+    :param public_freqs: public allele frequencies
     :return: Map as bijection between seqs and permuted seqs.
     """
-    assert len(seqs) == len(alt_freqs) == len(ref_freqs)
-    ref_seqs = seqs
-    alt_seqs = seqs[:]
+    assert len(seqs) == len(private_freqs) == len(public_freqs)
+    public_seqs = seqs
+    private_seqs = seqs[:]
     
     mut_map = {}
     # map bases but skip last unmapped base
     
-    for i in range(len(ref_freqs) - 1):
+    for i in range(len(public_freqs) - 1):
         # draw ref allele with multinomial probability
-        ref_indel_id = rnd.multirand_index(ref_freqs)
+        public_allele_id = rnd.multirand_index(public_freqs)
+        
         # draw most abundant alt allele
         # TODO why not use multi random here?
-        alt_indel_id = np.argmax(alt_freqs)  # type: int
+        private_allele_id = np.argmax(private_freqs)  # type: int
         # add mapping
-        mut_map[alt_seqs[alt_indel_id]] = ref_seqs[ref_indel_id]
+        mut_map[private_seqs[private_allele_id]] = public_seqs[public_allele_id]
         
         # delete processed items
-        del ref_seqs[ref_indel_id]
-        del ref_freqs[ref_indel_id]
-        del alt_seqs[alt_indel_id]
-        del alt_freqs[alt_indel_id]
+        del public_seqs[public_allele_id]
+        del public_freqs[public_allele_id]
+        del private_seqs[private_allele_id]
+        del private_freqs[private_allele_id]
     
     # last base mapping is obvious
-    mut_map[alt_seqs[0]] = ref_seqs[0]
+    mut_map[private_seqs[0]] = public_seqs[0]
     
     return mut_map
 
@@ -145,17 +144,15 @@ def freq_map(values: list):
 def base_freqs(pileup: list):
     """
     Count allele count in base pileup column.
-    :param pileup: list of DNA bases: A, T, G, C, N
+    :param pileup: list of DNA bases: A, T, G, C
     :return: list of DNA base frequencies [A_freq, T_freq, G_freq, C_freq]
     """
     freqs = [0] * 4
     for base in pileup:
-        # skip unknown base
-        if base != UNKNOWN_BASE:
-            try:
-                freqs[BASES.index(base)] += 1
-            except KeyError:
-                raise ValueError("Illegal DNA base %s" % base)
+        try:
+            freqs[BASES.index(base)] += 1
+        except ValueError:
+            raise ValueError("Illegal DNA base: %s" % base)
     
     return freqs
 
@@ -206,19 +203,6 @@ def checksum(filepath: str, as_bytes=False):
         return checksum_bytes
     else:
         return bytes2hex(checksum_bytes)
-
-
-def variant_seqs(variants: list):
-    """
-    :param variants: list of po.AlignedVariant
-    :return: list of bases at specific position
-    """
-    result = []
-    for variant in variants:  # type: AlleleAlignment
-        if variant.is_known:
-            result.append(variant.allele)
-    
-    return result
 
 
 def is_placed_alignment(alignment: pysam.AlignedSegment):

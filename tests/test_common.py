@@ -32,24 +32,23 @@ class TestCommon(unittest.TestCase):
         self.assertListEqual([0, 0, 2, 1], cmn.base_freqs(['G', 'C', 'G']))
     
     def test_snv_mut_map(self):
-        mut_map = cmn.snv_mut_map(alt_freqs=[1, 1, 1, 1], ref_freqs=[1, 1, 1, 1], rnd=VeryRandom(Random(0)))
-        self.assertDictEqual({'A': 'G', 'T': 'T', 'G': 'C', 'C': 'A', 'N': 'N'}, mut_map)
+        mut_map = cmn.snv_mut_map(private_freqs=[1, 1, 1, 1], public_freqs=[1, 1, 1, 1], rnd=VeryRandom(Random(0)))
+        self.assertDictEqual({'A': 'G', 'T': 'T', 'G': 'C', 'C': 'A'}, mut_map)
         
-        mut_map = cmn.snv_mut_map(alt_freqs=[3, 0, 1, 0], ref_freqs=[2, 1, 4, 0], rnd=VeryRandom(RandomMockup(0.5)))
-        self.assertDictEqual({'A': 'G', 'T': 'T', 'G': 'A', 'C': 'C', 'N': 'N'}, mut_map)
+        mut_map = cmn.snv_mut_map(private_freqs=[3, 0, 1, 0], public_freqs=[2, 1, 4, 0], rnd=VeryRandom(RandomMockup(0.5)))
+        self.assertDictEqual({'A': 'G', 'T': 'T', 'G': 'A', 'C': 'C'}, mut_map)
     
     def test_indel_mut_map(self):
         mut_map = cmn.indel_mut_map(
-            
-            alt_freq_map={'G': 2},
-            ref_freq_map={'GCG': 1, 'G': 0},
+            private_freq_map={'G': 2},
+            public_freq_map={'GCG': 1, 'G': 0},
             rnd=VeryRandom(RandomMockup(0.5))
         )
         self.assertDictEqual({'G': 'GCG', 'GCG': 'G'}, mut_map)
         
         mut_map = cmn.indel_mut_map(
-            alt_freq_map={'AGT': 2, 'A': 1},
-            ref_freq_map={'AG': 2, 'A': 1, 'AGT': 0},
+            private_freq_map={'AGT': 2, 'A': 1},
+            public_freq_map={'AG': 2, 'A': 1, 'AGT': 0},
             rnd=VeryRandom(RandomMockup(0.5))
         )
         self.assertDictEqual({'A': 'A', 'AG': 'AGT', 'AGT': 'AG'}, mut_map)

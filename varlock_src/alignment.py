@@ -1,3 +1,4 @@
+import typing
 from array import array
 from typing import Optional
 
@@ -5,6 +6,7 @@ import numpy as np
 import pysam
 
 from varlock_src.cigar import Cigar, NotFoundError
+from varlock_src.common import BASES
 from varlock_src.po import Variant, VariantType
 
 
@@ -23,6 +25,8 @@ class AlleleAlignment:
         self._alignment = alignment
         self._variant = variant
         self._is_mutated = is_mutated
+        self._allele = None
+        self._allele_cigar = None
         
         if variant is not None:
             assert alignment.reference_name == variant.pos.ref_name
@@ -35,50 +39,53 @@ class AlleleAlignment:
                     self._cigar_pos = Cigar.seq_pos2cigar_pos(self._exp_cigar, self._seq_pos)
                     assert self._cigar_pos is not None
                     
-                    self._allele, self._allele_cigar = self._find_allele()
+                    if self.is_snv:
+                        self._allele, self._allele_cigar = self._find_snv_allele()
+                    elif self.is_indel:
+                        self._allele, self._allele_cigar = self._find_indel_allele()
     
-    def _find_allele(self) -> (str, str):
-        allele = None
-        allele_cigar = None
+    def _find_indel_allele(self) -> (str, str):
+        # if self._alignment.query_name == 'ERR013136.13215553' and self._alignment.reference_start == 10365830:
+        #     print()
+        #     print(self._alignment.query_sequence)
+        #     print('alleles %s' % str(self._variant.alleles))
+        #     # print('actual allele %s' % self._allele)
+        #     print('reference allele %s' % self._variant.ref_allele)
+        #     print(self._exp_cigar)
+        #     print(self._seq_pos)
+        #     print(self._cigar_pos)
+        #     print(self._variant)
+        #     print()
+        try:
+            allele, allele_cigar = Cigar.matching_allele(
+                seq=self._alignment.query_sequence,
+                exp_cigar=self._exp_cigar,
+                alleles=self._variant.alleles,
+                ref_allele=self._variant.ref_allele,
+                seq_pos=self._seq_pos,
+                cigar_pos=self._cigar_pos
+            )
+        except NotFoundError:
+            return None, None
         
-        if self.is_snv:
-            allele = self._alignment.query_sequence[self._seq_pos]
-            allele_cigar = self._exp_cigar[self._cigar_pos]
-            # TODO consider present CIGAR and =/X operations
-            assert allele_cigar == Cigar.OP_MATCH
+        if len(self._exp_cigar) > self._cigar_pos + len(allele_cigar):
+            # Only with CIGAR operation after an allele it is guranteed
+            # that replacement allele can be found too.
+            return allele, allele_cigar
+        else:
+            return None, None
+    
+    def _find_snv_allele(self) -> (str, str):
+        allele = self._alignment.query_sequence[self._seq_pos]
+        allele_cigar = self._exp_cigar[self._cigar_pos]
         
-        elif self.is_indel:
-            try:
-                # if self._alignment.query_name == 'ERR013136.13215553' and self._alignment.reference_start == 10365830:
-                #     print()
-                #     print(self._alignment.query_sequence)
-                #     print('alleles %s' % str(self._variant.alleles))
-                #     # print('actual allele %s' % self._allele)
-                #     print('reference allele %s' % self._variant.ref_allele)
-                #     print(self._exp_cigar)
-                #     print(self._seq_pos)
-                #     print(self._cigar_pos)
-                #     print(self._variant)
-                #     print()
-                
-                allele, allele_cigar = Cigar.matching_allele(
-                    seq=self._alignment.query_sequence,
-                    exp_cigar=self._exp_cigar,
-                    alleles=self._variant.alleles,
-                    ref_allele=self._variant.ref_allele,
-                    seq_pos=self._seq_pos,
-                    cigar_pos=self._cigar_pos
-                )
-                
-                if self._cigar_pos + len(allele_cigar) >= len(self._exp_cigar):
-                    # Only with CIGAR after an allele it is guranteed
-                    # that replacement allele can be found too.
-                    allele, allele_cigar = None, None
-            
-            except NotFoundError:
-                pass
+        # TODO consider present CIGAR and =/X operations
+        assert allele_cigar == Cigar.OP_MATCH
         
-        return allele, allele_cigar
+        if allele in BASES:
+            return allele, allele_cigar
+        else:
+            return None, None
     
     @staticmethod
     def _ref_pos2seq_pos(alignment: pysam.AlignedSegment, ref_pos: int) -> int:
@@ -112,10 +119,7 @@ class AlleleAlignment:
     
     @property
     def is_known(self) -> bool:
-        try:
-            return self._allele is not None
-        except AttributeError:
-            return False
+        return self._allele is not None
     
     @property
     def is_mutated(self) -> bool:
@@ -134,10 +138,7 @@ class AlleleAlignment:
         """
         Get variant sequence.
         """
-        if self.is_known:
-            return self._allele
-        else:
-            return None
+        return self._allele
     
     @allele.setter
     def allele(self, allele: str):
@@ -204,6 +205,8 @@ class AlleleAlignment:
             #     print(seq)
             #     print(exp_cigar)
             #     print()
+        
+        self._allele = allele
     
     @staticmethod
     def _replace_qualities(allele_len: int, matched_allele_len: int, seq_pos: int, qualities: array) -> array:
@@ -244,3 +247,16 @@ class AlleleAlignment:
         result_cigar = pre_cigar + allele_cigar + post_cigar
         
         return result_seq, result_cigar
+
+
+def pileup_alleles(variants: typing.List[AlleleAlignment]):
+    """
+    :param variants: list of po.AlignedVariant
+    :return: list of bases at specific position
+    """
+    result = []
+    for variant in variants:
+        if variant.is_known:
+            result.append(variant.allele)
+    
+    return result
