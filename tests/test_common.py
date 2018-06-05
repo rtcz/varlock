@@ -35,7 +35,8 @@ class TestCommon(unittest.TestCase):
         mut_map = cmn.snv_mut_map(private_freqs=[1, 1, 1, 1], public_freqs=[1, 1, 1, 1], rnd=VeryRandom(Random(0)))
         self.assertDictEqual({'A': 'G', 'T': 'T', 'G': 'C', 'C': 'A'}, mut_map)
         
-        mut_map = cmn.snv_mut_map(private_freqs=[3, 0, 1, 0], public_freqs=[2, 1, 4, 0], rnd=VeryRandom(RandomMockup(0.5)))
+        mut_map = cmn.snv_mut_map(private_freqs=[3, 0, 1, 0], public_freqs=[2, 1, 4, 0],
+                                  rnd=VeryRandom(RandomMockup(0.5)))
         self.assertDictEqual({'A': 'G', 'T': 'T', 'G': 'A', 'C': 'C'}, mut_map)
     
     def test_indel_mut_map(self):
@@ -103,6 +104,16 @@ class TestCommon(unittest.TestCase):
         self.assertEqual('AT', cmn.bytes2seq(self.bits2bytes('00010000'), 2))
         self.assertEqual('GC', cmn.bytes2seq(self.bits2bytes('10110000'), 2))
         self.assertEqual('ATGCGC', cmn.bytes2seq(self.bits2bytes('0001101110110000'), 6))
+    
+    def test_byte2base_perm(self):
+        self.assertListEqual(['A', 'A', 'A', 'A'], cmn.byte2base_perm(0b00000000))
+        self.assertListEqual(['A', 'T', 'G', 'C'], cmn.byte2base_perm(0b11100100))
+        self.assertListEqual(['C', 'G', 'T', 'A'], cmn.byte2base_perm(0b00011011))
+    
+    def test_base2byte_perm(self):
+        self.assertEqual(0b00000000, cmn.base_perm2byte(['A', 'A', 'A', 'A']))
+        self.assertEqual(0b11100100, cmn.base_perm2byte(['A', 'T', 'G', 'C']))
+        self.assertEqual(0b00011011, cmn.base_perm2byte(['C', 'G', 'T', 'A']))
 
 
 if __name__ == '__main__':

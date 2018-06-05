@@ -41,9 +41,9 @@ class TestVac(unittest.TestCase):
     def test_io(self):
         vac_file = self.__build_vac_file()
         self.assertTupleEqual((3, 3), Vac.read_header(vac_file))
-        self.assertTupleEqual((2000000000, 0, (3, 2, 1, 0)), Vac.read_snv_record(vac_file))
-        self.assertTupleEqual((2000000002, 1, (0, 1, 2, 3)), Vac.read_snv_record(vac_file))
-        self.assertTupleEqual((2000000004, 2, (1, 1, 1, 1)), Vac.read_snv_record(vac_file))
+        self.assertTupleEqual((2000000000, 0, [3, 2, 1, 0]), Vac.read_snv_record(vac_file))
+        self.assertTupleEqual((2000000002, 1, [0, 1, 2, 3]), Vac.read_snv_record(vac_file))
+        self.assertTupleEqual((2000000004, 2, [1, 1, 1, 1]), Vac.read_snv_record(vac_file))
         self.assertTupleEqual((2000000001, [10, 1], ['A', 'ATCG']), Vac.read_indel_record(vac_file))
         self.assertTupleEqual((2000000003, [10, 1], ['AT', 'ATCGT']), Vac.read_indel_record(vac_file))
         self.assertTupleEqual((2000000005, [10, 10, 0], ['AAAA', 'ATCG', 'A']), Vac.read_indel_record(vac_file))

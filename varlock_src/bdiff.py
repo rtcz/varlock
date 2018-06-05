@@ -30,9 +30,9 @@ class BdiffIO:
 
     Diff SNV record: permutation of DNA bases (A,T,G,C)
     index 4B, 0-based absolute genomic position
-    length 1B, always zero to indicate SNV record (SNV has always 4 alternatives)
-    reference index 1B, index of reference allele in the A,T,G,C list
-    mapping, 1B, index of base permutation
+    length 1B, always zero to indicate SNV record (always 4 possible alleles)
+    reference index 1B, index of reference allele within the A,T,G,C list
+    mapping, 1B, permutation of alleles as indiced of the A,T,G,C list
 
     DIFF INDEL record: permutation of sequences
     index 4B, 0-based absolute genomic position
@@ -55,60 +55,6 @@ class BdiffIO:
     INT_SIZE = 4
     SHORT_SIZE = 2
     BYTE_SIZE = 1
-    
-    INDEX_2_PERM = [
-        ('A', 'T', 'G', 'C'),
-        ('A', 'T', 'C', 'G'),
-        ('A', 'C', 'T', 'G'),
-        ('A', 'C', 'G', 'T'),
-        ('A', 'G', 'T', 'C'),
-        ('A', 'G', 'C', 'T'),
-        ('T', 'A', 'C', 'G'),
-        ('T', 'A', 'G', 'C'),
-        ('T', 'C', 'A', 'G'),
-        ('T', 'C', 'G', 'A'),
-        ('T', 'G', 'A', 'C'),
-        ('T', 'G', 'C', 'A'),
-        ('C', 'A', 'T', 'G'),
-        ('C', 'A', 'G', 'T'),
-        ('C', 'T', 'A', 'G'),
-        ('C', 'T', 'G', 'A'),
-        ('C', 'G', 'A', 'T'),
-        ('C', 'G', 'T', 'A'),
-        ('G', 'A', 'T', 'C'),
-        ('G', 'A', 'C', 'T'),
-        ('G', 'T', 'A', 'C'),
-        ('G', 'T', 'C', 'A'),
-        ('G', 'C', 'A', 'T'),
-        ('G', 'C', 'T', 'A')
-    ]
-    
-    PERM_2_INDEX = {
-        ('A', 'T', 'G', 'C'): 0,
-        ('A', 'T', 'C', 'G'): 1,
-        ('A', 'C', 'T', 'G'): 2,
-        ('A', 'C', 'G', 'T'): 3,
-        ('A', 'G', 'T', 'C'): 4,
-        ('A', 'G', 'C', 'T'): 5,
-        ('T', 'A', 'C', 'G'): 6,
-        ('T', 'A', 'G', 'C'): 7,
-        ('T', 'C', 'A', 'G'): 8,
-        ('T', 'C', 'G', 'A'): 9,
-        ('T', 'G', 'A', 'C'): 10,
-        ('T', 'G', 'C', 'A'): 11,
-        ('C', 'A', 'T', 'G'): 12,
-        ('C', 'A', 'G', 'T'): 13,
-        ('C', 'T', 'A', 'G'): 14,
-        ('C', 'T', 'G', 'A'): 15,
-        ('C', 'G', 'A', 'T'): 16,
-        ('C', 'G', 'T', 'A'): 17,
-        ('G', 'A', 'T', 'C'): 18,
-        ('G', 'A', 'C', 'T'): 19,
-        ('G', 'T', 'A', 'C'): 20,
-        ('G', 'T', 'C', 'A'): 21,
-        ('G', 'C', 'A', 'T'): 22,
-        ('G', 'C', 'T', 'A'): 23,
-    }
     
     def __init__(self, diff_file: io.BytesIO = None, index_resolution=1000):
         """
@@ -227,12 +173,10 @@ class BdiffIO:
         """
         return None if self.is_empty() else self._last_index
     
-    def _read_record(self):
+    def _read_record(self) -> (int, bool, int, list):
         """
         Reads next SNV or INDEL record
-        :return: index, reference_id, alternatives
-            SNV alternatives is a tuple
-            INDEL alternatives is a list
+        :return: index, is_snv, reference_id, alleles
         """
         assert self.is_read_mode
         byte_str = self._bdiff_file.read(self.INT_SIZE + self.BYTE_SIZE * 2)
@@ -240,41 +184,30 @@ class BdiffIO:
             raise EOFError
         
         index, length, ref_id = struct.unpack('<IBB', byte_str)
-        if length == 0:
-            # SNV record
-            return index, ref_id, self._read_snv_alts()
+        is_snv = length == 0
+        if is_snv:
+            perm_byte = struct.unpack('<B', self._bdiff_file.read(self.BYTE_SIZE))[0]
+            return index, is_snv, ref_id, cmn.byte2base_perm(perm_byte)
         else:
-            # INDEL record
-            return index, ref_id, self._read_indel_alts(length)
+            return index, is_snv, ref_id, self._read_indel_alts(length)
     
     def read_record(self):
         """
         :return: genomic_index, is_indel, reference_sequence, mutation_map
         """
-        index, ref_id, alts = self._read_record()
-        if isinstance(alts, tuple):
+        index, is_snv, ref_id, alleles = self._read_record()
+        if is_snv:
             # SNV: it is assumed that record was saved as:
             # BASES -> permuted(BASES)
-            return index, False, cmn.BASES[ref_id], dict(zip(
-                alts + (cmn.UNKNOWN_BASE,),
-                cmn.BASES + (cmn.UNKNOWN_BASE,))
-            )
+            return index, is_snv, cmn.BASES[ref_id], dict(zip(alleles, cmn.BASES))
         else:
             # INDEL it is assumed that record was saved as:
-            # sorted(alts) -> permuted(alts)
-            return index, True, alts[ref_id], dict(zip(alts, sorted(alts)))
-    
-    def _read_snv_alts(self):
-        """
-        Read SNV alternatives from rest of the record
-        :return: (base_1, base_2, base_3, base_4)
-        """
-        mut_index = struct.unpack('<B', self._bdiff_file.read(self.BYTE_SIZE))[0]
-        return self.INDEX_2_PERM[mut_index]
+            # sorted(alleles) -> permuted(alleles)
+            return index, is_snv, alleles[ref_id], dict(zip(alleles, sorted(alleles)))
     
     def _read_indel_alts(self, length):
         """
-        Read INDEL alternatives from rest of the record
+        Read mapped alleles from rest of an INDEL record
         :return: [SEQ_1, SEQ_2, ...]
         """
         alt_list = [None] * length
@@ -286,18 +219,18 @@ class BdiffIO:
         
         return alt_list
     
-    def _write_snv(self, index: int, ref_id: int, base_perm: tuple):
+    def _write_snv(self, index: int, ref_id: int, base_perm: list):
         """
         :param index: genomic index
         :param base_perm: permutation of bases
-        permutation represent values of map with keys A,T,G,C in this order
+        permutation represent values of map with keys A,T,G,C in respective order
         :return:
         """
         assert not self.is_read_mode
-        # assert ref_id >= 0 < len(cmn.BASES)
+        assert ref_id >= 0 < len(cmn.BASES)
         assert index > self._last_index
         
-        record = struct.pack('<IBBB', index, 0, ref_id, self.PERM_2_INDEX[base_perm])
+        record = struct.pack('<IBBB', index, 0, ref_id, cmn.base_perm2byte(base_perm))
         self._record_file.write(record)
         
         self._last_index = index
@@ -312,7 +245,7 @@ class BdiffIO:
         :param mut_map:
         :return:
         """
-        self._write_snv(index, ref_id, (mut_map['A'], mut_map['T'], mut_map['G'], mut_map['C']))
+        self._write_snv(index, ref_id, [mut_map['A'], mut_map['T'], mut_map['G'], mut_map['C']])
     
     def _write_indel(self, index: int, ref_id: int, seq_perm: list):
         """
@@ -418,14 +351,14 @@ class BdiffIO:
         indel_count = 0
         while True:
             try:
-                index, ref_id, alts = self._read_record()
+                index, is_snv, ref_id, alleles = self._read_record()
             except EOFError:
                 break
             
             if index > to_index:
                 break
             
-            if isinstance(alts, tuple):
+            if is_snv:
                 # SNV
                 snv_count += 1
             else:
@@ -448,7 +381,7 @@ class BdiffIO:
             file_index, snv_count, indel_count = self._build_index(from_index_pos, header[self.TO_INDEX])
             
             self._bdiff_file.seek(to_index_pos)
-            last_index, ref_id, alts = self._read_record()
+            last_index, is_snv, ref_id, alleles = self._read_record()
             end_pos = self._bdiff_file.tell()
             
             self._write_counts(bdiff_file, snv_count, indel_count)
@@ -630,9 +563,8 @@ class BdiffIO:
             for index, pos in bdiff.file_index:
                 text_file.write('%d\t%d\n' % (index + 1, pos))
             
-            for index, ref_id, alts in bdiff:
-                is_indel = isinstance(alts, list)
-                text_file.write('%d\t%d\t%d\t%s\n' % (index + 1, is_indel, ref_id, ','.join(alts)))
+            for index, is_snv, ref_id, alts in bdiff:
+                text_file.write('%d\t%d\t%d\t%s\n' % (index + 1, is_snv, ref_id, ','.join(alts)))
     
     @staticmethod
     def from_text_file(filename: str):
@@ -670,16 +602,16 @@ class BdiffIO:
                 line = text_file.readline().rstrip()
                 if not line:
                     break
-                raw_index, raw_is_indel, raw_ref_id, raw_alts = line.split('\t')
+                raw_index, raw_is_snv, raw_ref_id, raw_alts = line.split('\t')
                 index = int(raw_index) - 1
-                is_snv = raw_is_indel == '0'
+                is_snv = raw_is_snv == '1'
                 ref_id = int(raw_ref_id)
-                alts = raw_alts.split(',')
+                alleles = raw_alts.split(',')
                 if is_snv:
                     # snvs
-                    bdiff._write_snv(index, ref_id, tuple(alts))
+                    bdiff._write_snv(index, ref_id, alleles)
                 else:
                     # indel
-                    bdiff._write_indel(index, ref_id, alts)
+                    bdiff._write_indel(index, ref_id, alleles)
         
         return bdiff.file(header)

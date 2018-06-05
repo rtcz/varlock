@@ -62,12 +62,12 @@ class BdiffIterator:
     def _next(self) -> po.VariantDiff:
         record = None
         if self._bdiff_io.tell() <= self._end_pos:
-            index, is_indel, ref_seq, mut_map = self._bdiff_io.read_record()
+            index, is_snv, ref_seq, mut_map = self._bdiff_io.read_record()
             ref_name, ref_pos = self._fai.index2pos(index)
             
             record = po.VariantDiff(
                 position=po.GenomicPosition(index, ref_name, ref_pos),
-                vtype=po.VariantType.INDEL if is_indel else po.VariantType.SNV,
+                vtype=po.VariantType.SNV if is_snv else po.VariantType.INDEL,
                 mut_map=mut_map,
                 ref_allele=ref_seq
             )

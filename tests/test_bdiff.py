@@ -15,13 +15,13 @@ class TestBdiff(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         bdiff = BdiffIO()
-        bdiff._write_snv(1010, 0, ('C', 'A', 'T', 'G'))
-        bdiff._write_snv(1020, 1, ('G', 'A', 'T', 'C'))
+        bdiff._write_snv(1010, 0, ['C', 'A', 'T', 'G'])
+        bdiff._write_snv(1020, 1, ['G', 'A', 'T', 'C'])
         bdiff._write_indel(1030, 0, ['AT', 'ATT', 'A'])
-        bdiff._write_snv(1040, 2, ('T', 'G', 'A', 'C'))
+        bdiff._write_snv(1040, 2, ['T', 'G', 'A', 'C'])
         bdiff._write_indel(1050, 1, ['T', 'TT'])
         bdiff._write_indel(1060, 2, ['GCG', 'G', 'GCGCG'])
-        bdiff._write_snv(1070, 3, ('G', 'C', 'A', 'T'))
+        bdiff._write_snv(1070, 3, ['G', 'C', 'A', 'T'])
         
         cls._bdiff_file = bdiff.file(cls._header)
     
@@ -42,20 +42,20 @@ class TestBdiff(unittest.TestCase):
         self.assertEqual(4, bdiff.snv_count)
         self.assertEqual(2, bdiff.indel_count)
         
-        self.assertTupleEqual((11011, 2, ('A', 'G', 'T', 'C')), bdiff._read_record())
-        self.assertTupleEqual((11015, 3, ('C', 'A', 'T', 'G')), bdiff._read_record())
-        self.assertTupleEqual((11020, 2, ('G', 'T', 'A', 'C')), bdiff._read_record())
-        self.assertTupleEqual((11027, 2, ['A', 'AGT', 'AG']), bdiff._read_record())
-        self.assertTupleEqual((11031, 2, ('G', 'A', 'T', 'C')), bdiff._read_record())
-        self.assertTupleEqual((11037, 0, ['GCG', 'G']), bdiff._read_record())
+        self.assertTupleEqual((11011, True, 2, ['A', 'G', 'T', 'C']), bdiff._read_record())
+        self.assertTupleEqual((11015, True, 3, ['C', 'A', 'T', 'G']), bdiff._read_record())
+        self.assertTupleEqual((11020, True, 2, ['G', 'T', 'A', 'C']), bdiff._read_record())
+        self.assertTupleEqual((11027, False, 2, ['A', 'AGT', 'AG']), bdiff._read_record())
+        self.assertTupleEqual((11031, True, 2, ['G', 'A', 'T', 'C']), bdiff._read_record())
+        self.assertTupleEqual((11037, False, 0, ['GCG', 'G']), bdiff._read_record())
     
     def test_to_text_file(self):
         bdiff = BdiffIO()
-        bdiff._write_snv(11011, 2, ('A', 'G', 'T', 'C'))
-        bdiff._write_snv(11015, 3, ('C', 'A', 'T', 'G'))
-        bdiff._write_snv(11020, 2, ('G', 'T', 'A', 'C'))
+        bdiff._write_snv(11011, 2, ['A', 'G', 'T', 'C'])
+        bdiff._write_snv(11015, 3, ['C', 'A', 'T', 'G'])
+        bdiff._write_snv(11020, 2, ['G', 'T', 'A', 'C'])
         bdiff._write_indel(11027, 2, ['A', 'AGT', 'AG'])
-        bdiff._write_snv(11031, 2, ('G', 'A', 'T', 'C'))
+        bdiff._write_snv(11031, 2, ['G', 'A', 'T', 'C'])
         bdiff._write_indel(11037, 0, ['GCG', 'G'])
         
         BdiffIO.to_text_file(bdiff.file({
@@ -76,16 +76,16 @@ class TestBdiff(unittest.TestCase):
     
     def test_file_index(self):
         write_io = BdiffIO(index_resolution=3)
-        write_io._write_snv(1000, 0, ('C', 'A', 'T', 'G'))
-        write_io._write_snv(1010, 0, ('C', 'A', 'T', 'G'))
-        write_io._write_snv(1020, 0, ('C', 'A', 'T', 'G'))
-        write_io._write_snv(1030, 0, ('C', 'A', 'T', 'G'))
-        write_io._write_snv(1040, 0, ('C', 'A', 'T', 'G'))
-        write_io._write_snv(1050, 0, ('C', 'A', 'T', 'G'))
-        write_io._write_snv(1060, 0, ('C', 'A', 'T', 'G'))
-        write_io._write_snv(1070, 0, ('C', 'A', 'T', 'G'))
-        write_io._write_snv(1080, 0, ('C', 'A', 'T', 'G'))
-        write_io._write_snv(1090, 0, ('C', 'A', 'T', 'G'))
+        write_io._write_snv(1000, 0, ['C', 'A', 'T', 'G'])
+        write_io._write_snv(1010, 0, ['C', 'A', 'T', 'G'])
+        write_io._write_snv(1020, 0, ['C', 'A', 'T', 'G'])
+        write_io._write_snv(1030, 0, ['C', 'A', 'T', 'G'])
+        write_io._write_snv(1040, 0, ['C', 'A', 'T', 'G'])
+        write_io._write_snv(1050, 0, ['C', 'A', 'T', 'G'])
+        write_io._write_snv(1060, 0, ['C', 'A', 'T', 'G'])
+        write_io._write_snv(1070, 0, ['C', 'A', 'T', 'G'])
+        write_io._write_snv(1080, 0, ['C', 'A', 'T', 'G'])
+        write_io._write_snv(1090, 0, ['C', 'A', 'T', 'G'])
         
         read_io = BdiffIO(write_io.file())
         
@@ -112,13 +112,13 @@ class TestBdiff(unittest.TestCase):
         self.assertDictEqual(self._header, bdiff.header)
         self.assertEqual(4, bdiff.snv_count)
         self.assertEqual(3, bdiff.indel_count)
-        self.assertTupleEqual((1010, 0, ('C', 'A', 'T', 'G')), bdiff._read_record())
-        self.assertTupleEqual((1020, 1, ('G', 'A', 'T', 'C')), bdiff._read_record())
-        self.assertTupleEqual((1030, 0, ['AT', 'ATT', 'A']), bdiff._read_record())
-        self.assertTupleEqual((1040, 2, ('T', 'G', 'A', 'C')), bdiff._read_record())
-        self.assertTupleEqual((1050, 1, ['T', 'TT']), bdiff._read_record())
-        self.assertTupleEqual((1060, 2, ['GCG', 'G', 'GCGCG']), bdiff._read_record())
-        self.assertTupleEqual((1070, 3, ('G', 'C', 'A', 'T')), bdiff._read_record())
+        self.assertTupleEqual((1010, True, 0, ['C', 'A', 'T', 'G']), bdiff._read_record())
+        self.assertTupleEqual((1020, True, 1, ['G', 'A', 'T', 'C']), bdiff._read_record())
+        self.assertTupleEqual((1030, False, 0, ['AT', 'ATT', 'A']), bdiff._read_record())
+        self.assertTupleEqual((1040, True, 2, ['T', 'G', 'A', 'C']), bdiff._read_record())
+        self.assertTupleEqual((1050, False, 1, ['T', 'TT']), bdiff._read_record())
+        self.assertTupleEqual((1060, False, 2, ['GCG', 'G', 'GCGCG']), bdiff._read_record())
+        self.assertTupleEqual((1070, True, 3, ['G', 'C', 'A', 'T']), bdiff._read_record())
         self.assertRaises(EOFError, lambda: bdiff._read_record())
     
     @staticmethod
@@ -132,7 +132,7 @@ class TestBdiff(unittest.TestCase):
         saved_pos = bdiff.tell()
         pos = saved_pos
         while True:
-            index, ref_id, alts = bdiff._read_record()
+            index, is_snv, ref_id, alts = bdiff._read_record()
             if index == search_index:
                 break
             pos = bdiff.tell()
@@ -174,7 +174,7 @@ class TestBdiff(unittest.TestCase):
     
     def test_single_file(self):
         wbdiff = BdiffIO()
-        wbdiff._write_snv(1010, 0, ('C', 'A', 'T', 'G'))
+        wbdiff._write_snv(1010, 0, ['C', 'A', 'T', 'G'])
         rbdiff = wbdiff.readcopy()
         self.assertFalse(rbdiff.is_empty())
         

@@ -14,6 +14,7 @@ BASES = ("A", "T", "G", "C")
 UNKNOWN_BASE = "N"
 
 BASE_BITMASKS = [0b11000000, 0b00110000, 0b00001100, 0b00000011]
+# BASE_BITMASKS = [0b00000011, 0b00110000, 0b00001100, 0b11000000]
 BASE2BITS = {'A': 0b00, 'T': 0b01, 'G': 0b10, 'C': 0b11}
 BITS2BASE = {0b00: 'A', 0b01: 'T', 0b10: 'G', 0b11: 'C'}
 
@@ -62,7 +63,7 @@ def snv_mut_map(private_freqs: list, public_freqs: list, rnd: VeryRandom):
     mut_map = _mut_map(
         seqs=list(BASES),
         private_freqs=[freq + rnd.random() for freq in private_freqs],
-        public_freqs=list(public_freqs),
+        public_freqs=public_freqs.copy(),
         rnd=rnd
     )
     return mut_map
@@ -221,6 +222,7 @@ def open_vcf(filename, mode):
         return open(filename, mode)
 
 
+# TODO rewrite
 def seq2bytes(seq: str):
     """
     :param seq: DNA sequence
@@ -245,6 +247,7 @@ def seq2bytes(seq: str):
     return seq_bytes
 
 
+# TODO rewrite
 def bytes2seq(byte_list: bytes, seq_length: int):
     """
     :param byte_list: DNA sequence encoded as 2 bits per BASE
@@ -267,6 +270,36 @@ def bytes2seq(byte_list: bytes, seq_length: int):
         seq += BITS2BASE[bits]
     
     return seq
+
+
+def byte2base_perm(perm_byte: int) -> list:
+    """
+    Convert single byte to permuted list of A,T,G,C bases in respective order.
+    Each 2 bits represent one base.
+    :return: permutation list
+    """
+    perm_list = [None] * 4
+    for i in range(4):
+        shift = 2 * i
+        base_id = (perm_byte & (0b11 << shift)) >> shift
+        perm_list[i] = BASES[base_id]
+    
+    return perm_list
+
+
+def base_perm2byte(base_perm: list) -> int:
+    """
+    Convert permuted list of A,T,G,C bases to single byte in respective order.
+    Each 2 bits represent one base.
+    :return: permutation byte
+    """
+    assert len(base_perm) == 4
+    mapping_byte = 0
+    for i in range(4):
+        shift = 2 * i
+        mapping_byte |= BASES.index(base_perm[i]) << shift
+    
+    return mapping_byte
 
 
 def dict2bytes(value: dict):

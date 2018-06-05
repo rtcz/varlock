@@ -198,8 +198,7 @@ class Vac:
             raise EOFError()
         index, ref_id, a_ac, t_ac, c_ac, g_ac = struct.unpack(cls.SNV_FORMAT, byte_str)
         
-        # print('rs', index, (a_ac, t_ac, c_ac, g_ac))
-        return index, ref_id, (a_ac, t_ac, c_ac, g_ac)
+        return index, ref_id, [a_ac, t_ac, c_ac, g_ac]
     
     @classmethod
     def _write_snv_record(cls, snv_file, index: int, ref_id: int, ac_tuple: tuple):
