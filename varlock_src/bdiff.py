@@ -29,19 +29,20 @@ class BdiffIO:
         file content position of N-th record, 4B
 
     Diff SNV record: permutation of DNA bases (A,T,G,C)
-    index 4B, 0-based absolute genomic position
-    length 1B, always zero to indicate SNV record (always 4 possible alleles)
-    reference index 1B, index of reference allele within the A,T,G,C list
+    index, 4B, 0-based absolute genomic position
+    length, 1B, always zero to indicate SNV record (always 4 possible alleles)
+    reference index, 1B, index of reference allele within the A,T,G,C list
     mapping, 1B, permutation of alleles as indiced of the A,T,G,C list
 
     DIFF INDEL record: permutation of sequences
-    index 4B, 0-based absolute genomic position
-    length 1B, number of alternatives
-    reference index 1B, index of the reference allele in the sorted list
-    list (of length): permutation of sorted (ascending) alternative sequences
-        INDEL base length 2B, length of INDEL sequence
-        list:
-            INDEL 4 base sequence, 1B
+    index, 4B, 0-based absolute genomic position
+    length, 1B, number of alleles
+    reference index, 1B, index of the reference allele within the list of alleles
+    list (of length): alleles
+        index, 1B, index of target allele
+        INDEL sequence length, 2B
+        # list: INDEL sequence
+        #     INDEL base, 1B
     """
     # reserved header field, start of BAM's effective range, inclusive
     FROM_INDEX = '_from_index'
@@ -247,15 +248,26 @@ class BdiffIO:
         """
         self._write_snv(index, ref_id, [mut_map['A'], mut_map['T'], mut_map['G'], mut_map['C']])
     
+    # def _write_indel(self, index: int, ref_id: int, alleles: list, perm_indices: list):
     def _write_indel(self, index: int, ref_id: int, seq_perm: list):
         """
-        :param index:
-        :param seq_perm:
+        :param index: genomic position
+        :param ref_id: index of reference allele within the alleles
+        # :param alleles: list of allele sequences
+        # :param perm_indices: permutation indices
         :return:
         """
         assert not self.is_read_mode
         assert index > self._last_index
-        assert 1 < len(seq_perm) < 256
+        # assert 1 < len(alleles) < 256
+        # assert len(alleles) == len(perm_indices)
+        # assert 0 <= ref_id < len(alleles)
+        
+        # record = struct.pack('<IBB', index, len(alleles), ref_id)
+        # for i in range(len(alleles)):
+        #     assert 1 <= len(alleles[i]) < 256
+        #     assert 0 <= perm_indices[i] < len(alleles)
+        #     record += struct.pack('<BB', perm_indices[i], len(alleles[i])) + cmn.seq2bytes(alleles[i])
         
         record = struct.pack('<IBB', index, len(seq_perm), ref_id)
         for alt in seq_perm:
