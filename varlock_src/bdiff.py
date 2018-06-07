@@ -198,9 +198,8 @@ class BdiffIO:
         """
         index, is_snv, ref_id, alleles = self._read_record()
         if is_snv:
-            # SNV: it is assumed that record was saved as:
-            # BASES -> permuted(BASES)
-            return index, is_snv, cmn.BASES[ref_id], dict(zip(alleles, cmn.BASES))
+            # SNV: stored alleles are the original ones
+            return index, is_snv, cmn.BASES[ref_id], dict(zip(cmn.BASES, alleles))
         else:
             # INDEL it is assumed that record was saved as:
             # sorted(alleles) -> permuted(alleles)

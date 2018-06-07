@@ -91,3 +91,6 @@ class VeryRandom:
         
         raise ValueError(
             "sum of probability distribution %d must be greater then the probability value %d" % (sum(p_dist), p_value))
+    
+    def shuffle(self, x: list):
+        self._rnd.shuffle(x, self._rnd.random)
