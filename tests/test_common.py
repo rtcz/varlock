@@ -28,8 +28,8 @@ class TestCommon(unittest.TestCase):
         self.assertEqual(3, rnd.multirand_index([1, 0, 0, 1]))
     
     def test_base_count(self):
-        self.assertListEqual([3, 2, 1, 1], cmn.base_freqs(['A', 'A', 'G', 'T', 'C', 'T', 'A']))
-        self.assertListEqual([0, 0, 2, 1], cmn.base_freqs(['G', 'C', 'G']))
+        self.assertListEqual([3, 2, 1, 1], cmn.base_counts(['A', 'A', 'G', 'T', 'C', 'T', 'A']))
+        self.assertListEqual([0, 0, 2, 1], cmn.base_counts(['G', 'C', 'G']))
     
     def test_snv_mut_map(self):
         mut_map = cmn.snv_mut_map(private_freqs=[1, 1, 1, 1], public_freqs=[1, 1, 1, 1], rnd=VeryRandom(Random(0)))

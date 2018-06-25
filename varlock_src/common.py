@@ -142,20 +142,20 @@ def freq_map(values: list):
     return result
 
 
-def base_freqs(pileup: list):
+def base_counts(pileup: list):
     """
     Count allele count in base pileup column.
     :param pileup: list of DNA bases: A, T, G, C
     :return: list of DNA base frequencies [A_freq, T_freq, G_freq, C_freq]
     """
-    freqs = [0] * 4
+    counts = [0] * 4
     for base in pileup:
         try:
-            freqs[BASES.index(base)] += 1
+            counts[BASES.index(base)] += 1
         except ValueError:
             raise ValueError("Illegal DNA base: %s" % base)
     
-    return freqs
+    return counts
 
 
 def sam2bam(sam_filename, bam_filename):
