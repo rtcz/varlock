@@ -13,7 +13,7 @@ from varlock_src.random import VeryRandom
 
 
 class Mutator:
-    HOMOZYGOTE_RATIO = 0.8
+    MIN_ALLELE_RATIO = 0.2
     
     def __init__(
             self,
@@ -325,6 +325,8 @@ class Mutator:
             # BEGIN temp code
             # self._pos_file.write('%d\n' % (variant.pos.ref_pos + 1))
             # END temp code
+            # if variant.pos.ref_pos in [3624847, 13767942, 16410558, 21328951, 23805951]:
+            #     print(variant.pos.ref_pos)
             
             if variant.is_type(po.VariantType.SNV):
                 is_mutated = self._mutate_snv_pos(bdiff_io, allele_queue, variant, rnd)
@@ -349,17 +351,24 @@ class Mutator:
         private_freqs = private_counts / private_counts.sum()
         public_freqs = public_counts / public_counts.sum()
         
-        private_ids = (-private_freqs).argsort()
-        # is_homozygote = private_freqs[private_ids[0]] > self.HOMOZYGOTE_RATIO
-        # if is_homozygote and len(pileup) >= 5:
+        # private_ids = (-private_freqs).argsort()
         
-        from_allele_a = cmn.BASES[private_ids[0]]
-        if private_freqs[private_ids[0]] >= self.HOMOZYGOTE_RATIO:
-            # from homo
-            from_allele_b = from_allele_a
+        private_alleles = []
+        for i in range(len(cmn.BASES)):
+            if private_freqs[i] >= self.MIN_ALLELE_RATIO:
+                private_alleles.append(cmn.BASES[i])
+
+        if len(private_alleles) == 1:
+            # homozygote
+            from_allele_a = from_allele_b = private_alleles[0]
+        elif len(private_alleles) == 2:
+            # heterozygote
+            from_allele_a = private_alleles[0]
+            from_allele_b = private_alleles[1]
         else:
-            # from hetero
-            from_allele_b = cmn.BASES[private_ids[1]]
+            # unable to asses
+            self._test_counter += 1
+            return False
         
         prob_matrix = np.outer(public_freqs, public_freqs)
         draw_id = rnd.multirand_index(prob_matrix.reshape(prob_matrix.size))
@@ -388,7 +397,6 @@ class Mutator:
                 mut_map = dict(zip(cmn.BASES, cmn.BASES))
                 mut_map[from_allele_a] = to_allele_a
                 mut_map[from_allele_b] = to_allele_a
-                mut_map[to_allele_a] = from_allele_a
         
         else:
             # to hetero
@@ -432,7 +440,8 @@ class Mutator:
                 
                 else:
                     # TODO can not be mapped by the current method
-                    self._test_counter += 1
+                    # self._test_counter += 1
+                    return False
             
             else:
                 hetero2hetero = True
@@ -455,79 +464,6 @@ class Mutator:
                         mut_map[from_allele_b] = to_allele_b
                         mut_map[to_allele_b] = from_allele_b
         
-        # mut_map = cmn.snv_mut_map(
-        #     private_freqs=private_freqs,
-        #     public_freqs=variant.freqs,
-        #     rnd=rnd
-        # )
-        #
-        max_id = np.argmax(private_freqs)  # type: int
-        max_private_freq = private_freqs[max_id] / sum(private_freqs)
-        # max_private_base = cmn.BASES[max_id]
-        #
-        # is_masked = max_private_base != mut_map[max_private_base]
-        # is_homozygote = max_private_freq > self.HOMOZYGOTE_RATIO
-        # # is_ref = variant.ref_allele == max_private_base
-        #
-        # is_mutated = False
-        is_homo2hetero = False
-        # rev_mut_map = {}
-        # # if is_homozygote and is_masked and len(pileup) >= 5:
-        # if is_homozygote and len(pileup) >= 5:
-        #     # nonsense branch
-        #     # source_freq = variant.freqs[cmn.BASES.index(max_private_base)] / sum(variant.freqs)
-        #     # target_freq = variant.freqs[cmn.BASES.index(mut_map[max_private_base])] / sum(variant.freqs)
-        #
-        #     freqs = np.array(variant.freqs)
-        #     hetero_prob = 1 - ((freqs / freqs.sum()) ** 2).sum()
-        #
-        #     # source_homo_freq = source_freq ** 2
-        #     # target_homo_freq = target_freq ** 2
-        #     # half_hetero_freq = (1 - (source_homo_freq + target_homo_freq)) / 2
-        #     # hetero_prob = half_hetero_freq / (target_homo_freq + half_hetero_freq)
-        #
-        #     if rnd.random() < hetero_prob:
-        #         # find private bases that are not the homozygous allele and are present in alignment column
-        #         # these bases must be mapped
-        #         left_bases = []
-        #         for i in range(len(cmn.BASES)):
-        #             if i != max_id and private_freqs[i] != 0:
-        #                 left_bases.append(cmn.BASES[i])
-        #
-        #         # find masked bases that are not heterozygous alleles
-        #         right_bases = list(cmn.BASES)
-        #         right_bases.remove(max_private_base)
-        #         right_bases.remove(mut_map[max_private_base])
-        #         rnd.shuffle(right_bases)
-        #
-        #         if len(left_bases) <= len(right_bases):
-        #             # every private base can be mapped to unique unoccupied base
-        #             alt_mut_map = {max_private_base: max_private_base}
-        #             for i in range(len(left_bases)):
-        #                 alt_mut_map[left_bases[i]] = right_bases[i]
-        #
-        #             self._test_counter += 1
-        #
-        #             for allele in allele_queue:  # type: AlleleAlignment
-        #                 if allele.is_known:
-        #                     # alignment has vac to mutate
-        #                     if rnd.random() > 0.5:
-        #                         is_mutated |= self._mutate_allele(allele, alt_mut_map)
-        #                     else:
-        #                         is_mutated |= self._mutate_allele(allele, mut_map)
-        #
-        #             # merge and reverse mut_map
-        #             rev_mut_map = {}
-        #             rev_alt_map = {value: key for key, value in alt_mut_map.items()}
-        #             for key, value in mut_map.items():
-        #                 if value in rev_alt_map:
-        #                     rev_mut_map[value] = rev_alt_map[value]
-        #                 else:
-        #                     rev_mut_map[value] = key
-        #
-        #             is_homo2hetero = True
-        #
-        
         if mut_map is not None and not homo2hetero:
             for allele in allele_queue:  # type: AlleleAlignment
                 if allele.is_known:
@@ -543,35 +479,34 @@ class Mutator:
         # TODO temp code -> rework as optional stats
         # BEGIN temp code
         # personal allele is mutated
-        ref_id = variant.alleles.index(variant.ref_allele)
-        max_public_freq = variant.freqs[max_id] / sum(variant.freqs)
         
-        # is the most abundant personal allele the reference one ?
-        is_reference = ref_id == max_id
-        
-        ref_pos = variant.pos.ref_pos + 1
+        is_masked = rev_mut_map is not None
+        ref_pos = variant.pos.ref_pos
         while self._bed_id < len(self._bed_file_lines):
             segments = self._bed_file_lines[self._bed_id].rstrip().split('\t')
             start = int(segments[1])
             end = int(segments[2])
-            if end <= ref_pos:
+            # both ref_pos and bed positions are zero based
+            if ref_pos >= end:
                 self._bed_id += 1
                 continue
             
-            if start > ref_pos:
+            if ref_pos < start:
                 break
+            
+            is_from_ref = variant.ref_allele in [from_allele_a, from_allele_b]
+            is_to_ref = variant.ref_allele in [to_allele_a, to_allele_b]
             
             # public_alt_freq = sum([variant.freqs[i] for i in range(len(variant.freqs)) if i != ref_id]) / sum(
             #     variant.freqs)
             self._freqs_file.write(
-                '%d\t%d\t%d\t%.3f\t%.3f\t%d\t%d\t%d\t%d\t%d\n' %
+                '%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n' %
                 (
                     ref_pos,
-                    is_reference,
-                    rev_mut_map is not None,
-                    max_public_freq,
-                    max_private_freq,
                     len(pileup),
+                    is_masked,
+                    is_from_ref,
+                    is_to_ref,
                     homo2homo,
                     homo2hetero,
                     hetero2homo,
@@ -581,11 +516,11 @@ class Mutator:
             break
         # END temp code
         
-        if rev_mut_map is not None:
+        if is_masked:
             # at least one alignment has been mutated
             bdiff_io.write_snv(variant.pos.index, cmn.BASES.index(variant.ref_allele), rev_mut_map)
         
-        return rev_mut_map is not None
+        return is_masked
     
     def _mutate_indel_pos(
             self,
