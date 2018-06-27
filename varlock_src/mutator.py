@@ -502,7 +502,7 @@ class Mutator:
             self._freqs_file.write(
                 '%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n' %
                 (
-                    ref_pos,
+                    ref_pos + 1,
                     len(pileup),
                     is_masked,
                     is_from_ref,
