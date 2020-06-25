@@ -140,7 +140,7 @@ def parse_encrypt_args(args):
     
     optional = parser.add_argument_group("Optional")
     optional.add_argument('-p', '--password', type=str, help='private key password')
-    mut_p_help = 'random variant probability per genome base'
+    mut_p_help = 'probability of introducing random allele per genome base'
     optional.add_argument('-t', '--mut_p', type=is_mut_p, help=mut_p_help, default=0.0)
     optional.add_argument('-s', '--seed', type=int, help='random number generator seed')
     optional.add_argument('-v', '--verbose', action='store_true', help="explain what is being done")

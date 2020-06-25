@@ -328,6 +328,9 @@ class Mutator:
             # if variant.pos.ref_pos in [3624847, 13767942, 16410558, 21328951, 23805951]:
             #     print(variant.pos.ref_pos)
             
+            # if variant.pos.ref_pos >= 4839896:
+            #     print(variant.pos.ref_pos)
+            
             if variant.is_type(po.VariantType.SNV):
                 is_mutated = self._mutate_snv_pos(bdiff_io, allele_queue, variant, rnd)
             elif variant.is_type(po.VariantType.INDEL):

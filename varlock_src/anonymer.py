@@ -1,7 +1,8 @@
-import pyfaidx
-import subprocess
 import os
 import re
+import subprocess
+
+import pyfaidx
 
 
 class Anonymer:
@@ -321,7 +322,7 @@ class Anonymer:
         example: path/file_R1.fasq -> path/file
         """
         return re.sub(self.FASTQ_SUFFIX_PATTERN, "", fastq)
-
+    
     def build_mapping_command(self, r1, r2, gen_idx, threads):
         """
         Builds command as array for Popen from subprocess
