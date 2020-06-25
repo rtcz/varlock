@@ -9,13 +9,13 @@ from Crypto.Hash import MD5
 from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5
 
-from varlock_src.aes import FileAES
-from varlock_src.bam import open_bam
-from varlock_src.bam_mutator import BamMutator
-from varlock_src.bdiff import BdiffIO
-from varlock_src.fasta_index import FastaIndex
-from varlock_src.random import VeryRandom
-from varlock_src.vac import Vac
+from src.aes import FileAES
+from src.bam import open_bam
+from src.bam_mutator import BamMutator
+from src.bdiff import BdiffIO
+from src.fasta_index import FastaIndex
+from src.random import VeryRandom
+from src.vac import Vac
 
 
 class Varlocker:

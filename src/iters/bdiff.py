@@ -1,6 +1,6 @@
-import varlock_src.bdiff as bdiff
-from varlock_src import po
-from varlock_src.fasta_index import FastaIndex
+import src.bdiff as bdiff
+from src import po
+from src.fasta_index import FastaIndex
 
 
 class BdiffIterator:

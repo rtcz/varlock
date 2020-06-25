@@ -8,7 +8,7 @@ import os
 import numpy as np
 import pysam
 
-from varlock_src.random import VeryRandom
+from src.random import VeryRandom
 
 BASES = ("A", "T", "G", "C")
 UNKNOWN_BASE = "N"

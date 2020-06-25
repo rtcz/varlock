@@ -1,10 +1,10 @@
 import numpy as np
 
-import varlock_src.po as po
-from varlock_src.common import BASES
-from varlock_src.fasta_index import FastaIndex
-from varlock_src.random import VeryRandom
-from varlock_src.vac import Vac
+import src.po as po
+from src.common import BASES
+from src.fasta_index import FastaIndex
+from src.random import VeryRandom
+from src.vac import Vac
 
 
 # TODO do not use python iterator "interface", use custom next() and close() methods

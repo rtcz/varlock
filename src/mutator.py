@@ -3,13 +3,13 @@ import hashlib
 import numpy as np
 import pysam
 
-import varlock_src.bdiff as bdiff
-import varlock_src.common as cmn
-import varlock_src.iters as iters
-import varlock_src.po as po
-from varlock_src.alignment import AlleleAlignment, pileup_alleles
-from varlock_src.fasta_index import FastaIndex
-from varlock_src.random import VeryRandom
+import src.bdiff as bdiff
+import src.common as cmn
+import src.iters as iters
+import src.po as po
+from src.alignment import AlleleAlignment, pileup_alleles
+from src.fasta_index import FastaIndex
+from src.random import VeryRandom
 
 
 class Mutator:

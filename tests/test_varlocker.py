@@ -3,9 +3,9 @@ import unittest
 import pysam
 from Crypto.PublicKey import RSA
 
-import varlock_src.common as cmn
-from varlock_src.vac import Vac
-from varlock_src.varlocker import Varlocker
+import src.common as cmn
+from src.vac import Vac
+from src.varlocker import Varlocker
 
 
 class TestVarlocker(unittest.TestCase):

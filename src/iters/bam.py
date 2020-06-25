@@ -1,7 +1,7 @@
 import pysam
 
-from varlock_src.bam import open_bam
-from varlock_src.fasta_index import FastaIndex
+from src.bam import open_bam
+from src.fasta_index import FastaIndex
 
 
 class BamIterator:

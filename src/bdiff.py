@@ -5,7 +5,7 @@ import os
 import shutil
 import struct
 
-import varlock_src.common as cmn
+import src.common as cmn
 
 
 class BdiffIO:

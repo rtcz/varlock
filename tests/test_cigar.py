@@ -1,6 +1,6 @@
 import unittest
 
-from varlock_src.cigar import Cigar, NotFoundError
+from src.cigar import Cigar, NotFoundError
 
 
 class TestCigar(unittest.TestCase):

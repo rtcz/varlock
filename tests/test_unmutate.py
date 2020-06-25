@@ -3,9 +3,9 @@ import unittest
 
 import pysam
 
-from varlock_src.bam_mutator import BamMutator
-from varlock_src.bdiff import BdiffIO
-from varlock_src.common import bam2sam
+from src.bam_mutator import BamMutator
+from src.bdiff import BdiffIO
+from src.common import bam2sam
 
 
 class TestUnmutate(unittest.TestCase):

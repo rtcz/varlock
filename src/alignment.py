@@ -5,9 +5,9 @@ from typing import Optional
 import numpy as np
 import pysam
 
-from varlock_src.cigar import Cigar, NotFoundError
-from varlock_src.common import BASES
-from varlock_src.po import Variant, VariantType
+from src.cigar import Cigar, NotFoundError
+from src.common import BASES
+from src.po import Variant, VariantType
 
 
 class AlleleAlignment:

@@ -2,8 +2,8 @@ import unittest
 
 import pysam
 
-from varlock_src.cigar import Cigar
-from varlock_src.alignment import AlleleAlignment
+from src.cigar import Cigar
+from src.alignment import AlleleAlignment
 
 
 class TestVariant(unittest.TestCase):

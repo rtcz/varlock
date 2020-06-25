@@ -3,12 +3,12 @@ import unittest
 
 import pysam
 
-import varlock_src.common as cmn
+import src.common as cmn
 from tests.random import RandomMockup
-from varlock_src.bam_mutator import BamMutator
-from varlock_src.bdiff import BdiffIO
-from varlock_src.random import VeryRandom
-from varlock_src.vac import Vac
+from src.bam_mutator import BamMutator
+from src.bdiff import BdiffIO
+from src.random import VeryRandom
+from src.vac import Vac
 
 
 class TestMutate(unittest.TestCase):

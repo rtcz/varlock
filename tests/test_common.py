@@ -4,9 +4,9 @@ from random import Random
 from bitarray import bitarray
 from bitstring import BitArray
 
-import varlock_src.common as cmn
+import src.common as cmn
 from tests.random import RandomMockup
-from varlock_src.random import VeryRandom
+from src.random import VeryRandom
 
 
 class TestCommon(unittest.TestCase):

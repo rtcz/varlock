@@ -13,7 +13,7 @@ import re
 import sys
 from datetime import datetime
 
-from varlock_src.anonymer import Anonymer
+from src.anonymer import Anonymer
 
 GENOME_FILE = "/data/genome/human/hg38/hg38.fa"
 GENOME_INDEX = "/data/genome/human/hg38/bowtie2_index/hg38"

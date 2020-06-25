@@ -285,7 +285,7 @@ class Vac:
     def vcf2vac(
             self,
             vcf_file: typing.Union[io.TextIOWrapper, io.BufferedReader],
-            vac_file: io.FileIO,
+            vac_file: typing.BinaryIO,
             ref_fasta: dict = None,
             skip_indels: bool = False
     ):
