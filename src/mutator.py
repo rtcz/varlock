@@ -14,7 +14,7 @@ from src.random import VeryRandom
 
 class Mutator:
     MIN_ALLELE_RATIO = 0.2
-    
+
     def __init__(
             self,
             fai: FastaIndex,
@@ -25,7 +25,7 @@ class Mutator:
         """
         self._fai = fai
         self._verbose = verbose
-    
+
     def __is_before_index(self, alignment, index):
         """
         Check if alignment is mapped before index.
@@ -35,7 +35,7 @@ class Mutator:
         ref_end = alignment.reference_end - 1
         alignment_end = self._fai.pos2index(alignment.reference_name, ref_end)
         return alignment_end < index
-    
+
     def __is_after_index(self, alignment, index):
         """
         Check if alignment is mapped after index.
@@ -43,7 +43,7 @@ class Mutator:
         """
         alignment_start = self._fai.pos2index(alignment.reference_name, alignment.reference_start)
         return alignment_start > index
-    
+
     def __write_alignment(self, bam_file, alignment: pysam.AlignedSegment, is_mutated: bool):
         """
         :param alignment: pysam.AlignedSegment
@@ -52,20 +52,20 @@ class Mutator:
         bam_file.write(alignment)
         self.alignment_counter += 1
         self.alignment_mut_counter += is_mutated
-        
+
         if self._verbose and self.alignment_counter % 100000 == 0:
             print("%d alignments done" % self.alignment_counter)
-    
+
     def __init_counters(self):
         self.alignment_counter = 0  # written alignments
         self.diff_counter = 0  # processed diff records
         self.mut_counter = 0  # all mutations
         self.alignment_mut_counter = 0  # mutated alignments
         self.vac_counter = 0  # read vac records (variants)
-        
+
         self.covering_counter = 0  # alignments with variant positions
         self.max_coverage = 0  # maximum alignments overlapping single SNV
-    
+
     def mutate(
             self,
             mut_bam_file: pysam.AlignmentFile,
@@ -84,22 +84,22 @@ class Mutator:
         BDIFF records are written only if bases at variant position differ after mutation.
         """
         self.__init_counters()
-        
+
         alignment_queue = []
         alignment = next(bam_iter)
         # TODO optimization: seek to first alignment covering variant to skip all preceding records
         variant = variant_iter.next_after()
-        
+
         if self._verbose:
             print('first variant: %s' % variant)
-        
-        # TODO temporary code - remove
-        self._test_counter = 0
+
+        # # TODO temporary code - remove
+        # self._test_counter = 0
         # self._pos_file = open('/home/hekel/projects/python/varlock/analysis/exome/analysis/vac_cov.pos', 'w')
-        self._freqs_file = open('/home/hekel/projects/python/varlock/analysis/exome/analysis/freqs_v5.tsv', 'w')
-        self._bed_file_lines = open('in/chr20.bed', 'rt').readlines()
-        self._bed_id = 0
-        
+        # self._freqs_file = open('/home/hekel/projects/python/varlock/analysis/exome/analysis/freqs_v5.tsv', 'w')
+        # self._bed_file_lines = open('in/chr20.bed', 'rt').readlines()
+        # self._bed_id = 0
+
         bdiff_io = bdiff.BdiffIO()
         while True:
             if variant is None or alignment is None:
@@ -109,27 +109,27 @@ class Mutator:
                         print("EOF VAC")
                     else:
                         print("EOF BAM")
-                
+
                 # last mutation
                 if variant is not None:
                     # noinspection PyTypeChecker
                     self._mutate_pos(bdiff_io, alignment_queue, variant, rnd)
-                
+
                 for allele_alignment in alignment_queue:  # type: AlleleAlignment
                     # unmapped alignments in queue are already encrypted
                     self.__write_alignment(mut_bam_file, allele_alignment.alignment, allele_alignment.is_mutated)
-                
+
                 # write remaining alignments (in EOF VAC case only)
                 while alignment is not None:
                     self.__encrypt_unmapped(alignment, secret)
                     self.__write_alignment(mut_bam_file, alignment, False)
                     alignment = next(bam_iter)
-                
+
                 if self._verbose:
                     print("total of %d alignments done" % self.alignment_counter)
-                
+
                 break
-            
+
             elif alignment.is_unmapped or self.__is_before_index(alignment, variant.pos.index):
                 self.__encrypt_unmapped(alignment, secret)
                 if len(alignment_queue) == 0:
@@ -138,14 +138,14 @@ class Mutator:
                 else:
                     # append to queue
                     alignment_queue.append(AlleleAlignment(alignment))
-                
+
                 alignment = next(bam_iter)
-            
+
             elif self.__is_after_index(alignment, variant.pos.index):
                 # apply the variant to alignment
                 # if len(alignment_queue) == 0:
                 #     self.test_counter += 1
-                
+
                 self._mutate_pos(bdiff_io, alignment_queue, variant, rnd)
                 # done with this variant, read next
                 prev_variant = variant
@@ -163,24 +163,24 @@ class Mutator:
                             variant,
                             alignment_queue[i].is_mutated
                         )
-                
+
                 elif self._verbose:
                     print('last variant: %s' % prev_variant)
-            
+
             else:  # alignment is covering variant position
                 alignment_queue.append(AlleleAlignment(alignment, variant))
                 alignment = next(bam_iter)
                 self.covering_counter += 1
-        
+
         # noinspection PyAttributeOutsideInit
         self.vac_counter = variant_iter.counter
         # noinspection PyAttributeOutsideInit
         self.diff_counter = bdiff_io.snv_count + bdiff_io.indel_count
-        
-        print('TEST: %d' % self._test_counter)
-        
+
+        # print('TEST: %d' % self._test_counter)
+
         return bdiff_io
-    
+
     def unmutate(
             self,
             bam_iter: iters.BamIterator,
@@ -197,14 +197,14 @@ class Mutator:
         :return:
         """
         self.__init_counters()
-        
+
         alignment_queue = []
         alignment = next(bam_iter)
         variant = next(bdiff_iter)  # type: po.VariantDiff
-        
+
         if self._verbose:
             print('first variant: %s' % variant)
-        
+
         while True:
             if variant is None or alignment is None:
                 # finish
@@ -213,27 +213,27 @@ class Mutator:
                         print("EOF DIFF")
                     if alignment is None:
                         print("EOF BAM")
-                
+
                 # last mutation
                 if variant is not None:
                     # noinspection PyTypeChecker
                     self.__unmutate_pos(alignment_queue, variant.mut_map)
-                
+
                 for allele_alignment in alignment_queue:  # type: AlleleAlignment
                     # unmapped alignments in queue are already encrypted
                     self.__write_alignment(out_bam_file, allele_alignment.alignment, allele_alignment.is_mutated)
-                
+
                 # write remaining alignments (in EOF DIFF case only)
                 while alignment is not None:
                     self.__encrypt_unmapped(alignment, secret)
                     self.__write_alignment(out_bam_file, alignment, False)
                     alignment = next(bam_iter)
-                
+
                 if self._verbose:
                     print("total of %d alignments done" % self.alignment_counter)
-                
+
                 break
-            
+
             elif alignment.is_unmapped or self.__is_before_index(alignment, variant.pos.index):
                 self.__encrypt_unmapped(alignment, secret)
                 if len(alignment_queue) == 0:
@@ -242,9 +242,9 @@ class Mutator:
                 else:
                     # append to queue
                     alignment_queue.append(AlleleAlignment(alignment))
-                
+
                 alignment = next(bam_iter)
-            
+
             elif self.__is_after_index(alignment, variant.pos.index):
                 self.__unmutate_pos(alignment_queue, variant.mut_map)
                 # done with this variant, read next
@@ -262,24 +262,22 @@ class Mutator:
                             variant,
                             alignment_queue[i].is_mutated
                         )
-                
+
                 elif self._verbose:
                     print('last variant: %s' % prev_variant)
-            
+
             else:  # alignment is covering variant position
                 alignment_queue.append(AlleleAlignment(alignment, variant))
                 alignment = next(bam_iter)
                 self.covering_counter += 1
-        
+
         # noinspection PyAttributeOutsideInit
         self.diff_counter = bdiff_iter.counter
-    
+
     def __unmutate_pos(self, allele_queue: list, mut_map: dict):
         for allele in allele_queue:  # type: AlleleAlignment
-            if allele.is_known:
-                # alignment has vac to mutate
-                self._mutate_allele(allele, mut_map)
-    
+            self._mutate_allele(allele, mut_map)
+
     @staticmethod
     def __encrypt_unmapped(alignment: pysam.AlignedSegment, secret: bytes):
         """
@@ -293,18 +291,18 @@ class Mutator:
         if alignment.is_unmapped:
             if secret is None:
                 raise ValueError('Secret key must be present when unmapped alignments are iterated.')
-            
+
             # use 64B long hash (encrypts 256 bases)
             sha512 = hashlib.sha512()
             sha512.update(secret + alignment.query_name.encode())
             mut_seq = cmn.stream_cipher(alignment.query_sequence, sha512.digest())
-            
+
             # change and preserve quality
             # TODO: maybe something else with the quality?
             quality = alignment.query_qualities
             alignment.query_sequence = mut_seq
             alignment.query_qualities = quality
-    
+
     def _mutate_pos(
             self,
             bdiff_io: bdiff.BdiffIO,
@@ -320,26 +318,21 @@ class Mutator:
         """
         is_mutated = False
         if any(allele.is_known for allele in allele_queue):
-            
+
             # TODO temp code
             # BEGIN temp code
             # self._pos_file.write('%d\n' % (variant.pos.ref_pos + 1))
             # END temp code
-            # if variant.pos.ref_pos in [3624847, 13767942, 16410558, 21328951, 23805951]:
-            #     print(variant.pos.ref_pos)
-            
-            # if variant.pos.ref_pos >= 4839896:
-            #     print(variant.pos.ref_pos)
-            
+
             if variant.is_type(po.VariantType.SNV):
                 is_mutated = self._mutate_snv_pos(bdiff_io, allele_queue, variant, rnd)
             elif variant.is_type(po.VariantType.INDEL):
                 is_mutated = self._mutate_indel_pos(bdiff_io, allele_queue, variant, rnd)
             else:
                 raise ValueError("unnknown variant type")
-        
+
         return is_mutated
-    
+
     def _mutate_snv_pos(
             self,
             bdiff_io: bdiff.BdiffIO,
@@ -350,12 +343,12 @@ class Mutator:
         pileup = pileup_alleles(allele_queue)
         private_counts = np.array(cmn.base_counts(pileup))
         public_counts = np.array(variant.freqs)
-        
+
         private_freqs = private_counts / private_counts.sum()
         public_freqs = public_counts / public_counts.sum()
-        
+
         # private_ids = (-private_freqs).argsort()
-        
+
         private_alleles = []
         for i in range(len(cmn.BASES)):
             if private_freqs[i] >= self.MIN_ALLELE_RATIO:
@@ -370,161 +363,166 @@ class Mutator:
             from_allele_b = private_alleles[1]
         else:
             # unable to asses
-            self._test_counter += 1
+            # self._test_counter += 1
             return False
-        
+
         prob_matrix = np.outer(public_freqs, public_freqs)
         draw_id = rnd.multirand_index(prob_matrix.reshape(prob_matrix.size))
         to_allele_a = cmn.BASES[int(draw_id / 4)]  # row_id
         to_allele_b = cmn.BASES[draw_id % 4]  # col_id
-        
+
         homo2homo = False
         homo2hetero = False
         hetero2homo = False
         hetero2hetero = False
-        
+
         mut_map = None
         rev_mut_map = None
         if to_allele_a == to_allele_b:
             # to homo
             if from_allele_a == from_allele_b:
+                # from homo
                 homo2homo = True
-                is_synonymous = from_allele_a == to_allele_a
-                if not is_synonymous:
+                if from_allele_a != to_allele_a:
+                    # homo to other homo
                     mut_map = dict(zip(cmn.BASES, cmn.BASES))
                     mut_map[from_allele_a] = to_allele_a
                     mut_map[to_allele_a] = from_allele_a
+                else:
+                    # homo to same homo
+                    pass
             else:
-                # TODO only temporary solution - not reversible
+                # TODO not reversible yet
                 hetero2homo = True
                 mut_map = dict(zip(cmn.BASES, cmn.BASES))
                 mut_map[from_allele_a] = to_allele_a
                 mut_map[from_allele_b] = to_allele_a
-        
+
         else:
             # to hetero
             if from_allele_a == from_allele_b:
+                # from homo
                 homo2hetero = True
-                
+
                 mut_map_a = {from_allele_a: to_allele_a}
                 mut_map_b = {from_allele_a: to_allele_b}
-                
+
                 # find remaining bases that must be mapped
                 from_bases = []
                 for i in range(len(cmn.BASES)):
                     if cmn.BASES[i] != from_allele_a and private_freqs[i] != 0:
                         from_bases.append(cmn.BASES[i])
-                
+
                 # find remaining mappings
                 to_bases = list(cmn.BASES)
                 to_bases.remove(to_allele_a)
                 to_bases.remove(to_allele_b)
-                
+
                 if len(from_bases) <= len(to_bases):
-                    
+                    # all bases can be mapped
                     for i in range(len(from_bases)):
                         mut_map_a[from_bases[i]] = to_bases[i]
                         mut_map_b[from_bases[i]] = to_bases[i]
-                    
-                    for allele in allele_queue:  # type: AlleleAlignment
-                        if allele.is_known:
-                            # alignment has vac to mutate
-                            if rnd.random() > 0.5:
-                                self._mutate_allele(allele, mut_map_a)
-                            else:
-                                self._mutate_allele(allele, mut_map_b)
-                    
+
+                    for aligned_allele in allele_queue:  # type: AlleleAlignment
+                        # select random allele from the hetero pair
+                        if rnd.random() > 0.5:
+                            self._mutate_allele(aligned_allele, mut_map_a)
+                        else:
+                            self._mutate_allele(aligned_allele, mut_map_b)
+
                     rev_mut_map = dict(zip(cmn.BASES, cmn.BASES))
+                    rev_mut_map[to_allele_a] = from_allele_a
+                    rev_mut_map[to_allele_b] = from_allele_a
+
                     for base in cmn.BASES:
                         if base in mut_map_a:
                             rev_mut_map[mut_map_a[base]] = base
                         elif base in mut_map_b:
                             rev_mut_map[mut_map_b[base]] = base
-                
+
                 else:
                     # TODO can not be mapped by the current method
                     # self._test_counter += 1
                     return False
-            
+
             else:
                 hetero2hetero = True
                 is_synonymous = from_allele_a == to_allele_a and from_allele_b == to_allele_b or \
                                 from_allele_a == to_allele_b and from_allele_b == to_allele_a
-                
+
                 if not is_synonymous:
                     mut_map = dict(zip(cmn.BASES, cmn.BASES))
-                    # least changes alternative
+                    # select the least changes alternative
                     if from_allele_a == to_allele_b or from_allele_b == to_allele_a:
-                        mut_map[from_allele_b] = to_allele_a
-                        mut_map[to_allele_a] = from_allele_b
-                        
                         mut_map[from_allele_a] = to_allele_b
+                        mut_map[from_allele_b] = to_allele_a
+
+                        mut_map[to_allele_a] = from_allele_b
                         mut_map[to_allele_b] = from_allele_a
                     else:
                         mut_map[from_allele_a] = to_allele_a
-                        mut_map[to_allele_a] = from_allele_a
-                        
                         mut_map[from_allele_b] = to_allele_b
+
+                        mut_map[to_allele_a] = from_allele_a
                         mut_map[to_allele_b] = from_allele_b
-        
+
         if mut_map is not None and not homo2hetero:
-            for allele in allele_queue:  # type: AlleleAlignment
-                if allele.is_known:
-                    # alignment has vac to mutate
-                    self._mutate_allele(allele, mut_map)
-            
+            for aligned_allele in allele_queue:  # type: AlleleAlignment
+                self._mutate_allele(aligned_allele, mut_map)
+
             if hetero2homo:
                 # temp solution, use dummy dict
                 rev_mut_map = dict(zip(cmn.BASES, cmn.BASES))
             else:
                 rev_mut_map = {value: key for key, value in mut_map.items()}
-        
-        # TODO temp code -> rework as optional stats
-        # BEGIN temp code
-        # personal allele is mutated
-        
+
         is_masked = rev_mut_map is not None
-        ref_pos = variant.pos.ref_pos
-        while self._bed_id < len(self._bed_file_lines):
-            segments = self._bed_file_lines[self._bed_id].rstrip().split('\t')
-            start = int(segments[1])
-            end = int(segments[2])
-            # both ref_pos and bed positions are zero based
-            if ref_pos >= end:
-                self._bed_id += 1
-                continue
-            
-            if ref_pos < start:
-                break
-            
-            is_from_ref = variant.ref_allele in [from_allele_a, from_allele_b]
-            is_to_ref = variant.ref_allele in [to_allele_a, to_allele_b]
-            
-            # public_alt_freq = sum([variant.freqs[i] for i in range(len(variant.freqs)) if i != ref_id]) / sum(
-            #     variant.freqs)
-            self._freqs_file.write(
-                '%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n' %
-                (
-                    ref_pos + 1,
-                    len(pileup),
-                    is_masked,
-                    is_from_ref,
-                    is_to_ref,
-                    homo2homo,
-                    homo2hetero,
-                    hetero2homo,
-                    hetero2hetero,
-                )
-            )
-            break
-        # END temp code
-        
+
+        # # TODO temp code -> rework as optional stats
+        # # BEGIN temp code
+        # # personal allele is mutated
+        # ref_pos = variant.pos.ref_pos
+        # while self._bed_id < len(self._bed_file_lines):
+        #     segments = self._bed_file_lines[self._bed_id].rstrip().split('\t')
+        #     start = int(segments[1])
+        #     end = int(segments[2])
+        #     # both ref_pos and bed positions are zero based
+        #     if ref_pos >= end:
+        #         self._bed_id += 1
+        #         continue
+        #
+        #     if ref_pos < start:
+        #         break
+        #
+        #     is_from_ref = variant.ref_allele in [from_allele_a, from_allele_b]
+        #     is_to_ref = variant.ref_allele in [to_allele_a, to_allele_b]
+        #
+        #     # public_alt_freq = sum([variant.freqs[i] for i in range(len(variant.freqs)) if i != ref_id]) / sum(
+        #     #     variant.freqs)
+        #     self._freqs_file.write(
+        #         '%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n' %
+        #         (
+        #             ref_pos + 1,
+        #             len(pileup),
+        #             is_masked,
+        #             is_from_ref,
+        #             is_to_ref,
+        #             homo2homo,
+        #             homo2hetero,
+        #             hetero2homo,
+        #             hetero2hetero,
+        #         )
+        #     )
+        #     break
+        # # END temp code
+
         if is_masked:
             # at least one alignment has been mutated
             bdiff_io.write_snv(variant.pos.index, cmn.BASES.index(variant.ref_allele), rev_mut_map)
-        
+
         return is_masked
-    
+
     def _mutate_indel_pos(
             self,
             bdiff_io: bdiff.BdiffIO,
@@ -534,16 +532,16 @@ class Mutator:
     ) -> bool:
         # TODO
         return False
-        
+
         pileup = pileup_alleles(allele_queue)
         alt_freq_map = cmn.freq_map(pileup)
-        
+
         mut_map = cmn.indel_mut_map(
             private_freq_map=alt_freq_map,
             public_freq_map=dict(zip(variant.alleles, variant.freqs)),
             rnd=rnd
         )
-        
+
         # # BEGIN temp code
         # personal_allele = sorted(alt_freq_map.keys(), key=lambda key: alt_freq_map[key], reverse=True)[0]
         # # personal allele is mutated
@@ -559,18 +557,16 @@ class Mutator:
         # )
         # self._freqs_file.write(record)
         # # END temp code
-        
+
         is_mutated = False
         for allele in allele_queue:  # type: AlleleAlignment
-            if allele.is_known:
-                # alignment has vac to mutate
-                is_mutated |= self._mutate_allele(allele, mut_map)
-        
+            is_mutated |= self._mutate_allele(allele, mut_map)
+
         if is_mutated:
             bdiff_io.write_indel(variant.pos.index, variant.ref_allele, mut_map)
-        
+
         return is_mutated
-    
+
     def _mutate_allele(self, alignment: AlleleAlignment, mut_map: dict) -> bool:
         """
         Mutate alignment by mutation map at SNV position.
@@ -579,16 +575,22 @@ class Mutator:
         :return: True if variant mutation is non-synonymous
         """
         is_mutated = False
-        
-        mut_seq = mut_map[alignment.allele]
-        if alignment.allele != mut_seq:
-            # non-synonymous mutation
-            self.mut_counter += 1
-            is_mutated = True
-            alignment.allele = mut_seq
-        
+
+        if alignment.allele is not None:
+            # alignment with allele (defined by VAC)
+            # mapping must exist
+            assert alignment.allele in mut_map
+            mut_allele = mut_map[alignment.allele]
+            if alignment.allele != mut_allele:
+                # non-synonymous mutation
+                # print(mut_seq)
+
+                self.mut_counter += 1
+                is_mutated = True
+                alignment.allele = mut_allele
+
         return is_mutated
-    
+
     def __write_before_index(self, out_bam_file, variant_queue, index):
         """
         Write snv alignments while their end reference position is before index.
@@ -605,7 +607,7 @@ class Mutator:
                 # break to keep alignments in order
                 # otherwise shorter alignment could be written before longer alignment
                 break
-            
+
             self.__write_alignment(out_bam_file, variant.alignment, variant.is_mutated)
             # remove written alignment
             variant_queue.remove(variant)

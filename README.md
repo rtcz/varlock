@@ -1,4 +1,4 @@
-# Personal genome anonymization
+# Varlock: the tool for pseudonymization of sequenced genome
 
 ## Introduction
 Human genome is a linear sequence of more than 3 billion DNA nucleotides, called bases. In technical terms, it is a word over an alphabet {A, T, G, C}, representing 4 nucleotide types: adenine, thymine, guanine, and cytosine. Any two human individuals share over 99.9% of all genome, but the remaining difference is sufficient to ensure uniqueness of each person's genome.

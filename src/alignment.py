@@ -149,7 +149,8 @@ class AlleleAlignment:
         assert len(allele) > 0
         if allele not in self._variant.alleles:
             ValueError('allele %s is not in available list %s' % (allele, self._variant.alleles))
-        
+
+        # TODO remove ?
         if not self.is_known:
             return
         

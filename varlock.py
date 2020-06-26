@@ -12,8 +12,8 @@ def main():
     # print start time
     start_time = datetime.now()
     print(
-        'VarLock = "Variant Locker" genomic sequenced reads pseudonymization tool'
-        '\nVarLock starting: {start: %Y-%m-%d %H:%M:%S}'.format(start=start_time)
+        'Varlock: the tool for pseudonymization of sequenced genome'
+        '\nVarlock starting: {start: %Y-%m-%d %H:%M:%S}'.format(start=start_time)
     )
 
     try:
@@ -110,7 +110,7 @@ def main():
 
     # print the time of the end:
     end_time = datetime.now()
-    print('VarLock stoppping: {finish:%Y-%m-%d %H:%M:%S}'.format(finish=end_time))
+    print('Varlock stoppping: {finish:%Y-%m-%d %H:%M:%S}'.format(finish=end_time))
     print('Total time of run: {duration}'.format(duration=end_time - start_time))
 
 
@@ -199,7 +199,7 @@ def parse_vac_args(args):
     parser = argparse.ArgumentParser(prog='varlock vac')
 
     required = parser.add_argument_group("Required")
-    required.add_argument('-b', '--bam', type=is_file, help='BAM file', required=True)
+    required.add_argument('-b', '--bam', type=is_file, help='BAM file with header providing sequence index', required=True)
     required.add_argument('-f', '--vcf', type=is_file, help='VCF file', required=True)
     required.add_argument('-c', '--vac', type=str, help='output VAC file', required=True)
 
