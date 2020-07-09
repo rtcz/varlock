@@ -42,7 +42,7 @@ class Varlocker:
         :param ref_fasta_filename: filename to reference FASTA file
         :param skip_indels: whether to skip indels and keep only SNPs
         """
-        # TODO use fasta index instead of BAM header
+        # TODO use fasta index / vcf header instead of BAM header
 
         # load the reference FASTA
         ref_fasta = None
@@ -52,12 +52,12 @@ class Varlocker:
             ref_fasta = pyfaidx.Fasta(ref_fasta_filename)
 
         # is VCF gzipped?
-        is_gzipped = vcf_filename.endswith('.gz')
+        # is_gzipped = vcf_filename.endswith(('.gz', '.bgz'))
 
         # open all files and create the VAC file
         if self._verbose:
-            print('--- Processing VCF %s (gzipped: %s) ---' % (vcf_filename, is_gzipped))
-        with io.BufferedReader(gzip.open(vcf_filename)) if is_gzipped else open(vcf_filename, 'rt') as vcf_file, \
+            print('--- Processing VCF %s ---' % vcf_filename)
+        with pysam.VariantFile(vcf_filename) as vcf_file, \
                 open_bam(bam_filename, 'rb') as sam_file, \
                 open(out_vac_filename, 'wb') as out_vac_file:
             vac = Vac(FastaIndex(sam_file.header), self._verbose)

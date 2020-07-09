@@ -1,10 +1,11 @@
-import io
 import struct
 import typing
 
 import pyfaidx
 
-from .common import *
+from src.common import *
+from src.fasta_index import FastaIndex
+from src.po import FastaSequence
 
 
 # TODO refactor like file object interface
@@ -23,10 +24,10 @@ class Vac:
     VAC SNV record:
     index 4B, 0-based absolute genomic position
     reference index 1B, index of reference allele in the A,T,G,C list
-    A allele count 2B
-    T allele count 2B
-    C allele count 2B
-    G allele count 2B
+    A allele count 4B
+    T allele count 4B
+    C allele count 4B
+    G allele count 4B
     
     VAC INDEL record:
     index 4B, 0-based absolute genomic position
@@ -34,7 +35,7 @@ class Vac:
     list:, of tuples in format (allele_count, allele_sequence)
         reference allele is the first tuple, alternative alleles are ordered as in VCF
         
-        INDEL allele count 2B
+        INDEL allele count 4B
         INDEL base length 2B, length of INDEL sequence
         list:
             INDEL base sequence, 1B
@@ -64,13 +65,13 @@ class Vac:
     Max value of 2 bytes
     """
 
-    SNV_FORMAT = "<IBHHHH"  # int, byte, short, short, short, short
-    SNV_RECORD_SIZE = 13  # bytes
+    SNV_FORMAT = "<IBIIII"  # int, byte, int, int, int, int
+    SNV_RECORD_SIZE = 21  # bytes
 
     SNV_TEMP_EXT = '.snv.temp'
     INDEL_TEMP_EXT = '.indel.temp'
 
-    def __init__(self, fai, verbose=False):
+    def __init__(self, fai: FastaIndex, verbose=False):
         """
         :param fai: FastaIndex
         :param verbose:
@@ -121,7 +122,7 @@ class Vac:
             # find allele count item
             if item[:3] == 'AC=':
                 # AC=value1,value2
-                return list(map(int, item[3:].split(cls.VCF_LIST_SEP)))
+                return tuple(map(int, item[3:].split(cls.VCF_LIST_SEP)))
 
         raise ValueError("VCF record is missing INFO AC attribute")
 
@@ -140,29 +141,14 @@ class Vac:
 
         raise ValueError("VCF record is missing INFO AN attribute")
 
-    def compact_base_counts(self, count_list: list):
-        """
-        Compact base counts so each of them is lower than MAX_BASE_COUNT
-        :param count_list:
-        :return: compacted ac_list
-        """
-        max_count = max(count_list)
-        if max_count > self.MAX_SHORT_INT:
-            ratio = self.MAX_SHORT_INT / float(max_count)
-            new_count_list = np.round(np.array(count_list) * ratio).astype(int).tolist()
-            if self.verbose:
-                print("compacting base counts from %s to %s" % (count_list, new_count_list))
-            return new_count_list
-        else:
-            return count_list
-
-    def snv_count_map(self, allele_list: list, count_list: list):
+    @staticmethod
+    def snv_count_map(allele_list: tuple, count_list: tuple) -> dict:
         """
         :return: SNV count map
         """
         assert len(allele_list) == len(count_list)
 
-        count_map = dict(zip(allele_list, self.compact_base_counts(count_list)))
+        count_map = dict(zip(allele_list, count_list))
 
         for base in BASES:
             if base not in count_map:
@@ -171,13 +157,12 @@ class Vac:
 
         return count_map
 
-    def _indel_count_map(self, allele_list: list, count_list: list):
+    @staticmethod
+    def _indel_count_map(allele_list: tuple, count_list: tuple) -> tuple:
         """
         :return: INDEL count map as list of tuples
         """
-        compacted_counts = self.compact_base_counts(count_list)
-        assert len(allele_list) == len(compacted_counts)
-        return list(zip(compacted_counts, allele_list))
+        return tuple(zip(count_list, allele_list))
 
     @classmethod
     def read_header(cls, vac_file):
@@ -230,7 +215,7 @@ class Vac:
         freqs = [0] * length
         seqs = [''] * length
         for i in range(length):
-            freq, base_length = struct.unpack('<HH', indel_file.read(cls.SHORT_SIZE * 2))
+            freq, base_length = struct.unpack('<IH', indel_file.read(cls.INT_SIZE + cls.SHORT_SIZE))
             seq_byte_size = math.ceil(base_length / 4)
             seq = bytes2seq(indel_file.read(seq_byte_size), base_length)
             freqs[i] = freq
@@ -241,7 +226,7 @@ class Vac:
 
     # TODO parameters: index, counts, seqs
     @classmethod
-    def _write_indel_record(cls, indel_file, index: int, indel_map: list):
+    def _write_indel_record(cls, indel_file, index: int, indel_map: tuple):
         """
         :param indel_file:
         :param index: genomic index
@@ -253,13 +238,10 @@ class Vac:
         record = struct.pack('<IB', index, len(indel_map))
         for allele_count, sequence in indel_map:
 
-            if allele_count > cls.MAX_SHORT_INT:
-                raise IndelError('INDEL occurence count %d too large (> %d)' % (allele_count, cls.MAX_SHORT_INT))
-
             if len(sequence) > cls.MAX_SHORT_INT:
                 raise IndelError('length of INDEL sequence %d too large (> %d)' % (len(sequence), cls.MAX_SHORT_INT))
 
-            record += struct.pack('<HH', allele_count, len(sequence))
+            record += struct.pack('<IH', allele_count, len(sequence))
             record += seq2bytes(sequence)
 
         indel_file.write(record)
@@ -284,7 +266,7 @@ class Vac:
 
     def vcf2vac(
             self,
-            vcf_file: typing.Union[io.TextIOWrapper, io.BufferedReader],
+            vcf_file: pysam.VariantFile,
             vac_file: typing.BinaryIO,
             ref_fasta: dict = None,
             skip_indels: bool = False
@@ -314,107 +296,125 @@ class Vac:
         with open(snv_filename, 'wb') as snv_file, \
                 open(indel_filename, 'wb') as indel_file:
 
-            for line in vcf_file:
-                line = line.decode() if isinstance(line, bytes) else line
+            for sequence in self.fai:  # type: FastaSequence
+                for variant in vcf_file.fetch(sequence.name):  # type: pysam.VariantRecord
 
-                if line[0] == "#":
-                    # skip header line
-                    continue
+                    if self.verbose and variant_cnt % 100000 == 0:
+                        print(f'{variant_cnt} variants processed; current variant {variant.chrom}:{variant.pos}')
 
-                if self.verbose and variant_cnt % 10000 == 0:
-                    print("variant %d" % variant_cnt)
-                variant_cnt += 1
+                    variant_cnt += 1
 
-                # split until last used column only
-                data = line.split(self.VCF_COL_SEP, maxsplit=8)
-                allele_list = [data[self.VCF_REF_ID]] + data[self.VCF_ALT_ID].split(self.VCF_LIST_SEP)
-                is_snv = self.is_snv(allele_list)
-                is_indel = self.is_indel(allele_list)
-
-                # check consistency of alleles
-                # skip INDEL if first base of an alternative allele differs:
-                if is_indel:
-                    incorrect = False
-                    for allele in allele_list[1:]:
-                        if allele_list[0][:1] != allele[:1]:
-                            incorrect = True
-                            break
-
-                    if incorrect:
-                        # print(allele_list)
-                        incorrect_count += 1
+                    if len(variant.alleles) < 2:
+                        if self.verbose:
+                            print(f'WARNING: incomplete variant at {variant.chrom}:{variant.pos}')
                         continue
 
-                # TODO consider unknown bases
-                # TODO refactor this stupid shit
+                    is_snv = self.is_snv(variant.alleles)
+                    is_indel = self.is_indel(variant.alleles)
 
-                if is_snv or is_indel:
-                    chrom = data[self.VCF_CHROM_ID]
-                    pos = int(data[self.VCF_POS_ID]) - 1  # vcf has 1-based index, convert it to 0-based index
-                    index = self.fai.pos2index(chrom, pos)
+                    if not is_snv and not is_indel:
+                        if self.verbose:
+                            print(f'WARNING: unknown variant type at {variant.chrom}:{variant.pos} '
+                                  f'with alleles: {variant.alleles}')
+                        continue
+
+                    if is_indel:
+                        # check consistency of alleles
+                        if skip_indels:
+                            continue
+
+                        incorrect = False
+                        for alt_allele in variant.alts:
+                            if variant.ref[0] != alt_allele[0]:
+                                incorrect = True
+                                break
+
+                        if incorrect:
+                            # skip INDEL if first base of an alternative allele differs
+                            if self.verbose:
+                                print(f'WARNING: first base mismatch at {variant.chrom}:{variant.pos} '
+                                      f'for alleles {variant.alleles}')
+                            incorrect_count += 1
+                            continue
+
+                    # TODO consider unknown bases
+                    # TODO refactor this stupid shit
+                    index = self.fai.pos2index(variant.chrom, variant.start)
 
                     # check if the reference is correct (and switch if not)
                     if ref_fasta is not None:
-                        reference = ref_fasta[chrom]
-                        ref_allele_id = self.find_reference_allele(reference, allele_list, pos)
+                        reference = ref_fasta[variant.chrom]
+                        ref_allele_id = self.find_reference_allele(reference, variant.alleles, variant.start)
                         if ref_allele_id is None:
                             not_found_in_ref += 1
-                            # if is_indel:
-                            # print("Warning: could not find reference allele (reference ...%s...)." % reference[pos-1:pos+2], allele_list, "SKIPPING.", line)
-                            continue
+                            if self.verbose:
+                                print(f'WARNING: reference allele not found at {variant.chrom}:{variant.pos} '
+                                      f'in available alleles {variant.alleles}')
                         elif ref_allele_id != 0:
                             # swap them if it is not first
-                            # print("Warning: swapping reference allele %s to %s" % (allele_list[0], allele_list[ref_allele_id]))
-                            ref_allele = allele_list[ref_allele_id]
-                            first_allele = allele_list[0]
-                            allele_list[0] = ref_allele
-                            allele_list[ref_allele_id] = first_allele
-
-                            # if ref_allele_id is not None and is_indel:
-                            #    print("reference allele (reference ...%s...)." % reference[pos - 5:pos + 10], allele_list,  line)
+                            if self.verbose:
+                                print(f'WARNING: reference allele mismatch at {variant.chrom}:{variant.pos} '
+                                      f'for allele {variant.alleles[ref_allele_id]}')
 
                     # skip same position variants:
                     if last_index == index:
-                        # TODO merge them
-                        # if self.verbose:
-                        #   print("WARNING: skipping record (equal positions %d with previous record)" % index)
+                        # TODO merge them ?
+                        if self.verbose:
+                            print(f'WARNING: skipping duplicated position at {variant.chrom}:{variant.pos}')
                         same_pos_records += 1
                         continue
 
-                    count_list = self.parse_allele_counts(data[self.VCF_INFO_ID])
+                    # TODO check if AN and AC exist
+
+                    if isinstance(variant.info['AN'], tuple):
+                        assert len(variant.info['AN']) == 1
+                        allele_number = variant.info['AN'][0]
+                    else:
+                        allele_number = variant.info['AN']
+
+                    try:
+                        count_list = self.allele_counts(variant.info['AC'], allele_number)
+                    except NegativeRefCountError:
+                        print(f'WARNING: skipping negative reference allele count at {variant.chrom}:{variant.pos}')
+                        continue
+
+                    if count_list[0] == 0:
+                        if self.verbose:
+                            print(f'WARNING: zero reference allele count at {variant.chrom}:{variant.pos} '
+                                  f'for alleles {variant.alleles} with counts {count_list}')
+
                     if is_snv:
                         # allele count map
-                        count_map = self.snv_count_map(allele_list, count_list)
+                        count_map = self.snv_count_map(variant.alleles, count_list)
                         count_tuple = (count_map['A'], count_map['T'], count_map['G'], count_map['C'])
                         self._write_snv_record(
                             snv_file=snv_file,
                             index=index,
-                            ref_id=BASES.index(data[self.VCF_REF_ID]),
+                            ref_id=BASES.index(variant.ref),
                             ac_tuple=count_tuple
                         )
                         last_index = index
                         snv_count += 1
 
-                    else:  # is indel
-                        if not skip_indels:
-                            indel_map = self._indel_count_map(allele_list, count_list)
-                            try:
-                                self._write_indel_record(
-                                    indel_file=indel_file,
-                                    index=index,
-                                    indel_map=indel_map
-                                )
-                                last_index = index
-                                indel_count += 1
-                            except IndelError as e:
-                                print('skipping INDEL %s:%d cause: %s' % (chrom, pos, e))
+                    elif is_indel:
+                        indel_map = self._indel_count_map(variant.alleles, count_list)
+                        try:
+                            self._write_indel_record(
+                                indel_file=indel_file,
+                                index=index,
+                                indel_map=indel_map
+                            )
+                            last_index = index
+                            indel_count += 1
+                        except IndelError as e:
+                            print(f'ERROR: INDEL {variant.chrom}:{variant.pos} cause: {e}')
 
         self.write_header(vac_file, snv_count, indel_count)
 
         if self.verbose:
-            print("total variants %d" % variant_cnt)
-            print("total SNVs %d" % snv_count)
-            print("total INDELs %d" % indel_count)
+            print("variants read %d" % variant_cnt)
+            print("SNVs written %d" % snv_count)
+            print("INDELs written %d" % indel_count)
             print("total same_pos_records %d" % same_pos_records)
             print("total not found in reference %d" % not_found_in_ref)
             print("total incorrect starting point %d" % incorrect_count)
@@ -440,7 +440,8 @@ class Vac:
         os.remove(snv_filename)
         os.remove(indel_filename)
 
-    def parse_allele_counts(self, info_value: str):
+    # deprecta
+    def parse_allele_counts(self, info_value: str) -> tuple:
         """
         :param info_value: VCF INFO value
         :return: list of allele counts
@@ -451,10 +452,18 @@ class Vac:
         info_ac = self.parse_ac(info_list)
         # total allele number
         info_an = self.parse_an(info_list)
-        # sanity check
+
+        return self.allele_counts(info_ac, info_an)
+
+    @staticmethod
+    def allele_counts(info_ac: tuple, info_an: int) -> tuple:
         ref_count = info_an - sum(info_ac)
-        assert ref_count >= 0
-        return [ref_count] + info_ac
+
+        # sanity check
+        if ref_count < 0:
+            raise NegativeRefCountError()
+
+        return (ref_count,) + info_ac
 
     @classmethod
     def text2vac(cls, text_filepath, vac_filepath):
@@ -542,4 +551,8 @@ class Vac:
 
 
 class IndelError(ValueError):
+    pass
+
+
+class NegativeRefCountError(ValueError):
     pass

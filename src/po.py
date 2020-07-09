@@ -107,13 +107,13 @@ class VariantOccurrence(Variant):
         return self._freqs
 
 
-class FaiRecord:
+class FastaSequence:
     def __init__(self, index: int, name: str, start: int, length: int):
         """
         :param index: reference id
         :param name: reference name
         :param start: 0-based first position
-        :param length: reference length - number of bases
+        :param length: number of bases
         """
         self.id = index
         self.name = name

@@ -1,4 +1,5 @@
 import hashlib
+import typing
 
 import numpy as np
 import pysam
@@ -156,8 +157,13 @@ class Mutator:
                 if variant is not None:
                     # write alignments to mutated BAM
                     self.__write_before_index(mut_bam_file, alignment_queue, variant.pos.index)
-                    # update alignment queue
+                    # update alignment queue with new variant
                     for i in range(len(alignment_queue)):
+                        # if alignment.reference_name != variant.pos.ref_name:
+                        #     print(f'alignment {alignment.reference_name}:{alignment.reference_start} '
+                        #           f'has foreign variant {variant}')
+                        #     print(f'prev variant {prev_variant}')
+
                         alignment_queue[i] = AlleleAlignment(
                             alignment_queue[i].alignment,
                             variant,
@@ -591,7 +597,7 @@ class Mutator:
 
         return is_mutated
 
-    def __write_before_index(self, out_bam_file, variant_queue, index):
+    def __write_before_index(self, out_bam_file, alignment_queue: typing.List[AlleleAlignment], index):
         """
         Write snv alignments while their end reference position is before index.
         :param out_bam_file:
@@ -600,7 +606,7 @@ class Mutator:
         :return:
         """
         # TODO optimize, search for index, then cut the array
-        tmp_queue = variant_queue[:]
+        tmp_queue = alignment_queue[:]
         for variant in tmp_queue:  # type: AlleleAlignment
             is_mapped = not variant.alignment.is_unmapped
             if is_mapped and not self.__is_before_index(variant.alignment, index):
@@ -610,4 +616,4 @@ class Mutator:
 
             self.__write_alignment(out_bam_file, variant.alignment, variant.is_mutated)
             # remove written alignment
-            variant_queue.remove(variant)
+            alignment_queue.remove(variant)

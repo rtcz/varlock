@@ -1,6 +1,6 @@
 ### chr20_1m.vcf.gz
 
-[ALL.chr2.integrated_phase1_v3.20101123.snps_indels_svs.genotypes.vcf.gz.tbi](ftp://ftp.1000genomes.ebi.ac.uk//vol1/ftp/phase1/analysis_results/integrated_call_sets/ALL.chr2.integrated_phase1_v3.20101123.snps_indels_svs.genotypes.vcf.gz.tbi)
+[ALL.chr20.integrated_phase1_v3.20101123.snps_indels_svs.genotypes.vcf.gz.tbi](ftp://ftp.1000genomes.ebi.ac.uk//vol1/ftp/phase1/analysis_results/integrated_call_sets/ALL.chr2.integrated_phase1_v3.20101123.snps_indels_svs.genotypes.vcf.gz.tbi)
 1000genomes
 
 chr20:1m-2m subset

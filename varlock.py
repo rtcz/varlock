@@ -17,10 +17,11 @@ def main():
     )
 
     try:
+        # TODO refactor
         command, args = parse_command()
         parse_args_function = {
-            'mask': parse_encrypt_args,
-            'unmask': parse_decrypt_args,
+            'mask': parse_mask_args,
+            'unmask': parse_unmask_args,
             'reencrypt': parse_reencrypt_args,
             'vac': parse_vac_args
         }
@@ -30,7 +31,7 @@ def main():
             raise InvalidCommandError("unknown command %s (use: %s)" % (command, ' '.join(parse_args_function.keys())))
         locker = Varlocker(verbose=parsed_args.verbose)
 
-        if command == 'encrypt':
+        if command == 'mask':
             with open(parsed_args.key, 'r') as key_file, \
                     open(parsed_args.pub_key, 'r') as pub_key_file:
                 rsa_key = RSA.importKey(key_file.read(), passphrase=parsed_args.password)
@@ -46,7 +47,7 @@ def main():
                     seed=parsed_args.seed
                 )
 
-        elif command == 'decrypt':
+        elif command == 'unmask':
             with open(parsed_args.key, 'r') as key_file:
                 rsa_key = RSA.importKey(key_file.read(), passphrase=parsed_args.password)
 
@@ -132,7 +133,7 @@ def print_usage():
     print('\t\tvac\t\tconvert VCF to VAC')
 
 
-def parse_encrypt_args(args):
+def parse_mask_args(args):
     parser = argparse.ArgumentParser(prog='varlock mask')
 
     required = parser.add_argument_group("Required")
@@ -141,7 +142,7 @@ def parse_encrypt_args(args):
     required.add_argument('-b', '--bam', type=is_file, help='BAM file', required=True)
     required.add_argument('-c', '--vac', type=is_file, help='VAC file', required=True)
     required.add_argument('-m', '--out_bam', type=str, help='output masked BAM file', required=True)
-    required.add_argument('-d', '--out_diff', type=str, help='output encrypted DIFF file', required=True)
+    required.add_argument('-d', '--out_diff', type=str, help='output encrypted BDIFF file', required=True)
 
     optional = parser.add_argument_group("Optional")
     optional.add_argument('-p', '--password', type=str, help='private key password')
@@ -152,13 +153,13 @@ def parse_encrypt_args(args):
     return parser.parse_args(args)
 
 
-def parse_decrypt_args(args):
+def parse_unmask_args(args):
     parser = argparse.ArgumentParser(prog='varlock unmask')
 
     required = parser.add_argument_group("Required")
     required.add_argument('-k', '--key', type=is_file, help='private key for decryption', required=True)
     required.add_argument('-m', '--bam', type=is_file, help='masked BAM file', required=True)
-    required.add_argument('-d', '--diff', type=is_file, help='encrypted DIFF file', required=True)
+    required.add_argument('-d', '--diff', type=is_file, help='encrypted BDIFF file', required=True)
     required.add_argument('-b', '--out_bam', type=str, help='output restored BAM file', required=True)
 
     optional = parser.add_argument_group("Optional")
@@ -179,8 +180,8 @@ def parse_reencrypt_args(args):
     required.add_argument('-k', '--key', type=is_file, help='private key for decryption', required=True)
     required.add_argument('-e', '--pub_key', type=is_file, help='public key for encryption', required=True)
     required.add_argument('-b', '--bam', type=is_file, help='masked BAM file', required=True)
-    required.add_argument('-c', '--diff', type=is_file, help='encrypted DIFF input', required=True)
-    required.add_argument('-o', '--out_diff', type=str, help='encrypted DIFF output', required=True)
+    required.add_argument('-c', '--diff', type=is_file, help='encrypted BDIFF input', required=True)
+    required.add_argument('-o', '--out_diff', type=str, help='encrypted BDIFF output', required=True)
 
     optional = parser.add_argument_group("Optional")
     optional.add_argument('-p', '--password', type=str, help='private key password')
@@ -199,7 +200,8 @@ def parse_vac_args(args):
     parser = argparse.ArgumentParser(prog='varlock vac')
 
     required = parser.add_argument_group("Required")
-    required.add_argument('-b', '--bam', type=is_file, help='BAM file with header providing sequence index', required=True)
+    required.add_argument('-b', '--bam', type=is_file, help='BAM file with header providing sequence index',
+                          required=True)
     required.add_argument('-f', '--vcf', type=is_file, help='VCF file', required=True)
     required.add_argument('-c', '--vac', type=str, help='output VAC file', required=True)
 

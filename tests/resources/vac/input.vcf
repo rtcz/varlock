@@ -2,7 +2,10 @@
 ##fileDate=20171909
 ##INFO=<ID=AC,Number=A,Type=Integer,Description="Allele count in genotypes, for each ALT allele">
 ##INFO=<ID=AN,Number=A,Type=Integer,Description="Total number of alleles in called genotypes">
+##contig=<ID=chr1,length=10000,assembly=TEST>
+##contig=<ID=chr2,length=10000,assembly=TEST>
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+chr1	1111	.	C	T	47	.	AC=20;AN=100
 chr2	1011	.	G	A	29	.	AC=10;AN=100
 chr2	1021	.	T	A	3	.	AC=5;AN=100
 chr2	1031	.	A	G,T	67	.	AC=10,5;AN=100
