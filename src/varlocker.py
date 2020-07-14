@@ -1,4 +1,3 @@
-import gzip
 import io
 import struct
 
