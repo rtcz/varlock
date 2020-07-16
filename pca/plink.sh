@@ -11,4 +11,5 @@ plink --bcf "${pca_dir}/merged_samples_snp.bcf" \
       --make-bed \
       --out "${pca_dir}/plink/merged_samples_snp";
 
-# TODO add missing genotype
+plink --bfile "${pca_dir}/plink/merged_samples_snp" --pca 3 'header' 'tabs' 'var-wts' \
+  --out "${pca_dir}/merged_samples_snp"

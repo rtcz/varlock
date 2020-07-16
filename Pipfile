@@ -11,6 +11,9 @@ pyfaidx = "*"
 pysam = "*"
 numpy = "*"
 deprecated = "*"
+matplotlib = "*"
+pandas = "*"
+seaborn = "*"
 
 [requires]
 python_version = "3.6"

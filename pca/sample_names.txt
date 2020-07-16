@@ -23,11 +23,8 @@ one_bilsky-f
 one_Denis
 one_FRNO1
 one_FRNO2
-one_ivemarkA
-one_ivemaryD
 one_Jancsi
 one_Jaro
-one_Jaseckova-IDP
 one_klacan-f
 one_LUCIA
 one_MamaBednarikova
