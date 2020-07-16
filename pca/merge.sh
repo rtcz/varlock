@@ -27,11 +27,14 @@ do
 
   mv "${pca_dir}/tmp/${sample}_masked.bcf.tmp" "${pca_dir}/tmp/${sample}_masked.bcf"
 
+  # reindex modified file
+  bcftools index -f "${pca_dir}/tmp/${sample}_masked.bcf"
+
 done < "$(dirname "$0")/sample_names.txt"
 
 # 2; merge samples into single vcf
 # shellcheck disable=SC2010
-bcftools merge --filter-logic '+' --merge 'none' --output-type 'b' \
+bcftools merge --filter-logic '+' --merge 'none' --output-type 'b' --missing-to-ref \
   --output "${pca_dir}/merged_samples.bcf" \
   --file-list <(ls ${pca_dir}/tmp/*.bcf | grep -v 'csi$')
 bcftools index -f "${pca_dir}/merged_samples.bcf"
