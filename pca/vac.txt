@@ -1,0 +1,63 @@
+wget https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.vcf.bgz gnomad3.vcf.gz
+
+bcftools view gnomad3.vcf.gz --apply-filters PASS --output-file gnomad3_pass.vcf.gz --output-type z
+
+tabix -p vcf gnomad3_pass.vcf.gz
+
+bcftools sort gnomad3_pass.vcf.gz --max-mem 16.0G --output-type z --output-file gnomad3_pass_sorted.vcf.gz --temp-dir tmp
+
+tabix -p vcf gnomad3_pass_sorted.vcf.gz
+
+bcftools view -v snps gnomad3_pass_sorted.vcf.gz | bcftools norm --check-ref ws --fasta-ref /data/genome/human/grch38_decoy_alt/grch38_decoy_alt.fa --multiallelics +snps --output gnomad3_pass_sorted_multisnp.vcf.gz --output-type z --threads 8
+
+tabix -p vcf gnomad3_pass_sorted_multisnp.vcf.gz
+
+bcftools view gnomad3_pass_sorted_multisnp.vcf.gz --regions-file /data/genome/human/grch38_decoy_alt/annotation/one/regions.bed --output-type z --output-file gnomad3_pass_sorted_multisnp_onepanel.vcf.gz
+
+bcftools view -H --regions 'chr1:1041950' gnomad3_pass_sorted_multisnp_onepanel.vcf.gz
+
+	bcftools sort gnomad3_pass_sorted_multisnp_onepanel.vcf.gz --max-mem 16.0G --output-type z --output-file gnomad3_pass_sorted_multisnp_onepanel_sorted.vcf.gz --temp-dir tmp
+
+	tabix -p vcf gnomad3_pass_sorted_multisnp_onepanel_sorted.vcf.gz
+
+python scripts/varlock/varlock.py vac --bam mapping/grch38_decoy_alt/deduplicated/one_1020b.bam --vcf vac/gnomad3_pass_sorted_multisnp_onepanel.vcf.gz --vac vac/gnomad3_pass_sorted_multisnp_onepanel.vac --verbose
+
+variants read 1910414
+SNVs written 1910414
+INDELs written 0
+total same_pos_records 0
+total not found in reference 0
+total incorrect starting point 0
+merging temporary files
+Varlock stoppping: 2020-07-12 14:03:23
+Total time of run: 0:02:14.025992
+
+python scripts/varlock/varlock.py mask --key mask/id_rsa --pub_key mask/id_rsa.pub --bam mapping/grch38_decoy_alt/deduplicated/one_ZinaBednarikova.bam --vac vac/gnomad3_pass_sorted_multisnp_onepanel.vac --out_bam mask/one_ZinaBednarikova.masked.bam --out_diff mask/one_ZinaBednarikova.bdiff --seed 0 --verbose
+
+total of 19385233 alignments done
+stats: {'alignment_count': 19385233, 'covering_count': 361113, 'vac_count': 2736907, 'mut_count': 19168, 'diff_count': 2574, 'alignment_mut_count': 17701}
+--- Signing DIFF ---
+--- Encrypting DIFF ---
+Varlock stoppping: 2020-07-06 10:24:23
+Total time of run: 0:13:29.473008
+
+python scripts/varlock/varlock.py mask --key mask/id_rsa --pub_key mask/id_rsa --bam /data/projects/exome/mapping/grch38_decoy_alt/deduplicated/one_526-15.bam --vac vac/gnomad3_pass_sorted_multisnp_onepanel.vac --out_bam mapping/grch38_decoy_alt/deduplicated/one_526-15.bam --out_diff mask/one_526-15.bam.bdiff --seed 0 --verbose
+
+48800000 alignments done
+total of 48860678 alignments done
+stats: {'alignment_count': 48860678, 'covering_count': 28672256, 'vac_count': 1910414, 'mut_count': 1178410, 'diff_count': 8574, 'alignment_mut_count': 1099261}
+--- Signing DIFF ---
+--- Encrypting DIFF ---
+Varlock stoppping: 2020-07-13 10:14:41
+Total time of run: 14:22:51.501837
+
+ZINA below
+
+python scripts/varlock/varlock.py mask --key mask/id_rsa --pub_key mask/id_rsa --bam /data/projects/exome/mapping/grch38_decoy_alt/deduplicated/one_ZinaBednarikova.bam --vac vac/gnomad3_pass_sorted_multisnp_onepanel.vac --out_bam mapping/grch38_decoy_alt/deduplicated/one_ZinaBednarikova.bam --out_diff mask/one_ZinaBednarikova.bam.bdiff --seed 0 --verbose
+
+total of 19385233 alignments done
+stats: {'alignment_count': 19385233, 'covering_count': 12815377, 'vac_count': 1910414, 'mut_count': 496532, 'diff_count': 8470, 'alignment_mut_count': 464611}
+--- Signing DIFF ---
+--- Encrypting DIFF ---
+Varlock stoppping: 2020-07-13 04:24:20
+Total time of run: 8:32:30.098589

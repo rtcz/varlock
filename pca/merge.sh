@@ -1,8 +1,10 @@
 exome_dir='/data/projects/exome'
 varlock_dir='/data/projects/varlock'
 exome_vcf_dir="${exome_dir}/variant/grch38_decoy_alt-one/original"
-varlock_vcf_dir="${varlock_dir}/variant/grch38_decoy_alt-one/original"
-pca_dir="${varlock_dir}/pca"
+varlock_vcf_dir="${varlock_dir}/variant/grch38_decoy_alt-one/original_masked_gnomad3nfe_onepanel"
+pca_dir="${varlock_dir}/pca/gnomad3nfe_onepanel"
+
+mkdir -p "${pca_dir}/tmp"
 
 # 1; prepare samples for merge
 while read -r sample;

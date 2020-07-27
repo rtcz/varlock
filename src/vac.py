@@ -269,7 +269,9 @@ class Vac:
             vcf_file: pysam.VariantFile,
             vac_file: typing.BinaryIO,
             ref_fasta: dict = None,
-            skip_indels: bool = False
+            skip_indels: bool = False,
+            ac_tag: str = 'AC',
+            an_tag: str = 'AN'
     ):
         # TODO enable gzipped VCF file as input
         """
@@ -297,6 +299,10 @@ class Vac:
                 open(indel_filename, 'wb') as indel_file:
 
             for sequence in self.fai:  # type: FastaSequence
+                if sequence.name not in vcf_file.header.contigs:
+                    # TODO warning
+                    continue
+
                 for variant in vcf_file.fetch(sequence.name):  # type: pysam.VariantRecord
 
                     if self.verbose and variant_cnt % 100000 == 0:
@@ -366,14 +372,30 @@ class Vac:
 
                     # TODO check if AN and AC exist
 
-                    if isinstance(variant.info['AN'], tuple):
-                        assert len(variant.info['AN']) == 1
-                        allele_number = variant.info['AN'][0]
+                    # an_tag = 'AN_nfe'  # 'DP'
+                    # ac_tag = 'AC_nfe'  # 'VD'
+
+                    total_count = variant.info[an_tag]
+                    alt_counts = variant.info[ac_tag]
+
+                    if isinstance(total_count, tuple):
+                        assert len(total_count) == 1
+                        total_count = total_count[0]
+
+                    assert isinstance(total_count, int)
+
+                    if isinstance(variant.info[ac_tag], int):
+                        alt_counts = (variant.info[ac_tag],)
                     else:
-                        allele_number = variant.info['AN']
+                        assert isinstance(alt_counts, tuple)
+
+                    if sum(alt_counts) == 0:
+                        # nothing to do here
+                        # print(f'WARNING: skipping zero alternative allele count at {variant.chrom}:{variant.pos}')
+                        continue
 
                     try:
-                        count_list = self.allele_counts(variant.info['AC'], allele_number)
+                        count_list = self.allele_counts(alt_counts, total_count)
                     except NegativeRefCountError:
                         print(f'WARNING: skipping negative reference allele count at {variant.chrom}:{variant.pos}')
                         continue
