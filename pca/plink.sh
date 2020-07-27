@@ -1,5 +1,7 @@
 varlock_dir='/data/projects/varlock'
-pca_dir="${varlock_dir}/pca"
+pca_dir="${varlock_dir}/pca/horsa2_onepanel"
+
+mkdir -p "${pca_dir}/plink"
 
 # https://www.biostars.org/p/335605/
 plink --bcf "${pca_dir}/merged_samples_snp.bcf" \
@@ -11,5 +13,6 @@ plink --bcf "${pca_dir}/merged_samples_snp.bcf" \
       --make-bed \
       --out "${pca_dir}/plink/merged_samples_snp";
 
-plink --bfile "${pca_dir}/plink/merged_samples_snp" --pca 3 'header' 'tabs' 'var-wts' \
+# 8000 is tool's upper limit (maximum number of PCs is equal to lesser from number of samples or features)
+plink --bfile "${pca_dir}/plink/merged_samples_snp" --pca 8000 "header" "tabs" "var-wts" \
   --out "${pca_dir}/merged_samples_snp"
