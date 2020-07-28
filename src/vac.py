@@ -544,7 +544,7 @@ class Vac:
     @classmethod
     def vac2text(cls, vac_filepath, text_filepath):
         """
-        Binary genomic indices are 0-based. After conversion to text format they change to 1-based.
+        Indices are always 0-based.
         :param vac_filepath:
         :param text_filepath:
         :return:
@@ -558,12 +558,12 @@ class Vac:
             for i in range(snv_count):
                 index, ref_id, count_list = cls.read_snv_record(vac_file)
                 ac_string = ','.join(map(str, count_list))
-                text_file.write('%d\t%d\t%s\n' % (index + 1, ref_id, ac_string))
+                text_file.write('%d\t%d\t%s\n' % (index, ref_id, ac_string))
 
             for i in range(indel_count):
                 index, counts, seqs = cls.read_indel_record(vac_file)
 
-                text_file.write('%d\t' % (index + 1))
+                text_file.write('%d\t' % index)
                 indels = []
                 for count, seq in zip(counts, seqs):
                     indels.append('%d:%s' % (count, seq))
