@@ -19,10 +19,10 @@ out_filename = 'resources/chr20_10m.vac'
 # TODO test two variants of temporary files merging
 
 with pysam.AlignmentFile(bam_filename, 'rb') as sam_file, \
-        gzip.open(vcf_filename, 'rt') as vcf_file, \
+        pysam.VariantFile(vcf_filename) as vcf_file, \
         open(out_filename, 'wb') as out_vac_file:
     
-    vac = Vac(FastaIndex(sam_file.header), verbose=True)
+    vac = Vac(FastaIndex.from_bam(sam_file), verbose=True)
     vac.vcf2vac(vcf_file, out_vac_file)
 
 # python3 -m cProfile -s tottime examples.vac

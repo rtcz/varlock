@@ -59,7 +59,7 @@ class Varlocker:
         with pysam.VariantFile(vcf_filename) as vcf_file, \
                 open_bam(bam_filename, 'rb') as sam_file, \
                 open(out_vac_filename, 'wb') as out_vac_file:
-            vac = Vac(FastaIndex(sam_file.header), self._verbose)
+            vac = Vac(FastaIndex.from_bam(sam_file), self._verbose)
             vac.vcf2vac(vcf_file, out_vac_file, ref_fasta, skip_indels)
 
     def encrypt(

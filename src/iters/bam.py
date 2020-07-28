@@ -55,7 +55,7 @@ class MappedBamIterator(BamIterator):
         if not self._bam_file.has_index():
             raise IndexError('BAM has no index')
         
-        self._fai = FastaIndex(self._bam_file.header)
+        self._fai = FastaIndex.from_bam(self._bam_file)
         # empty iterator
         self._iterator = iter(())
         
@@ -217,7 +217,7 @@ class RangedBamIterator(BamIterator):
         if not self._bam_file.has_index():
             raise IndexError('BAM has no index')
         
-        self._fai = FastaIndex(self._bam_file.header)
+        self._fai = FastaIndex.from_bam(self._bam_file)
         self._start_ref_name, self._start_ref_pos = self._fai.resolve_start_pos(start_index)
         self._end_ref_name, self._end_ref_pos = self._fai.resolve_end_pos(end_index)
         

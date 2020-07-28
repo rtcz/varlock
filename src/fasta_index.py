@@ -1,33 +1,18 @@
+import typing
+
+import pysam
+
 from src.po import FastaSequence
 
 
 class FastaIndex:
 
-    # TODO factory methods: from_bam / from_fai / from_vcf
-
-    def __init__(self, bam_header: dict):
+    def __init__(self, sequences: typing.List[FastaSequence]):
         """
-        :param bam_header: bam header parsed by pysam
+        :param sequences: bam header parsed by pysam
         """
-        indices = []
-        start = 0
-        counter = 0
-
-        for record in bam_header['SQ']:
-            # ref_name = record['SN'] if keep_chr else strip_chr(record['SN'])
-            ref_name = record['SN']
-            indices.append(FastaSequence(index=counter, name=ref_name, start=start, length=record['LN']))
-            start += record['LN']
-            counter += 1
-
-        if len(indices) == 0:
-            raise ValueError("Empty BAM sequence header")
-
-        self._indices = indices
+        self._indices = sequences
         self._dict = dict((reference.name, reference) for reference in self._indices)
-
-    # def __getitem__(self, index: int):
-    #     return self._indices[index]
 
     def __iter__(self):
         for item in self._indices:
@@ -36,11 +21,51 @@ class FastaIndex:
     def __len__(self):
         return len(self._indices)
 
-    # def __next__(self) -> Optional[FaiRecord]:
-    #     try:
-    #         return next(self._indices)
-    #     except StopIteration:
-    #         return None
+    @staticmethod
+    def from_bam(bam_file: pysam.AlignmentFile):
+        sequences = []
+        start = 0
+        counter = 0
+
+        for record in bam_file.header['SQ']:
+            # ref_name = record['SN'] if keep_chr else strip_chr(record['SN'])
+            ref_name = record['SN']
+            sequences.append(FastaSequence(index=counter, name=ref_name, start=start, length=record['LN']))
+            start += record['LN']
+            counter += 1
+
+        if len(sequences) == 0:
+            raise ValueError("Empty BAM sequence header")
+
+        return FastaIndex(sequences)
+
+    @staticmethod
+    def from_fai(fai_file: typing.IO[str]):
+        # TODO
+        raise NotImplementedError
+
+    @staticmethod
+    def from_vcf(vcf_file: pysam.VariantFile) -> 'FastaIndex':
+        sequences = []
+        start = 0
+        counter = 0
+
+        for record in vcf_file.header.records:  # type: pysam.libcbcf.VariantHeaderRecord
+            if record.type == 'CONTIG':
+                if len(record.values()) < 2:
+                    raise ValueError('Contig must specify both ID and length')
+
+                contig = dict(zip(record.keys(), record.values()))
+                assert 'ID' in contig
+                assert 'length' in contig
+                length = int(contig['length'])
+
+                ref_name = str(contig['ID'])
+                sequences.append(FastaSequence(index=counter, name=ref_name, start=start, length=length))
+                start += length
+                counter += 1
+
+        return FastaIndex(sequences)
 
     def resolve_start_index(self, start_ref_name, start_ref_pos):
         if start_ref_name is None and start_ref_pos is not None:
@@ -103,7 +128,7 @@ class FastaIndex:
 
     def index2pos(self, index) -> (str, int):
         """
-        Convert absolute position (index) on genome to reference position.
+        Convert absolute position (index) on a genome to reference position.
         :param index: 0-based position on genome
         :return: reference position as tuple (<reference name>, <0-based position>)
         """
@@ -118,7 +143,7 @@ class FastaIndex:
 
     def pos2index(self, ref_name, ref_pos) -> int:
         """
-        Convert reference position to absolute position (index) on genome.
+        Convert reference position to absolute position (index) on a genome.
         :param ref_name: reference name
         :param ref_pos: 0-based reference position
         :return: 0-based position on genome

@@ -50,8 +50,7 @@ class BamMutator:
         
         with bam.open_bam(self._bam_filename, 'rb') as bam_file:
             self._bam_header = bam_file.header
-        
-        self._fai = FastaIndex(self._bam_header)
+            self._fai = FastaIndex(bam_file)
         
         self._checksum = None
     
