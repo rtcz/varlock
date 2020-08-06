@@ -68,9 +68,7 @@ class Analyser:
         self._index = FastaIndex.from_vcf(pysam.VariantFile(personal_vcf))
 
         self._personal_df = vcf2df(personal_vcf)
-        self._personal_df = self._personal_df[
-            (self._personal_df['FILTER'] == 'PASS') & (self._personal_df['QUAL'] > 20)
-        ]
+        self._personal_df = self._personal_df[self._personal_df['FILTER'] == 'PASS']
         self._personal_df.index = self._personal_df.apply(
             lambda row: self._index.pos2index(row['CHROM'], row['POS'] - 1), axis=1
         )
@@ -80,11 +78,10 @@ class Analyser:
         self._personal_df['alt_freq'] = self._personal_df.apply(
             lambda row: altfreq(row['FORMAT'], row[self._personal_df.columns.get_loc("FORMAT") + 1]), axis=1
         )
+        self._personal_df = self._personal_df[(self._personal_df['depth'] > 30) & (self._personal_df['QUAL'] > 30)]
 
         self._masked_df = vcf2df(masked_vcf)
-        self._masked_df = self._masked_df[
-            (self._masked_df['FILTER'] == 'PASS') & (self._masked_df['QUAL'] > 20)
-            ]
+        self._masked_df = self._masked_df[self._masked_df['FILTER'] == 'PASS']
         self._masked_df.index = self._masked_df.apply(
             lambda row: self._index.pos2index(row['CHROM'], row['POS'] - 1), axis=1
         )
@@ -94,13 +91,11 @@ class Analyser:
         self._masked_df['alt_freq'] = self._masked_df.apply(
             lambda row: altfreq(row['FORMAT'], row[self._masked_df.columns.get_loc("FORMAT") + 1]), axis=1
         )
+        self._masked_df = self._masked_df[(self._masked_df['depth'] > 30) & (self._masked_df['QUAL'] > 30)]
 
         self._population_df = vac2df(vac)
         self._population_df['alt_freq'] = self._population_df.apply(
             lambda row: countstr2altfreq(row['counts'], int(row['ref_id'])), axis=1)
-
-        # print(self._public_df)
-        # exit(0)
 
         self._personal_ids = set(self._personal_df.index)
         self._masked_ids = set(self._masked_df.index)
@@ -231,7 +226,7 @@ class Analyser:
         step_size = 0.1
 
         plt.figure()
-        plt.title('Population Allele Frequency by Category')
+        plt.title('Allele Frequency by Category')
 
         result = plt.hist(
             [
@@ -245,7 +240,7 @@ class Analyser:
         )
         # plt.yscale('log')
         plt.legend()
-        plt.xlabel('allele frequency')
+        plt.xlabel('population allele frequency')
         plt.ylabel('occurrence')
         plt.xticks(np.arange(0, 1.0 + step_size, step_size))
         plt.savefig(os.path.join(self._out_dir, 'categorized_af.png'), bbox_inches='tight', dpi=300)
@@ -262,8 +257,9 @@ class Analyser:
         bar2 = plt.bar(result[1][:-1] + (step_size / 2), masked_y / (not_masked_y + masked_y), width=width,
                        bottom=not_masked_y / (not_masked_y + masked_y))
         plt.legend((bar1, bar2), ['not masked', 'masked'])
-        plt.xlabel('frequency')
+        plt.xlabel('population allele frequency')
         plt.ylabel('ratio')
+        plt.ylim((0, 1))
         plt.savefig(os.path.join(self._out_dir, 'masked_notmasked.png'), bbox_inches='tight', dpi=300)
 
         plt.figure()
@@ -273,8 +269,9 @@ class Analyser:
         bar2 = plt.bar(result[1][:-1] + (step_size / 2), introduced_y / (not_masked_y + introduced_y), width=width,
                        bottom=not_masked_y / (not_masked_y + introduced_y))
         plt.legend((bar1, bar2), ['not masked', 'introduced'])
-        plt.xlabel('frequency')
+        plt.xlabel('population allele frequency')
         plt.ylabel('ratio')
+        plt.ylim((0, 1))
         plt.savefig(os.path.join(self._out_dir, 'notmasked_introduced.png'), bbox_inches='tight', dpi=300)
 
         plt.figure()
@@ -284,64 +281,64 @@ class Analyser:
         bar2 = plt.bar(result[1][:-1] + (step_size / 2), introduced_y / (masked_y + introduced_y), width=width,
                        bottom=masked_y / (masked_y + introduced_y))
         plt.legend((bar1, bar2), ['masked', 'introduced'])
-        plt.xlabel('frequency')
+        plt.xlabel('population allele frequency')
         plt.ylabel('ratio')
+        plt.ylim((0, 1))
         plt.savefig(os.path.join(self._out_dir, 'masked_introduced.png'), bbox_inches='tight', dpi=300)
 
-    @DeprecationWarning
-    def analyse_not_masked(self):
+    def not_masked(self):
         # remove duplicates
-        not_masked_priv_df = self._personal_df[self._personal_df[3].isin(self._not_masked_set)] \
-            .drop_duplicates(subset=3, keep=False)
+        not_masked_personal_df = self._personal_df[self._personal_df.index.isin(self._not_masked_set)]
 
-        not_masked_mut_df = self._masked_df[self._masked_df[3].isin(self._not_masked_set)] \
-            .drop_duplicates(subset=3, keep=False)
+        not_masked_masked_df = self._masked_df[self._masked_df.index.isin(self._not_masked_set)]
 
         # inner join on position column
-        joined_df = not_masked_priv_df.merge(not_masked_mut_df, on=3, how='inner')
+        joined_df = not_masked_personal_df.join(
+            not_masked_masked_df,
+            how='inner',
+            lsuffix='_personal',
+            rsuffix='_masked'
+        )
 
-        altered_df = joined_df[
-            (joined_df['14_x'] != joined_df['14_y'])  # AF
-            | (joined_df['5_x'] != joined_df['5_y'])  # REF
-            | (joined_df['6_x'] != joined_df['6_y'])  # ALT
-            ]  # type: pd.DataFrame
+        print(f'not_masked total len: {len(joined_df)}')
+        joined_df = joined_df[joined_df['ALT_personal'] == joined_df['ALT_masked']]
+        print(f'not_masked same alt len: {len(joined_df)}')
 
-        altered_set = set(altered_df[3].values)
-        not_altered_set = set(joined_df[3].values).difference(altered_set)
+        # altered: 13 (0.29%) from 4416
+
+        altered_df = joined_df[joined_df['alt_freq_personal'] != joined_df['alt_freq_masked']]  # type: pd.DataFrame
+        not_altered_df = joined_df[joined_df['alt_freq_personal'] == joined_df['alt_freq_masked']]  # type: pd.DataFrame
+
+        altered_set = set(altered_df.index)
+        not_altered_set = set(joined_df.index).difference(altered_set)
 
         # all except one of altered differ only in AF
         masked_percentage = len(altered_set) / len(joined_df) * 100
 
         print('altered: %d (%.2f%%) from %d' % (len(altered_set), masked_percentage, len(joined_df)))
+        # altered: 1463 (33.23%) from 4403
 
         # print(altered_df.iloc[3].values)
-        test_df = self._varlock_df[
-            self._varlock_df['pos'].isin(altered_set)
-            # & (self._varlock_df['hetero2homo'] == 1)
-        ]
-        print(test_df)
+        # test_df = self._varlock_df[
+        #     self._varlock_df['pos'].isin(altered_set)
+        #     # & (self._varlock_df['hetero2homo'] == 1)
+        # ]
+        # print(test_df)
         # print(self._not_masked_set.difference(set(test_df['pos'].values)))
         # print(altered_set.difference(set(test_df['pos'].values)))
         # exit(0)
 
         step_size = 0.1
 
-        altered_df = self._population_df[
-            (self._population_df[0].isin(altered_set)) &
-            (self._population_df[1] <= 1.0)
-            ]
-
-        not_altered_df = self._population_df[
-            (self._population_df[0].isin(not_altered_set)) &
-            (self._population_df[1] <= 1.0)
-            ]
+        altered_population_df = self._population_df[self._population_df.index.isin(altered_set)]
+        not_altered_population_df = self._population_df[self._population_df.index.isin(not_altered_set)]
 
         plt.figure()
         plt.title('not masked position')
         result = plt.hist(
             [
-                altered_df[1].values,
-                not_altered_df[1].values,
+                altered_population_df['alt_freq'].values,
+                not_altered_population_df['alt_freq'].values,
             ],
             bins=np.arange(0, 1.0 + step_size, step_size),
             label=['masked allele', 'not masked allele'],
@@ -349,10 +346,10 @@ class Analyser:
         )
         # plt.yscale('log')
         plt.legend()
-        plt.xlabel('allele frequency')
+        plt.xlabel('population allele frequency')
         plt.ylabel('occurrence')
         plt.xticks(np.arange(0, 1.0 + step_size, step_size))
-        plt.savefig(self.OUT_DIR + 'not_masked.png', bbox_inches='tight')
+        plt.savefig(os.path.join(self._out_dir, 'not_masked_a.png'), bbox_inches='tight', dpi=300)
 
         altered_y = result[0][0]
         not_altered_y = result[0][1]
@@ -364,9 +361,10 @@ class Analyser:
         bar2 = plt.bar(result[1][:-1] + (step_size / 2), not_altered_y / (altered_y + not_altered_y), width=width,
                        bottom=altered_y / (altered_y + not_altered_y))
         plt.legend((bar1, bar2), ['altered', 'not altered'])
-        plt.xlabel('frequency')
+        plt.xlabel('population allele frequency')
         plt.ylabel('ratio')
-        plt.savefig(self.OUT_DIR + 'not_masked_1.png', bbox_inches='tight')
+        plt.ylim((0, 1))
+        plt.savefig(os.path.join(self._out_dir, 'not_masked_b.png'), bbox_inches='tight', dpi=300)
 
     @DeprecationWarning
     def analyse_rare(self):
@@ -468,3 +466,4 @@ if __name__ == '__main__':
     analyser.sets()
     analyser.vcfs()
     analyser.pop()
+    analyser.not_masked()
