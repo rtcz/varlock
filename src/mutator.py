@@ -355,18 +355,18 @@ class Mutator:
 
         # private_ids = (-private_freqs).argsort()
 
-        private_alleles = []
+        personal_alleles = []
         for i in range(len(cmn.BASES)):
             if private_freqs[i] >= self.MIN_ALLELE_RATIO:
-                private_alleles.append(cmn.BASES[i])
+                personal_alleles.append(cmn.BASES[i])
 
-        if len(private_alleles) == 1:
+        if len(personal_alleles) == 1:
             # homozygote
-            from_allele_a = from_allele_b = private_alleles[0]
-        elif len(private_alleles) == 2:
+            from_allele_a = from_allele_b = personal_alleles[0]
+        elif len(personal_alleles) == 2:
             # heterozygote
-            from_allele_a = private_alleles[0]
-            from_allele_b = private_alleles[1]
+            from_allele_a = personal_alleles[0]
+            from_allele_b = personal_alleles[1]
         else:
             # unable to asses
             # self._test_counter += 1
@@ -382,6 +382,7 @@ class Mutator:
         hetero2homo = False
         hetero2hetero = False
 
+        is_masked = False
         mut_map = None
         rev_mut_map = None
         if to_allele_a == to_allele_b:
@@ -433,9 +434,9 @@ class Mutator:
                     for aligned_allele in allele_queue:  # type: AlleleAlignment
                         # select random allele from the hetero pair
                         if rnd.random() > 0.5:
-                            self._mutate_allele(aligned_allele, mut_map_a)
+                            is_masked |= self._mutate_allele(aligned_allele, mut_map_a)
                         else:
-                            self._mutate_allele(aligned_allele, mut_map_b)
+                            is_masked |= self._mutate_allele(aligned_allele, mut_map_b)
 
                     rev_mut_map = dict(zip(cmn.BASES, cmn.BASES))
                     rev_mut_map[to_allele_a] = from_allele_a
@@ -475,53 +476,13 @@ class Mutator:
 
         if mut_map is not None and not homo2hetero:
             for aligned_allele in allele_queue:  # type: AlleleAlignment
-                self._mutate_allele(aligned_allele, mut_map)
+                is_masked |= self._mutate_allele(aligned_allele, mut_map)
 
             if hetero2homo:
                 # temp solution, use dummy dict
                 rev_mut_map = dict(zip(cmn.BASES, cmn.BASES))
             else:
                 rev_mut_map = {value: key for key, value in mut_map.items()}
-
-        is_masked = rev_mut_map is not None
-
-        # # TODO temp code -> rework as optional stats
-        # # BEGIN temp code
-        # # personal allele is mutated
-        # ref_pos = variant.pos.ref_pos
-        # while self._bed_id < len(self._bed_file_lines):
-        #     segments = self._bed_file_lines[self._bed_id].rstrip().split('\t')
-        #     start = int(segments[1])
-        #     end = int(segments[2])
-        #     # both ref_pos and bed positions are zero based
-        #     if ref_pos >= end:
-        #         self._bed_id += 1
-        #         continue
-        #
-        #     if ref_pos < start:
-        #         break
-        #
-        #     is_from_ref = variant.ref_allele in [from_allele_a, from_allele_b]
-        #     is_to_ref = variant.ref_allele in [to_allele_a, to_allele_b]
-        #
-        #     # public_alt_freq = sum([variant.freqs[i] for i in range(len(variant.freqs)) if i != ref_id]) / sum(
-        #     #     variant.freqs)
-        #     self._freqs_file.write(
-        #         '%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n' %
-        #         (
-        #             ref_pos + 1,
-        #             len(pileup),
-        #             is_masked,
-        #             is_from_ref,
-        #             is_to_ref,
-        #             homo2homo,
-        #             homo2hetero,
-        #             hetero2homo,
-        #             hetero2hetero,
-        #         )
-        #     )
-        #     break
-        # # END temp code
 
         if is_masked:
             # at least one alignment has been mutated
@@ -536,8 +497,8 @@ class Mutator:
             variant: po.VariantOccurrence,
             rnd: VeryRandom
     ) -> bool:
-        # TODO
-        return False
+        # # TODO
+        # return False
 
         pileup = pileup_alleles(allele_queue)
         alt_freq_map = cmn.freq_map(pileup)
@@ -564,14 +525,14 @@ class Mutator:
         # self._freqs_file.write(record)
         # # END temp code
 
-        is_mutated = False
+        is_masked = False
         for allele in allele_queue:  # type: AlleleAlignment
-            is_mutated |= self._mutate_allele(allele, mut_map)
+            is_masked |= self._mutate_allele(allele, mut_map)
 
-        if is_mutated:
+        if is_masked:
             bdiff_io.write_indel(variant.pos.index, variant.ref_allele, mut_map)
 
-        return is_mutated
+        return is_masked
 
     def _mutate_allele(self, alignment: AlleleAlignment, mut_map: dict) -> bool:
         """
@@ -587,11 +548,16 @@ class Mutator:
             # mapping must exist
             assert alignment.allele in mut_map
             mut_allele = mut_map[alignment.allele]
+
             if alignment.allele != mut_allele:
                 # non-synonymous mutation
                 # print(mut_seq)
 
                 self.mut_counter += 1
+                #
+                # print(self.mut_counter)
+                # print(alignment.variant.pos.index)
+
                 is_mutated = True
                 alignment.allele = mut_allele
 

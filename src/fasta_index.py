@@ -12,6 +12,7 @@ class FastaIndex:
         :param sequences: bam header parsed by pysam
         """
         self._indices = sequences
+
         self._dict = dict((reference.name, reference) for reference in self._indices)
 
     def __iter__(self):

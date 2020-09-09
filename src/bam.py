@@ -1,3 +1,4 @@
+import pysam
 from pysam.libcalignmentfile import VALID_HEADER_TYPES, KNOWN_HEADER_FIELDS, AlignmentFile, AlignmentHeader
 
 MUT_TAG = 'mt'
@@ -13,18 +14,27 @@ def mut_header(header: AlignmentHeader, bam_checksum: str, vac_checksum: str) ->
     if MUT_TAG in header:
         raise ValueError("File appears to be already mutated.")
     else:
-        result_header = header.to_dict()
-        result_header[MUT_TAG] = {MUT_BAM_TAG: bam_checksum, MUT_VAC_TAG: vac_checksum}
-        return AlignmentHeader.from_dict(header)
+        bm = MUT_BAM_TAG + ':' + bam_checksum
+        vc = MUT_VAC_TAG + ':' + vac_checksum
+        mut_line = '@' + MUT_TAG + '\t' + bm + '\t' + vc + '\n'
+        result_header = str(header) + mut_line
+        return AlignmentHeader.from_text(result_header)
 
 
 def unmut_header(header: AlignmentHeader):
-    if MUT_TAG in header:
-        del header[MUT_TAG]
-        return header
+    # drop empty line
+    header_lines = str(header).split('\n')[:-1]
+    last_line = header_lines[-1]
+    segments = last_line.split('\t')
+
+    if segments and '@' + MUT_TAG == segments[0]:
+        # drop mut line
+        return '\n'.join(header_lines[:-1]) + '\n'
     else:
         raise ValueError('File does not appear to be mutated.')
 
 
 def open_bam(*args, **kwargs):
+    # https://github.com/pysam-developers/pysam/issues/939
+    pysam.set_verbosity(0)
     return AlignmentFile(*args, **kwargs)

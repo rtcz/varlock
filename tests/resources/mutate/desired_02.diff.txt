@@ -1,16 +1,15 @@
 {
     "_from_index": 0,
     "_to_index": 19999,
-    "mb_checksum": "ace8d8689a6d5ab91955830a5fdca2e6",
+    "mb_checksum": "8f5125e0633928d38eaf68acdd9bd218",
     "secret": "ffffffffffffffffffffffffffffffff"
 }
-snvs	4
+snvs	3
 indels	1
-last_index	11032
+last_index	11031
 index_res	1000
 index_size	0
-11012	1	2	A,G,T,C
-11016	1	3	T,G,C,A
-11021	1	2	G,T,A,C
-11028	0	2	A,AGT,AG
-11032	1	2	T,G,A,C
+11003	1	0	A,T,A,C
+11011	1	2	T,T,T,C
+11027	0	2	A,AGT,AG
+11031	1	2	A,G,T,C
