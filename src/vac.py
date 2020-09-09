@@ -273,7 +273,6 @@ class Vac:
             ac_tag: str = 'AC',
             an_tag: str = 'AN'
     ):
-        # TODO enable gzipped VCF file as input
         """
         Converts VCF to binary VAC file.
         Can preserve compatibility between different BAM and VCF reference genomes
@@ -490,7 +489,7 @@ class Vac:
     @classmethod
     def text2vac(cls, text_filepath, vac_filepath):
         """
-        Text genomic indices are 1-based. After conversion to binary they change to 1-based.
+        Indices are always 0-based.
         :param text_filepath:
         :param vac_filepath:
         :return:
@@ -519,7 +518,7 @@ class Vac:
 
                 cls._write_snv_record(
                     snv_file=vac_file,
-                    index=int(index_str) - 1,
+                    index=int(index_str),
                     ref_id=int(ref_id_str),
                     ac_tuple=ac_tuple
                 )
@@ -537,7 +536,7 @@ class Vac:
 
                 cls._write_indel_record(
                     indel_file=vac_file,
-                    index=int(index_str) - 1,
+                    index=int(index_str),
                     indel_map=indel_map
                 )
 

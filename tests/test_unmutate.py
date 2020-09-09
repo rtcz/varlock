@@ -13,7 +13,7 @@ class TestUnmutate(unittest.TestCase):
     
     @classmethod
     def setUpClass(cls):
-        # TODO problem (bam1->sam->bam2) != bam1
+        # TODO problem (bam1->sam->bam2) != bam1, using samtools manually instead
         # sam2bam(cls.RESOURCE_PATH + 'input.sam', cls.RESOURCE_PATH + 'input.bam')
         cls.mut = BamMutator(cls.RESOURCE_PATH + 'input.bam')
         pysam.index(cls.RESOURCE_PATH + 'input.bam')

@@ -556,7 +556,7 @@ class BdiffIO:
     def to_text_file(bytes_io: io.BytesIO(), filename: str):
         """
         Convert Bdiff file from BytesIO to text file.
-        Indices are converted from 0-based to 1-based.
+        Indices are always 0-based.
         :param filename:
         :param bytes_io:
         :return:
@@ -567,21 +567,21 @@ class BdiffIO:
             text_file.write('%s\n' % header)
             text_file.write('snvs\t%d\n' % bdiff.snv_count)
             text_file.write('indels\t%d\n' % bdiff.indel_count)
-            text_file.write('last_index\t%d\n' % (bdiff.last_index + 1))
+            text_file.write('last_index\t%d\n' % bdiff.last_index)
             
             text_file.write('index_res\t%d\n' % bdiff.index_resolution)
             text_file.write('index_size\t%d\n' % len(bdiff.file_index))
             for index, pos in bdiff.file_index:
-                text_file.write('%d\t%d\n' % (index + 1, pos))
+                text_file.write('%d\t%d\n' % (index, pos))
             
             for index, is_snv, ref_id, alts in bdiff:
-                text_file.write('%d\t%d\t%d\t%s\n' % (index + 1, is_snv, ref_id, ','.join(alts)))
+                text_file.write('%d\t%d\t%d\t%s\n' % (index, is_snv, ref_id, ','.join(alts)))
     
     @staticmethod
     def from_text_file(filename: str):
         """
         Convert Bdiff text file to BytesIO.
-        Indices are converted from 1-based to 0-based.
+        Indices are always 0-based.
         :param filename:
         :return:
         """
@@ -614,7 +614,7 @@ class BdiffIO:
                 if not line:
                     break
                 raw_index, raw_is_snv, raw_ref_id, raw_alts = line.split('\t')
-                index = int(raw_index) - 1
+                index = int(raw_index)
                 is_snv = raw_is_snv == '1'
                 ref_id = int(raw_ref_id)
                 alleles = raw_alts.split(',')

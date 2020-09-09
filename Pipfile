@@ -15,6 +15,8 @@ matplotlib = "*"
 pandas = "*"
 seaborn = "*"
 matplotlib-venn = "*"
+bitarray = "*"
+bitstring = "*"
 
 [requires]
 python_version = "3.6"

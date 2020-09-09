@@ -37,21 +37,21 @@ class TestMutate(unittest.TestCase):
             mut_p=0,
             rnd=self._rnd
         )
-        
+        cmn.bam2sam(self.RESOURCE_PATH + 'output_01.bam', self.RESOURCE_PATH + 'output_01.sam')
+        BdiffIO.to_text_file(bdiff_file, self.RESOURCE_PATH + 'output_01.diff.txt')
+
         self.assertEqual(21, self._mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
         self.assertEqual(16, self._mut.stat(BamMutator.STAT_COVERING_COUNT))
         self.assertEqual(8, self._mut.stat(BamMutator.STAT_VAC_COUNT))
-        self.assertEqual(16, self._mut.stat(BamMutator.STAT_MUT_COUNT))
-        self.assertEqual(6, self._mut.stat(BamMutator.STAT_DIFF_COUNT))
-        self.assertEqual(14, self._mut.stat(BamMutator.STAT_ALIGNMENT_MUT_COUNT))
-        
-        cmn.bam2sam(self.RESOURCE_PATH + 'output_01.bam', self.RESOURCE_PATH + 'output_01.sam')
+        self.assertEqual(8, self._mut.stat(BamMutator.STAT_MUT_COUNT))
+        self.assertEqual(5, self._mut.stat(BamMutator.STAT_DIFF_COUNT))
+        self.assertEqual(8, self._mut.stat(BamMutator.STAT_ALIGNMENT_MUT_COUNT))
+
         self.assertTrue(filecmp.cmp(
             self.RESOURCE_PATH + 'desired_01.sam',
             self.RESOURCE_PATH + 'output_01.sam')
         )
-        
-        BdiffIO.to_text_file(bdiff_file, self.RESOURCE_PATH + 'output_01.diff.txt')
+
         self.assertTrue(filecmp.cmp(
             self.RESOURCE_PATH + 'desired_01.diff.txt',
             self.RESOURCE_PATH + 'output_01.diff.txt')
@@ -71,9 +71,9 @@ class TestMutate(unittest.TestCase):
         self.assertEqual(21, self._mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))
         self.assertEqual(13, self._mut.stat(BamMutator.STAT_COVERING_COUNT))
         self.assertEqual(7, self._mut.stat(BamMutator.STAT_VAC_COUNT))
-        self.assertEqual(14, self._mut.stat(BamMutator.STAT_MUT_COUNT))
-        self.assertEqual(5, self._mut.stat(BamMutator.STAT_DIFF_COUNT))
-        self.assertEqual(12, self._mut.stat(BamMutator.STAT_ALIGNMENT_MUT_COUNT))
+        self.assertEqual(6, self._mut.stat(BamMutator.STAT_MUT_COUNT))
+        self.assertEqual(4, self._mut.stat(BamMutator.STAT_DIFF_COUNT))
+        self.assertEqual(6, self._mut.stat(BamMutator.STAT_ALIGNMENT_MUT_COUNT))
         
         cmn.bam2sam(self.RESOURCE_PATH + 'output_02.bam', self.RESOURCE_PATH + 'output_02.sam')
         self.assertTrue(filecmp.cmp(

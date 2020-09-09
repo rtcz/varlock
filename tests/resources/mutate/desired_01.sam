@@ -1,22 +1,22 @@
 @HD	VN:1.0	SO:coordinate
 @SQ	SN:chr1	LN:10000
 @SQ	SN:chr2	LN:10000
-@mt	bm:3d9976872cafa3c28c6e829a2a2eaae2	vc:a58cd7b14aed64da5ae986d2a009ed7f
-*	2	chr2	1002	6	6M	=	1	0	GAAGCA	*
+@mt	bm:3d9976872cafa3c28c6e829a2a2eaae2	vc:cc96f61e18b8c44d3292590000bcf2df
+*	2	chr2	1002	6	6M	=	1	0	GAGGCA	*
 *	2	chr2	1005	6	4M	=	1	0	GCAC	*
-*	2	chr2	1010	6	9M	=	1	0	CCGCATCGC	*
-*	2	chr2	1012	6	4M	=	1	0	GCAT	*
-*	2	chr2	1013	6	8M	=	1	0	CATCGCCT	*
-*	2	chr2	1017	6	7M	=	1	0	GCCTGTC	*
-*	2	chr2	1019	7	7M	=	1	0	CTATCGC	*
-*	2	chr2	1020	7	7M	=	1	0	TGTCGCT	*
-*	2	chr2	1021	30	3M	=	1	0	GTC	*
+*	2	chr2	1010	6	9M	=	1	0	CCACATAGC	*
+*	2	chr2	1012	6	4M	=	1	0	ACAT	*
+*	2	chr2	1013	6	8M	=	1	0	CATAGCCT	*
+*	2	chr2	1017	6	7M	=	1	0	GCCTATC	*
+*	2	chr2	1019	7	7M	=	1	0	CTGTCGC	*
+*	2	chr2	1020	7	7M	=	1	0	TATCGCT	*
+*	2	chr2	1021	30	3M	=	1	0	ATC	*
 *	4	chr2	1025	255	*	=	1	0	GGG	*
-*	2	chr2	1027	30	2M1D3M	=	1	0	TACTG	*
-*	2	chr2	1027	30	7M	=	1	0	TAGCTGT	*
+*	2	chr2	1027	30	2M1D3M	=	1	0	TACTA	*
+*	2	chr2	1027	30	7M	=	1	0	TAGCTAT	*
 *	2	chr2	1028	30	4M	=	1	0	AGCT	*
-*	2	chr2	1029	30	1M1I6M	=	1	0	GTCTATCG	*
-*	2	chr2	1030	30	1I5M	=	1	0	TCTGTC	*
+*	2	chr2	1029	30	1M1I6M	=	1	0	GTCTGTCG	*
+*	2	chr2	1030	30	1I5M	=	1	0	TCTATC	*
 *	2	chr2	1034	6	6M	=	1	0	CGCAGC	*
 *	2	chr2	1037	6	6M	=	1	0	AGCGAC	*
 *	2	chr2	1038	6	6M	=	1	0	GCGACT	*

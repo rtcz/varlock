@@ -18,9 +18,7 @@ class TestVac(unittest.TestCase):
     @classmethod
     def vac(cls):
         with open_bam(cls.RESOURCE_PATH + 'input.sam', 'rb') as sam_file:
-            sam_header = sam_file.header
-
-        return Vac(FastaIndex(sam_header))
+            return Vac(FastaIndex.from_bam(sam_file))
 
     @classmethod
     def __build_empty_vac_file(cls):

@@ -7,10 +7,10 @@ from src.fasta_index import FastaIndex
 class TestFastaIndex(unittest.TestCase):
     def setUp(self):
         with pysam.AlignmentFile('tests/resources/fasta_index/input.sam', "r") as sam_file:
-            self._fai = FastaIndex(sam_file.header)
+            self._fai = FastaIndex.from_bam(sam_file)
     
     def test_fai_parsing(self):
-        ref = self._fai[1]
+        ref = self._fai._indices[1]
         
         self.assertEqual(ref.name, 'chr2')
         self.assertEqual(ref.start, 10000)
