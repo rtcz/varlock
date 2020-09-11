@@ -12,7 +12,7 @@ def main():
     # print start time
     start_time = datetime.now()
     print(
-        'Varlock: the tool for pseudonymization of sequenced genome'
+        'Varlock: privacy preserving storage and dissemination of sequenced genomic data'
         '\nVarlock starting: {start: %Y-%m-%d %H:%M:%S}'.format(start=start_time)
     )
 
@@ -20,8 +20,8 @@ def main():
         # TODO refactor
         command, args = parse_command()
         parse_args_function = {
-            'mask': parse_mask_args,
-            'unmask': parse_unmask_args,
+            'mask': parse_encrypt_args,
+            'unmask': parse_decrypt_args,
             'reencrypt': parse_reencrypt_args,
             'vac': parse_vac_args
         }
@@ -133,7 +133,7 @@ def print_usage():
     print('\t\tvac\t\tconvert VCF to VAC')
 
 
-def parse_mask_args(args):
+def parse_encrypt_args(args):
     parser = argparse.ArgumentParser(prog='varlock mask')
 
     required = parser.add_argument_group("Required")
@@ -153,7 +153,7 @@ def parse_mask_args(args):
     return parser.parse_args(args)
 
 
-def parse_unmask_args(args):
+def parse_decrypt_args(args):
     parser = argparse.ArgumentParser(prog='varlock unmask')
 
     required = parser.add_argument_group("Required")

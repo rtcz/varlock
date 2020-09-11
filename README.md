@@ -1,6 +1,6 @@
-# Varlock: the tool for pseudonymization of sequenced genome
+# Varlock: privacy preserving storage and dissemination of sequenced genomic data
 
-## Varlock
+## Introduction
 Varlock is a command line interface utility for reversible allele maskig contained within a BAM file. The differences between the original and the masked BAM are stored in encrypted form, so only authorized users can recover their permitted parts of the original BAM. Varlock uses RSA asymmetric encryption with pairs of public and private keys for encryption and decryption, respectively.
 
 Two new binary file types are introduced in the tool: the first is a population specific _Variant Allele Count_ (_VAC_) file, which is essentially a compact VCF file that represents standard allele frequencies of a population. The second is a BAM file specific _BAM difference_ (_BDIFF_) file, where the differences between the original and a depersonalized BAM are compactly stored. 
@@ -20,7 +20,58 @@ BDIFF file acts as the secret key in the context of Varlock encryption, thus it 
 ### Masking
 User must provide the original BAM file, a VAC file of the closest population, and his public key for encryption. Both VAC and BAM files are iterated at the same time to write a new masked BAM together with BDIFF tracking all the changes. Every time a genomic position of a VAC record intersects with one or more alignments from the BAM file, a pseudo random permutation of DNA base letters (in the case of SNV) or INDEL sequences is generated. Alignments that do not overlap with any VAC records are written to the masked BAM unchanged. The masking always involves the whole content of the supplied BAM, meaning that all former alignments are present in the masked BAM either altered or unaltered.
 
-# Development
+## Running
+
+### Commands
+Show help message.
+```
+python3 varlock.py --help
+```
+
+Mask BAM and create BDIFF.
+```
+python3 varlock.py encrypt
+    --key       resources/jozko
+    --pub_key   resources/jozko.pub
+    --bam       resources/input.bam
+    --vac       resources/input.vac
+    --out_bam   resources/out.mut.bam
+    --out_diff  resources/out.diff.enc
+    --password  password
+    --verbose
+```
+
+Unmask BAM.
+```
+python3 varlock.py decrypt
+    --key       resources/jozko
+    --bam       resources/out.mut.bam
+    --diff      resources/out.diff.enc
+    --out_bam   out.bam
+    --password  password
+    --verbose
+```
+
+Reencrypt BDIFF.
+```
+python3 varlock.py reencrypt
+    --key       resources/jozko
+    --pub_key   resources/jozko.pub
+    --bam       resources/out.mut.bam
+    --diff      resources/input.diff
+    --out_diff  resources/output.diff
+    --password  password
+    --verbose
+```
+
+Create VAC.
+```
+python3 varlock.py vac
+    --bam examples/resources/sample.bam
+    --vcf examples/resources/sample.vcf.gz
+    --vac examples/resources/sample.vac
+```
+
 ## Testing
 
 run all tests:
@@ -28,12 +79,3 @@ run all tests:
 
 run single test:
 <code>python3 -m unittest tests.<FILE_NAME>.<CLASS_NAME>.<METHOD_NAME></code>
-
-## Examples
-python3 varlock.py encrypt --key resources/jozko --pub_key resources/jozko.pub --bam resources/input.bam --vac resources/input.vac --out_bam resources/out.mut.bam --out_diff resources/out.diff.enc -v -p password
-python3 varlock.py decrypt --key resources/jozko --bam resources/out.mut.bam --diff resources/out.diff.enc --out_bam out.bam
-python3 varlock.py reencrypt -d resources/jozko -e resources/jozko.pub -b resources/out.mut.bam -s resources/input.diff -o resources/output.diff -v -p password
-python3 varlock.py vac --bam examples/resources/sample.bam --vcf examples/resources/sample.vcf.gz --vac examples/resources/sample.vac
-python3 varlock.py encrypt --key tests/resources/varlocker/admin --pub_key tests/resources/varlocker/admin.pub --bam tests/resources/varlocker/encrypt/input.bam --vac tests/resources/varlocker/encrypt/input.vac --out_bam tests/resources/varlocker/encrypt/out.mut.bam --out_diff tests/resources/varlocker/encrypt/out.diff.enc -p password -s seed
-
-
