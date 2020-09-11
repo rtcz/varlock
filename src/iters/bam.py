@@ -63,7 +63,7 @@ class MappedBamIterator(BamIterator):
         self.curr_ref_id = None
         self.end_ref_id = None
         self.counter = 0
-        
+
         if start_index is end_index is None:
             # fetch all
             self._iterator = self._bam_file.fetch()
@@ -76,7 +76,7 @@ class MappedBamIterator(BamIterator):
                 self._iterator = self._bam_file.fetch(
                     reference=self.start_ref_name,
                     start=self.start_ref_pos,
-                    end=self.end_ref_pos + 1  # add one for inclusive range
+                    end=self.end_ref_pos
                 )
             else:
                 # multiple iterators
@@ -246,10 +246,10 @@ class RangedBamIterator(BamIterator):
                     continue
                 
                 if curr_ref_id > self._end_ref_id or (
-                                curr_ref_id == self._end_ref_id and alignment.reference_start > self._end_ref_pos):
+                                curr_ref_id == self._end_ref_id and alignment.reference_start >= self._end_ref_pos):
                     # after range
                     continue
-                
+
                 return alignment
         
         except StopIteration:
