@@ -6,7 +6,7 @@
 }
 snvs	4
 indels	2
-last_index	11038
+last_index	11037
 index_res	1000
 index_size	0
 11011	1	2	A,G,T,C

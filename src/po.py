@@ -37,7 +37,7 @@ class Variant:
             alleles: list,
             ref_allele: str
     ):
-        assert ref_allele in alleles
+        # assert ref_allele in alleles
         self._position = position
         self._alleles = alleles
         self._ref_allele = ref_allele
@@ -76,7 +76,7 @@ class VariantDiff(Variant):
             list(mut_map.values()),
             ref_allele
         )
-        assert ref_allele in mut_map.values()
+        # assert ref_allele in mut_map.values()
         self._mut_map = mut_map
     
     @property

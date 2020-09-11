@@ -264,7 +264,6 @@ class BamMutator:
             from_index = self._fai.resolve_start_index(start_ref_name, start_ref_pos)
             to_index = self._fai.resolve_end_index(end_ref_name, end_ref_pos)
             # validate user range
-            # TODO show 1-based positions
             if from_index < bdiff_from_index:
                 args = (start_ref_name, start_ref_pos) \
                        + self._fai.index2pos(bdiff_from_index) \

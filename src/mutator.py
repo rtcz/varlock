@@ -274,7 +274,9 @@ class Mutator:
 
             else:  # alignment is covering variant position
                 alignment_queue.append(AlleleAlignment(alignment, variant))
+
                 alignment = next(bam_iter)
+
                 self.covering_counter += 1
 
         # noinspection PyAttributeOutsideInit
