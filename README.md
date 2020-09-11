@@ -31,12 +31,12 @@ python3 varlock.py --help
 Mask BAM and create BDIFF.
 ```
 python3 varlock.py encrypt
-    --key       resources/jozko
-    --pub_key   resources/jozko.pub
-    --bam       resources/input.bam
-    --vac       resources/input.vac
-    --out_bam   resources/out.mut.bam
-    --out_diff  resources/out.diff.enc
+    --key       keyfile
+    --pub_key   keyfile.pub
+    --bam       input.bam
+    --vac       input.vac
+    --out_bam   output.masked.bam
+    --out_diff  output.diff
     --password  password
     --verbose
 ```
@@ -44,10 +44,10 @@ python3 varlock.py encrypt
 Unmask BAM.
 ```
 python3 varlock.py decrypt
-    --key       resources/jozko
-    --bam       resources/out.mut.bam
-    --diff      resources/out.diff.enc
-    --out_bam   out.bam
+    --key       key
+    --bam       input.masked.bam
+    --diff      input.diff
+    --out_bam   output.bam
     --password  password
     --verbose
 ```
@@ -55,11 +55,11 @@ python3 varlock.py decrypt
 Reencrypt BDIFF.
 ```
 python3 varlock.py reencrypt
-    --key       resources/jozko
-    --pub_key   resources/jozko.pub
-    --bam       resources/out.mut.bam
-    --diff      resources/input.diff
-    --out_diff  resources/output.diff
+    --key       keyfile
+    --pub_key   keyfile.pub
+    --bam       input.masked.bam
+    --diff      input.diff
+    --out_diff  output.diff
     --password  password
     --verbose
 ```
@@ -67,15 +67,15 @@ python3 varlock.py reencrypt
 Create VAC.
 ```
 python3 varlock.py vac
-    --bam examples/resources/sample.bam
-    --vcf examples/resources/sample.vcf.gz
-    --vac examples/resources/sample.vac
+    --bam input.bam
+    --vcf input.vcf.gz
+    --vac output.vac
 ```
 
 ## Testing
 
 run all tests:
-<code>python3 -m unittest discover </code>
+`python3 -m unittest discover`
 
 run single test:
-<code>python3 -m unittest tests.<FILE_NAME>.<CLASS_NAME>.<METHOD_NAME></code>
+`python3 -m unittest tests.<FILE_NAME>.<CLASS_NAME>.<METHOD_NAME>`
