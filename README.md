@@ -1,7 +1,7 @@
 # Varlock: privacy preserving storage and dissemination of sequenced genomic data
 
 ## Introduction
-Varlock is a command line interface utility for reversible allele maskig contained within a BAM file. The differences between the original and the masked BAM are stored in encrypted form, so only authorized users can recover their permitted parts of the original BAM. Varlock uses RSA asymmetric encryption with pairs of public and private keys for encryption and decryption, respectively.
+Varlock is a command line interface utility for reversible masking of personal alleles contained within a BAM file. The differences between the original and the masked BAM file are stored in encrypted form, so only an authorized user can restore the original BAM file. Varlock uses RSA asymmetric encryption for encryption and decryption of masked personal alleles.
 
 Two new binary file types are introduced in the tool: the first is a population specific _Variant Allele Count_ (_VAC_) file, which is essentially a compact VCF file that represents standard allele frequencies of a population. The second is a BAM file specific _BAM difference_ (_BDIFF_) file, where the differences between the original and a depersonalized BAM are compactly stored. 
 
@@ -21,6 +21,8 @@ BDIFF file acts as the secret key in the context of Varlock encryption, thus it 
 User must provide the original BAM file, a VAC file of the closest population, and his public key for encryption. Both VAC and BAM files are iterated at the same time to write a new masked BAM together with BDIFF tracking all the changes. Every time a genomic position of a VAC record intersects with one or more alignments from the BAM file, a pseudo random permutation of DNA base letters (in the case of SNV) or INDEL sequences is generated. Alignments that do not overlap with any VAC records are written to the masked BAM unchanged. The masking always involves the whole content of the supplied BAM, meaning that all former alignments are present in the masked BAM either altered or unaltered.
 
 ## Running
+
+Project is managed by pipenv. Run `pipenv shell` first.
 
 ### Commands
 Show help message.
