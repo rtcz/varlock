@@ -481,6 +481,7 @@ class Mutator:
                 is_masked |= self._mutate_allele(aligned_allele, mut_map)
 
             if hetero2homo:
+                # TODO
                 # temp solution, use dummy dict
                 rev_mut_map = dict(zip(cmn.BASES, cmn.BASES))
             else:

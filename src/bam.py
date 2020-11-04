@@ -17,21 +17,25 @@ def mut_header(header: AlignmentHeader, bam_checksum: str, vac_checksum: str) ->
         bm = MUT_BAM_TAG + ':' + bam_checksum
         vc = MUT_VAC_TAG + ':' + vac_checksum
         mut_line = '@' + MUT_TAG + '\t' + bm + '\t' + vc + '\n'
-        result_header = str(header) + mut_line
-        return AlignmentHeader.from_text(result_header)
+        text_header = str(header) + mut_line
+        return AlignmentHeader.from_text(text_header)
 
 
-def unmut_header(header: AlignmentHeader):
+def unmut_header(header: AlignmentHeader) -> AlignmentHeader:
     # drop empty line
     header_lines = str(header).split('\n')[:-1]
     last_line = header_lines[-1]
     segments = last_line.split('\t')
 
     if segments and '@' + MUT_TAG == segments[0]:
-        # drop mut line
-        return '\n'.join(header_lines[:-1]) + '\n'
+        # drop mut line from the header
+        text_header = '\n'.join(header_lines[:-1]) + '\n'
+        return AlignmentHeader.from_text(text_header)
     else:
-        raise ValueError('File does not appear to be mutated.')
+        # TODO warning
+        print('File does not appear to be mutated.')
+        # return the original header
+        return header
 
 
 def open_bam(*args, **kwargs):

@@ -186,7 +186,6 @@ class BamMutator:
         with bam.open_bam(self._bam_filename, 'rb') as bam_file:  # type: pysam.AlignmentFile
             header = bam.unmut_header(bam_file.header)
             mut = Mutator(fai=self._fai, verbose=self._verbose)
-            header = pysam.AlignmentHeader.from_text(header)
 
             with bam.open_bam(out_bam_filename, 'wb', header=header) as out_bam_file:
                 bdiff_io = BdiffIO(bdiff_file)

@@ -34,6 +34,12 @@ class BdiffIO:
     reference index, 1B, index of reference allele within the A,T,G,C list
     mapping, 1B, permutation of alleles as indiced of the A,T,G,C list
 
+    # TODO
+    operation, 1B, index of operation from the homo2homo, hetero2hetero, homo2hetero, hetero2homo
+    length, 1B, number of alignments
+    list (of alignment ids): alignments
+        id, 1B, alignment id
+
     DIFF INDEL record: permutation of sequences
     index, 4B, 0-based absolute genomic position
     length, 1B, number of alleles
