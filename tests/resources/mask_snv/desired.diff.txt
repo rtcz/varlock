@@ -1,0 +1,19 @@
+{
+    "_from_index": 0,
+    "_to_index": 9999,
+    "mb_checksum": "1c29d060259d589060fc1e95616509c7",
+    "secret": "ffffffffffffffffffffffffffffffff"
+}
+snvs	8
+indels	0
+last_index	14
+index_res	1000
+index_size	0
+5	1	3	0	C,T,G,A
+6	1	3	0	C,T,G,A
+9	1	3	2	T,A,G,C
+10	1	3	2	T,A,G,C
+11	1	3	1	C,T,G,A	A,T,G,C	0
+12	1	3	1	C,T,G,A	A,T,G,C	0
+13	1	3	3	C,T,G,A	A,T,G,C	0
+14	1	3	3	C,T,G,A	A,T,G,C	0

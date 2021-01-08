@@ -9,7 +9,7 @@ from src.bdiff import BdiffIO
 from src.fasta_index import FastaIndex
 from src.mutator import Mutator
 # TODO rename MutatorWrapper ?
-from src.random import VeryRandom
+from src.very_random import VeryRandom
 
 
 class BamMutator:
@@ -102,14 +102,14 @@ class BamMutator:
             mut_bam_filename: str,
             secret: bytes,
             mut_p: float,
-            rnd: VeryRandom
+            rng: VeryRandom
     ):
         """
         :param vac_filename:
         :param mut_bam_filename:
         :param secret: Secret key written into DIFF used for unmapped alignment encryption.
         :param mut_p: random variant (mutation) probability per genome base
-        :param rnd:  random number generator
+        :param rng:  random number generator
         :return diff_file:
         """
         self._stats = {}
@@ -117,7 +117,7 @@ class BamMutator:
         header = bam.mut_header(self._bam_header, self.checksum, cmn.checksum(vac_filename))
 
         with bam.open_bam(mut_bam_filename, 'wb', header=header) as mut_bam_file, \
-                iters.VariantIterator(vac_filename, self._fai, mut_p, rnd) as vac_iter, \
+                iters.VariantIterator(vac_filename, self._fai, mut_p, rng) as vac_iter, \
                 iters.FullBamIterator(self._bam_filename) as bam_iter:
             mut = Mutator(fai=self._fai, verbose=self._verbose)
             bdiff_io = mut.mutate(
@@ -125,7 +125,7 @@ class BamMutator:
                 variant_iter=vac_iter,
                 bam_iter=bam_iter,
                 secret=secret,
-                rnd=rnd
+                rng=rng
             )
 
         self._stats = {
@@ -159,6 +159,7 @@ class BamMutator:
             self,
             bdiff_file: io.BytesIO,
             out_bam_filename: str,
+            rng: VeryRandom,
             start_ref_name: str = None,
             start_ref_pos: int = None,
             end_ref_name: str = None,
@@ -168,6 +169,7 @@ class BamMutator:
     ):
         """
         Unmutate BAM file in range specified by DIFF file or by parameters.
+        :param rng:
         :param bdiff_file:
         :param out_bam_filename:
         :param start_ref_name: inclusive
@@ -199,6 +201,10 @@ class BamMutator:
 
                 # validate checksum
                 if self.checksum != bdiff_io.header[self.BDIFF_CHECKSUM_TAG]:
+                    print(self.checksum)
+                    print(bdiff_io.header[self.BDIFF_CHECKSUM_TAG])
+
+
                     raise ValueError('BDIFF does not refer to this BAM')
 
                 # TODO user friendly exception on missing bdiff_io header value
@@ -227,6 +233,7 @@ class BamMutator:
                         end_index=end_index
                     ),
                     out_bam_file=out_bam_file,
+                    rng=rng,
                     secret=secret
                 )
 

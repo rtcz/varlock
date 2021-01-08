@@ -1,5 +1,6 @@
 import hashlib
-import typing
+from random import Random
+from typing import Dict, Tuple, List
 
 import numpy as np
 import pysam
@@ -7,14 +8,16 @@ import pysam
 import src.bdiff as bdiff
 import src.common as cmn
 import src.iters as iters
-import src.po as po
 from src.alignment import AlleleAlignment, pileup_alleles
 from src.fasta_index import FastaIndex
-from src.random import VeryRandom
+from src.po import VariantDiff, Variant
+from src.po import ZygosityChange, VariantOccurrence, VariantType
+from src.very_random import VeryRandom
 
 
 class Mutator:
     MIN_ALLELE_RATIO = 0.2
+    IDENTITY_SNV_MAP = dict(zip(cmn.BASES, cmn.BASES))
 
     def __init__(
             self,
@@ -73,14 +76,14 @@ class Mutator:
             variant_iter: iters.VariantIterator,
             bam_iter: iters.FullBamIterator,
             secret: bytes,
-            rnd: VeryRandom
+            rng: VeryRandom
     ) -> bdiff.BdiffIO:
         """
         :param mut_bam_file:
         :param variant_iter:
         :param bam_iter:
         :param secret:
-        :param rnd: (secure) random generator
+        :param rng: (secure) random generator
         :return: BdiffIO object
         BDIFF records are written only if bases at variant position differ after mutation.
         """
@@ -112,9 +115,15 @@ class Mutator:
                         print("EOF BAM")
 
                 # last mutation
-                if variant is not None:
+                while variant is not None:
                     # noinspection PyTypeChecker
-                    self._mutate_pos(bdiff_io, alignment_queue, variant, rnd)
+                    self._mutate_pos(bdiff_io, alignment_queue, variant, rng)
+                    prev_variant = variant
+                    variant = variant_iter.next_after()
+                    if variant is not None:
+                        self._update_alignment_queue(alignment_queue, variant)
+                    elif self._verbose:
+                        print('last variant: %s' % prev_variant)
 
                 for allele_alignment in alignment_queue:  # type: AlleleAlignment
                     # unmapped alignments in queue are already encrypted
@@ -147,7 +156,7 @@ class Mutator:
                 # if len(alignment_queue) == 0:
                 #     self.test_counter += 1
 
-                self._mutate_pos(bdiff_io, alignment_queue, variant, rnd)
+                self._mutate_pos(bdiff_io, alignment_queue, variant, rng)
                 # done with this variant, read next
                 prev_variant = variant
                 variant = variant_iter.next_after()
@@ -158,17 +167,7 @@ class Mutator:
                     # write alignments to mutated BAM
                     self.__write_before_index(mut_bam_file, alignment_queue, variant.pos.index)
                     # update alignment queue with new variant
-                    for i in range(len(alignment_queue)):
-                        # if alignment.reference_name != variant.pos.ref_name:
-                        #     print(f'alignment {alignment.reference_name}:{alignment.reference_start} '
-                        #           f'has foreign variant {variant}')
-                        #     print(f'prev variant {prev_variant}')
-
-                        alignment_queue[i] = AlleleAlignment(
-                            alignment_queue[i].alignment,
-                            variant,
-                            alignment_queue[i].is_mutated
-                        )
+                    self._update_alignment_queue(alignment_queue, variant)
 
                 elif self._verbose:
                     print('last variant: %s' % prev_variant)
@@ -187,14 +186,25 @@ class Mutator:
 
         return bdiff_io
 
+    @staticmethod
+    def _update_alignment_queue(alignment_queue: list, variant: Variant):
+        for i in range(len(alignment_queue)):
+            alignment_queue[i] = AlleleAlignment(
+                alignment_queue[i].alignment,
+                variant,
+                alignment_queue[i].is_mutated
+            )
+
     def unmutate(
             self,
             bam_iter: iters.BamIterator,
             bdiff_iter: iters.BdiffIterator,
             out_bam_file,
-            secret: bytes = None
+            rng: VeryRandom,
+            secret: bytes = None,
     ):
         """
+        :param rng:
         :param bam_iter:
         :param bdiff_iter:
         :param out_bam_file:
@@ -206,7 +216,7 @@ class Mutator:
 
         alignment_queue = []
         alignment = next(bam_iter)
-        variant = next(bdiff_iter)  # type: po.VariantDiff
+        variant = next(bdiff_iter)  # type: VariantDiff
 
         if self._verbose:
             print('first variant: %s' % variant)
@@ -221,9 +231,16 @@ class Mutator:
                         print("EOF BAM")
 
                 # last mutation
-                if variant is not None:
+                while variant is not None:
                     # noinspection PyTypeChecker
-                    self.__unmutate_pos(alignment_queue, variant.mut_map)
+                    self.__unmutate_pos(alignment_queue, variant, rng)
+                    prev_variant = variant
+                    variant = next(bdiff_iter)
+                    if variant is not None:
+                        self._update_alignment_queue(alignment_queue, variant)
+                    elif self._verbose:
+                        print('last variant: %s' % prev_variant)
+
 
                 for allele_alignment in alignment_queue:  # type: AlleleAlignment
                     # unmapped alignments in queue are already encrypted
@@ -252,7 +269,7 @@ class Mutator:
                 alignment = next(bam_iter)
 
             elif self.__is_after_index(alignment, variant.pos.index):
-                self.__unmutate_pos(alignment_queue, variant.mut_map)
+                self.__unmutate_pos(alignment_queue, variant, rng)
                 # done with this variant, read next
                 prev_variant = variant
                 variant = next(bdiff_iter)
@@ -262,12 +279,7 @@ class Mutator:
                     # not the end of DIFF file
                     self.__write_before_index(out_bam_file, alignment_queue, variant.pos.index)
                     # update alignment queue
-                    for i in range(len(alignment_queue)):
-                        alignment_queue[i] = AlleleAlignment(
-                            alignment_queue[i].alignment,
-                            variant,
-                            alignment_queue[i].is_mutated
-                        )
+                    self._update_alignment_queue(alignment_queue, variant)
 
                 elif self._verbose:
                     print('last variant: %s' % prev_variant)
@@ -282,9 +294,17 @@ class Mutator:
         # noinspection PyAttributeOutsideInit
         self.diff_counter = bdiff_iter.counter
 
-    def __unmutate_pos(self, allele_queue: list, mut_map: dict):
-        for allele in allele_queue:  # type: AlleleAlignment
-            self._mutate_allele(allele, mut_map)
+    def __unmutate_pos(self, allele_queue: list, variant: VariantDiff, rng: VeryRandom):
+        if variant.zygosity.is_changed():
+            pos_rng = rng.seed_rng(variant.rng_seed)
+            for allele in allele_queue:  # type: AlleleAlignment
+                if pos_rng.random() < 0.5:
+                    self._mutate_allele(allele, variant.mut_map_a)
+                else:
+                    self._mutate_allele(allele, variant.mut_map_b)
+        else:
+            for allele in allele_queue:  # type: AlleleAlignment
+                self._mutate_allele(allele, variant.mut_map_a)
 
     @staticmethod
     def __encrypt_unmapped(alignment: pysam.AlignedSegment, secret: bytes):
@@ -315,7 +335,7 @@ class Mutator:
             self,
             bdiff_io: bdiff.BdiffIO,
             allele_queue: list,
-            variant: po.VariantOccurrence,
+            variant: VariantOccurrence,
             rnd: VeryRandom
     ) -> bool:
         """
@@ -325,37 +345,126 @@ class Mutator:
         :return: True if NS mutation has occured
         """
         is_mutated = False
+
         if any(allele.is_known for allele in allele_queue):
-
-            # TODO temp code
-            # BEGIN temp code
-            # self._pos_file.write('%d\n' % (variant.pos.ref_pos + 1))
-            # END temp code
-
-            if variant.is_type(po.VariantType.SNV):
+            if variant.is_type(VariantType.SNV):
                 is_mutated = self._mutate_snv_pos(bdiff_io, allele_queue, variant, rnd)
-            elif variant.is_type(po.VariantType.INDEL):
+            elif variant.is_type(VariantType.INDEL):
                 is_mutated = self._mutate_indel_pos(bdiff_io, allele_queue, variant, rnd)
             else:
                 raise ValueError("unnknown variant type")
 
         return is_mutated
 
-    def _mutate_snv_pos(
+    def _homo2homo_map(
             self,
-            bdiff_io: bdiff.BdiffIO,
-            allele_queue: list,
-            variant: po.VariantOccurrence,
-            rnd: VeryRandom
-    ) -> bool:
+            from_allele_a: str,
+            from_allele_b: str,
+            to_allele_a: str,
+            to_allele_b: str
+    ) -> Dict[str, str]:
+        assert from_allele_a == from_allele_b
+        assert to_allele_a == to_allele_b
+        mask_map = self.IDENTITY_SNV_MAP.copy()
+
+        if from_allele_a != to_allele_a:
+            # homo to other homo
+            mask_map[from_allele_a] = to_allele_a
+            mask_map[to_allele_a] = from_allele_a
+
+        return mask_map
+
+    def _hetero2hetero_map(
+            self,
+            from_allele_a: str,
+            from_allele_b: str,
+            to_allele_a: str,
+            to_allele_b: str
+    ) -> Dict[str, str]:
+        assert from_allele_a != from_allele_b
+        assert to_allele_a != to_allele_b
+        mask_map = self.IDENTITY_SNV_MAP.copy()
+
+        is_synonymous = from_allele_a == to_allele_a and from_allele_b == to_allele_b or \
+                        from_allele_a == to_allele_b and from_allele_b == to_allele_a
+
+        if not is_synonymous:
+            # select the least changes alternative
+            if from_allele_a == to_allele_b or from_allele_b == to_allele_a:
+                mask_map[from_allele_a] = to_allele_b
+                mask_map[from_allele_b] = to_allele_a
+
+                mask_map[to_allele_a] = from_allele_b
+                mask_map[to_allele_b] = from_allele_a
+            else:
+                mask_map[from_allele_a] = to_allele_a
+                mask_map[from_allele_b] = to_allele_b
+
+                mask_map[to_allele_a] = from_allele_a
+                mask_map[to_allele_b] = from_allele_b
+
+        return mask_map
+
+    def _double_map(
+            self,
+            from_allele_a: str,
+            from_allele_b: str,
+            to_allele_a: str,
+            to_allele_b: str
+    ) -> Tuple[Dict[str, str], Dict[str, str]]:
+        # homo2hetero or hetero2homo
+        assert (from_allele_a == from_allele_b and to_allele_a != to_allele_b) or \
+               (from_allele_a != from_allele_b and to_allele_a == to_allele_b)
+
+        mask_map_a = self.IDENTITY_SNV_MAP.copy()
+        mask_map_b = self.IDENTITY_SNV_MAP.copy()
+
+        mask_map_a[from_allele_a] = to_allele_a
+        mask_map_a[to_allele_a] = from_allele_a
+
+        mask_map_b[from_allele_b] = to_allele_b
+        mask_map_b[to_allele_b] = from_allele_b
+
+        return mask_map_a, mask_map_b
+
+    def _create_masking(self, from_allele_a: str, from_allele_b: str, to_allele_a: str, to_allele_b: str) \
+            -> Tuple[Dict[str, str], Dict[str, str], ZygosityChange]:
+        mask_map_a = None
+        mask_map_b = None
+        zygosity = None
+
+        if from_allele_a == from_allele_b:
+            if to_allele_a == to_allele_b:
+                mask_map_a = self._homo2homo_map(from_allele_a, from_allele_b, to_allele_a, to_allele_b)
+                mask_map_b = mask_map_a
+                zygosity = ZygosityChange.HOMO_TO_HOMO
+            else:
+                mask_map_a, mask_map_b = self._double_map(from_allele_a, from_allele_b, to_allele_a, to_allele_b)
+                zygosity = ZygosityChange.HOMO_TO_HETERO
+
+        elif from_allele_a != from_allele_b:
+            if to_allele_a != to_allele_b:
+                mask_map_a = self._hetero2hetero_map(from_allele_a, from_allele_b, to_allele_a, to_allele_b)
+                mask_map_b = mask_map_a
+                zygosity = ZygosityChange.HETERO_TO_HETERO
+            else:
+                mask_map_a, mask_map_b = self._double_map(from_allele_a, from_allele_b, to_allele_a, to_allele_b)
+                zygosity = ZygosityChange.HETERO_TO_HOMO
+
+        return mask_map_a, mask_map_b, zygosity
+
+    def _private_allele_pair(self, allele_queue: List[AlleleAlignment]) -> Tuple[str, str]:
+        """
+        Pseudo variant calling - could be replaced by using personal VCF
+        :param allele_queue:
+        :return:
+        """
+        from_allele_a = None
+        from_allele_b = None
+
         pileup = pileup_alleles(allele_queue)
         private_counts = np.array(cmn.base_counts(pileup))
-        public_counts = np.array(variant.freqs)
-
         private_freqs = private_counts / private_counts.sum()
-        public_freqs = public_counts / public_counts.sum()
-
-        # private_ids = (-private_freqs).argsort()
 
         personal_alleles = []
         for i in range(len(cmn.BASES)):
@@ -372,124 +481,65 @@ class Mutator:
         else:
             # unable to asses
             # self._test_counter += 1
-            return False
+            pass
 
-        prob_matrix = np.outer(public_freqs, public_freqs)
-        draw_id = rnd.multirand_index(prob_matrix.reshape(prob_matrix.size))
-        to_allele_a = cmn.BASES[int(draw_id / 4)]  # row_id
-        to_allele_b = cmn.BASES[draw_id % 4]  # col_id
+        return from_allele_a, from_allele_b
 
-        homo2homo = False
-        homo2hetero = False
-        hetero2homo = False
-        hetero2hetero = False
+    @staticmethod
+    def _public_allele_pair(allele_freqeuencies: list, rnd: VeryRandom) -> Tuple[str, str]:
+        public_counts = np.array(allele_freqeuencies)
+        public_freqs = public_counts / public_counts.sum()
 
+        # prob_matrix = np.outer(public_freqs, public_freqs)
+        # draw_id = rnd.multirand_index(prob_matrix.reshape(prob_matrix.size))
+
+        # to_allele_a = cmn.BASES[int(draw_id / 4)]  # row_id
+        # to_allele_b = cmn.BASES[draw_id % 4]  # col_id
+
+        # faster alternative
+        to_allele_a = cmn.BASES[rnd.multirand_index(public_freqs)]
+        to_allele_b = cmn.BASES[rnd.multirand_index(public_freqs)]
+
+        return to_allele_a, to_allele_b
+
+    def _mutate_snv_pos(
+            self,
+            bdiff_io: bdiff.BdiffIO,
+            allele_queue: List[AlleleAlignment],
+            variant: VariantOccurrence,
+            rng: VeryRandom
+    ) -> bool:
         is_masked = False
-        mut_map = None
-        rev_mut_map = None
-        if to_allele_a == to_allele_b:
-            # to homo
-            if from_allele_a == from_allele_b:
-                # from homo
-                homo2homo = True
-                if from_allele_a != to_allele_a:
-                    # homo to other homo
-                    mut_map = dict(zip(cmn.BASES, cmn.BASES))
-                    mut_map[from_allele_a] = to_allele_a
-                    mut_map[to_allele_a] = from_allele_a
-                else:
-                    # homo to same homo
-                    pass
-            else:
-                # TODO not reversible yet
-                hetero2homo = True
-                mut_map = dict(zip(cmn.BASES, cmn.BASES))
-                mut_map[from_allele_a] = to_allele_a
-                mut_map[from_allele_b] = to_allele_a
 
+        from_allele_a, from_allele_b = self._private_allele_pair(allele_queue)
+        to_allele_a, to_allele_b = self._public_allele_pair(variant.freqs, rng)
+        mask_map_a, mask_map_b, zygosity = self._create_masking(from_allele_a, from_allele_b, to_allele_a, to_allele_b)
+
+        seed = rng.rand_int()
+        if zygosity.is_changed():
+            pos_rng = rng.seed_rng(seed)
+            for i in range(len(allele_queue)):
+                aligned_allele = allele_queue[i]  # type: AlleleAlignment
+                # use random masking map from the pair
+                if pos_rng.random() < 0.5:
+                    is_masked |= self._mutate_allele(aligned_allele, mask_map_a)
+                else:
+                    is_masked |= self._mutate_allele(aligned_allele, mask_map_b)
         else:
-            # to hetero
-            if from_allele_a == from_allele_b:
-                # from homo
-                homo2hetero = True
-
-                mut_map_a = {from_allele_a: to_allele_a}
-                mut_map_b = {from_allele_a: to_allele_b}
-
-                # find remaining bases that must be mapped
-                from_bases = []
-                for i in range(len(cmn.BASES)):
-                    if cmn.BASES[i] != from_allele_a and private_freqs[i] != 0:
-                        from_bases.append(cmn.BASES[i])
-
-                # find remaining mappings
-                to_bases = list(cmn.BASES)
-                to_bases.remove(to_allele_a)
-                to_bases.remove(to_allele_b)
-
-                if len(from_bases) <= len(to_bases):
-                    # all bases can be mapped
-                    for i in range(len(from_bases)):
-                        mut_map_a[from_bases[i]] = to_bases[i]
-                        mut_map_b[from_bases[i]] = to_bases[i]
-
-                    for aligned_allele in allele_queue:  # type: AlleleAlignment
-                        # select random allele from the hetero pair
-                        if rnd.random() > 0.5:
-                            is_masked |= self._mutate_allele(aligned_allele, mut_map_a)
-                        else:
-                            is_masked |= self._mutate_allele(aligned_allele, mut_map_b)
-
-                    rev_mut_map = dict(zip(cmn.BASES, cmn.BASES))
-                    rev_mut_map[to_allele_a] = from_allele_a
-                    rev_mut_map[to_allele_b] = from_allele_a
-
-                    for base in cmn.BASES:
-                        if base in mut_map_a:
-                            rev_mut_map[mut_map_a[base]] = base
-                        elif base in mut_map_b:
-                            rev_mut_map[mut_map_b[base]] = base
-
-                else:
-                    # TODO can not be mapped by the current method
-                    # self._test_counter += 1
-                    return False
-
-            else:
-                hetero2hetero = True
-                is_synonymous = from_allele_a == to_allele_a and from_allele_b == to_allele_b or \
-                                from_allele_a == to_allele_b and from_allele_b == to_allele_a
-
-                if not is_synonymous:
-                    mut_map = dict(zip(cmn.BASES, cmn.BASES))
-                    # select the least changes alternative
-                    if from_allele_a == to_allele_b or from_allele_b == to_allele_a:
-                        mut_map[from_allele_a] = to_allele_b
-                        mut_map[from_allele_b] = to_allele_a
-
-                        mut_map[to_allele_a] = from_allele_b
-                        mut_map[to_allele_b] = from_allele_a
-                    else:
-                        mut_map[from_allele_a] = to_allele_a
-                        mut_map[from_allele_b] = to_allele_b
-
-                        mut_map[to_allele_a] = from_allele_a
-                        mut_map[to_allele_b] = from_allele_b
-
-        if mut_map is not None and not homo2hetero:
-            for aligned_allele in allele_queue:  # type: AlleleAlignment
-                is_masked |= self._mutate_allele(aligned_allele, mut_map)
-
-            if hetero2homo:
-                # TODO
-                # temp solution, use dummy dict
-                rev_mut_map = dict(zip(cmn.BASES, cmn.BASES))
-            else:
-                rev_mut_map = {value: key for key, value in mut_map.items()}
+            for i in range(len(allele_queue)):
+                aligned_allele = allele_queue[i]  # type: AlleleAlignment
+                is_masked |= self._mutate_allele(aligned_allele, mask_map_a)
 
         if is_masked:
-            # at least one alignment has been mutated
-            bdiff_io.write_snv(variant.pos.index, cmn.BASES.index(variant.ref_allele), rev_mut_map)
+            # at least one alignment has been masked
+            bdiff_io._write_snv(
+                index=variant.pos.index,
+                ref_id=cmn.BASES.index(variant.ref_allele),
+                zygosity=zygosity,
+                perm_a=[mask_map_a['A'], mask_map_a['T'], mask_map_a['G'], mask_map_a['C']],
+                perm_b=[mask_map_b['A'], mask_map_b['T'], mask_map_b['G'], mask_map_b['C']],
+                rng_seed=seed
+            )
 
         return is_masked
 
@@ -497,7 +547,7 @@ class Mutator:
             self,
             bdiff_io: bdiff.BdiffIO,
             allele_queue: list,
-            variant: po.VariantOccurrence,
+            variant: VariantOccurrence,
             rnd: VeryRandom
     ) -> bool:
         # # TODO
@@ -566,7 +616,7 @@ class Mutator:
 
         return is_mutated
 
-    def __write_before_index(self, out_bam_file, alignment_queue: typing.List[AlleleAlignment], index):
+    def __write_before_index(self, out_bam_file, alignment_queue: List[AlleleAlignment], index):
         """
         Write snv alignments while their end reference position is before index.
         :param out_bam_file:

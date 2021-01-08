@@ -4,10 +4,10 @@ import unittest
 import pysam
 
 import src.common as cmn
-from tests.random import RandomMockup
+from tests.random_mockup import VeryRandomMockup
 from src.bam_mutator import BamMutator
 from src.bdiff import BdiffIO
-from src.random import VeryRandom
+from src.very_random import VeryRandom
 from src.vac import Vac
 
 
@@ -25,7 +25,7 @@ class TestMutate(unittest.TestCase):
         cmn.sam2bam(cls.RESOURCE_PATH + 'input.sam', cls.RESOURCE_PATH + 'input.bam')
         pysam.index(cls.RESOURCE_PATH + 'input.bam')
         cls._mut = BamMutator(cls.RESOURCE_PATH + 'input.bam')
-        cls._rnd = VeryRandom(RandomMockup(0.5))
+        cls._rnd = VeryRandom(VeryRandomMockup(0.5))
     
     def test_mutate_01(self):
         # EOF BAM case
@@ -35,7 +35,7 @@ class TestMutate(unittest.TestCase):
             mut_bam_filename=self.RESOURCE_PATH + 'output_01.bam',
             secret=self.SECRET,
             mut_p=0,
-            rnd=self._rnd
+            rng=self._rnd
         )
         cmn.bam2sam(self.RESOURCE_PATH + 'output_01.bam', self.RESOURCE_PATH + 'output_01.sam')
         BdiffIO.to_text_file(bdiff_file, self.RESOURCE_PATH + 'output_01.diff.txt')
@@ -65,7 +65,7 @@ class TestMutate(unittest.TestCase):
             mut_bam_filename=self.RESOURCE_PATH + 'output_02.bam',
             secret=self.SECRET,
             mut_p=0,
-            rnd=self._rnd
+            rng=self._rnd
         )
         
         self.assertEqual(21, self._mut.stat(BamMutator.STAT_ALIGNMENT_COUNT))

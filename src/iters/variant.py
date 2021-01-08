@@ -3,7 +3,7 @@ import numpy as np
 import src.po as po
 from src.common import BASES
 from src.fasta_index import FastaIndex
-from src.random import VeryRandom
+from src.very_random import VeryRandom
 from src.vac import Vac
 
 

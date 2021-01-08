@@ -13,7 +13,7 @@ from src.bam import open_bam
 from src.bam_mutator import BamMutator
 from src.bdiff import BdiffIO
 from src.fasta_index import FastaIndex
-from src.random import VeryRandom
+from src.very_random import VeryRandom
 from src.vac import Vac
 
 
@@ -70,8 +70,7 @@ class Varlocker:
             vac_filename: str,
             out_bam_filename: str,
             out_enc_diff_filename: str,
-            mut_p: float = None,
-            seed: int = None
+            mut_p: float = None
     ):
         """
         Mutate BAM file and store it along with encrypted DIFF file.
@@ -93,9 +92,10 @@ class Varlocker:
         if self._verbose:
             print('--- Mutating BAM ---')
 
-        rnd = VeryRandom.create(seed)
+        # rng is only used to create positional rng in umasking, no general seed needed
+        rng = VeryRandom.create()
 
-        aes_key = rnd.rand_bytes(self.AES_KEY_LENGTH)
+        aes_key = rng.rand_bytes(self.AES_KEY_LENGTH)
         mut = BamMutator(filename=bam_filename, verbose=self._verbose)
 
         with open(out_enc_diff_filename, 'wb') as enc_diff_file:
@@ -103,9 +103,9 @@ class Varlocker:
             diff_file = mut.mutate(
                 vac_filename=vac_filename,
                 mut_bam_filename=out_bam_filename,
-                secret=rnd.rand_bytes(self.SECRET_KEY_LENGTH),
+                secret=rng.rand_bytes(self.SECRET_KEY_LENGTH),
                 mut_p=mut_p,
-                rnd=rnd
+                rng=rng
             )
 
             if self._verbose:
@@ -128,12 +128,14 @@ class Varlocker:
             end_ref_pos: int = None,
             include_unmapped: bool = False,
             unmapped_only: bool = False,
-            rsa_ver_key: RSA = None
+            rsa_ver_key: RSA = None,
+            seed: int = None
     ):
         """
         Reverse of mutate operation. Restore original BAM file.
         Output formats:
         .bam
+        :param seed:
         :param rsa_key: private key to decrypt AES key to decrypt DIFF
         :param bam_filename: mutated BAM
         :param enc_diff_filename:
@@ -153,6 +155,8 @@ class Varlocker:
         if self._verbose:
             print('--- Unmutating BAM ---')
 
+        rng = VeryRandom.create(seed)
+
         # make sure that BAM is indexed
         pysam.index(bam_filename)
         with io.BytesIO() as diff_file, \
@@ -167,6 +171,7 @@ class Varlocker:
             mut.unmutate(
                 diff_file,
                 out_bam_filename,
+                rng,
                 start_ref_name,
                 start_ref_pos,
                 end_ref_name,
