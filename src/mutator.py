@@ -512,34 +512,42 @@ class Mutator:
         is_masked = False
 
         from_allele_a, from_allele_b = self._private_allele_pair(allele_queue)
-        to_allele_a, to_allele_b = self._public_allele_pair(variant.freqs, rng)
-        mask_map_a, mask_map_b, zygosity = self._create_masking(from_allele_a, from_allele_b, to_allele_a, to_allele_b)
+        if from_allele_a is not None and from_allele_b is not None:
+            # personal alleles are found
 
-        seed = rng.rand_int()
-        if zygosity.is_changed():
-            pos_rng = rng.seed_rng(seed)
-            for i in range(len(allele_queue)):
-                aligned_allele = allele_queue[i]  # type: AlleleAlignment
-                # use random masking map from the pair
-                if pos_rng.random() < 0.5:
-                    is_masked |= self._mutate_allele(aligned_allele, mask_map_a)
-                else:
-                    is_masked |= self._mutate_allele(aligned_allele, mask_map_b)
-        else:
-            for i in range(len(allele_queue)):
-                aligned_allele = allele_queue[i]  # type: AlleleAlignment
-                is_masked |= self._mutate_allele(aligned_allele, mask_map_a)
-
-        if is_masked:
-            # at least one alignment has been masked
-            bdiff_io._write_snv(
-                index=variant.pos.index,
-                ref_id=cmn.BASES.index(variant.ref_allele),
-                zygosity=zygosity,
-                perm_a=[mask_map_a['A'], mask_map_a['T'], mask_map_a['G'], mask_map_a['C']],
-                perm_b=[mask_map_b['A'], mask_map_b['T'], mask_map_b['G'], mask_map_b['C']],
-                rng_seed=seed
+            to_allele_a, to_allele_b = self._public_allele_pair(variant.freqs, rng)
+            mask_map_a, mask_map_b, zygosity = self._create_masking(
+                from_allele_a,
+                from_allele_b,
+                to_allele_a,
+                to_allele_b
             )
+
+            seed = rng.rand_int()
+            if zygosity.is_changed():
+                pos_rng = rng.seed_rng(seed)
+                for i in range(len(allele_queue)):
+                    aligned_allele = allele_queue[i]  # type: AlleleAlignment
+                    # use random masking map from the pair
+                    if pos_rng.random() < 0.5:
+                        is_masked |= self._mutate_allele(aligned_allele, mask_map_a)
+                    else:
+                        is_masked |= self._mutate_allele(aligned_allele, mask_map_b)
+            else:
+                for i in range(len(allele_queue)):
+                    aligned_allele = allele_queue[i]  # type: AlleleAlignment
+                    is_masked |= self._mutate_allele(aligned_allele, mask_map_a)
+
+            if is_masked:
+                # at least one alignment has been masked
+                bdiff_io._write_snv(
+                    index=variant.pos.index,
+                    ref_id=cmn.BASES.index(variant.ref_allele),
+                    zygosity=zygosity,
+                    perm_a=[mask_map_a['A'], mask_map_a['T'], mask_map_a['G'], mask_map_a['C']],
+                    perm_b=[mask_map_b['A'], mask_map_b['T'], mask_map_b['G'], mask_map_b['C']],
+                    rng_seed=seed
+                )
 
         return is_masked
 
@@ -601,6 +609,11 @@ class Mutator:
             # mapping must exist
             assert alignment.allele in mut_map
             mut_allele = mut_map[alignment.allele]
+
+            # TODO temp code
+            if mut_allele is None:
+                print(mut_map)
+                print(alignment.allele)
 
             if alignment.allele != mut_allele:
                 # non-synonymous mutation

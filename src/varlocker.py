@@ -70,7 +70,8 @@ class Varlocker:
             vac_filename: str,
             out_bam_filename: str,
             out_enc_diff_filename: str,
-            mut_p: float = None
+            mut_p: float = None,
+            seed: int = None
     ):
         """
         Mutate BAM file and store it along with encrypted DIFF file.
@@ -93,7 +94,7 @@ class Varlocker:
             print('--- Mutating BAM ---')
 
         # rng is only used to create positional rng in umasking, no general seed needed
-        rng = VeryRandom.create()
+        rng = VeryRandom.create(seed)
 
         aes_key = rng.rand_bytes(self.AES_KEY_LENGTH)
         mut = BamMutator(filename=bam_filename, verbose=self._verbose)

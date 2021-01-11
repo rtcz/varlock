@@ -18,7 +18,7 @@ do
       --pub_key ${project_dir}/masking/gnomad3nfe_onepanel/id_rsa.pub \
       --bam ${bam_file} \
       --vac ${project_dir}/vac/gnomad3nfe_pass_sorted_multisnp_onepanel.vac \
-      --out_bam ${project_dir}/mapping/grch38_decoy_alt/deduplicated/${bam_filename}.bam \
+      --out_bam ${project_dir}/mapping/grch38_decoy_alt/masked_gnomad3nfe_onepanel/${bam_filename}.bam \
       --out_diff ${project_dir}/masking/gnomad3nfe_onepanel/${bam_filename}.bdiff \
       --seed 0 \
       --verbose \

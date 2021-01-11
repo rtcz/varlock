@@ -20,6 +20,8 @@ class TestMaskSnv(unittest.TestCase):
 
     SECRET = bytes([255]) * 16
 
+    # TODO test cases with low coverage where personal alleles can not be determined
+
     @classmethod
     def setUpClass(cls):
         cmn.sam2bam(cls.RESOURCE_PATH + 'input.sam', cls.RESOURCE_PATH + 'input.bam')
