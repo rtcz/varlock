@@ -30,7 +30,7 @@ class TestBdiff(unittest.TestCase):
     @staticmethod
     def _write_bdiff_record(file: BdiffIO, index, ref_id, perm, is_snv: bool = True):
         if is_snv:
-            file._write_snv(index, ref_id, ZygosityChange.HOMO_TO_HOMO, perm, perm, 0)
+            file.write_snv(index, ref_id, ZygosityChange.HOMO_TO_HOMO, perm, perm, ())
         else:
             file._write_indel(index, ref_id, perm)
 
@@ -51,18 +51,18 @@ class TestBdiff(unittest.TestCase):
         self.assertEqual(4, bdiff.snv_count)
         self.assertEqual(2, bdiff.indel_count)
 
-        self.assertTupleEqual((11011, True, 2, ZygosityChange.HOMO_TO_HOMO.value, ['A', 'G', 'T', 'C'], ['A', 'G', 'T', 'C'], 0), bdiff._read_record())
-        self.assertTupleEqual((11015, True, 3, ZygosityChange.HOMO_TO_HETERO.value, ['C', 'A', 'T', 'G'], ['C', 'A', 'G', 'T'], 0), bdiff._read_record())
-        self.assertTupleEqual((11020, True, 2, ZygosityChange.HOMO_TO_HOMO.value, ['G', 'T', 'A', 'C'], ['G', 'T', 'A', 'C'], 0), bdiff._read_record())
-        self.assertTupleEqual((11027, False, 2, ZygosityChange.HOMO_TO_HOMO.value, ['A', 'AGT', 'AG'], ['A', 'AGT', 'AG'], 0), bdiff._read_record())
-        self.assertTupleEqual((11031, True, 2, ZygosityChange.HOMO_TO_HOMO.value, ['G', 'A', 'T', 'C'], ['G', 'A', 'T', 'C'], 0), bdiff._read_record())
-        self.assertTupleEqual((11037, False, 0, ZygosityChange.HOMO_TO_HOMO.value, ['GCG', 'G'], ['GCG', 'G'], 0), bdiff._read_record())
+        self.assertTupleEqual((11011, True, 2, ZygosityChange.HOMO_TO_HOMO.value, ['A', 'G', 'T', 'C'], ['A', 'G', 'T', 'C'], ()), bdiff.read_record())
+        self.assertTupleEqual((11015, True, 3, ZygosityChange.HOMO_TO_HETERO.value, ['C', 'A', 'T', 'G'], ['C', 'A', 'G', 'T'], (2, 4, 6)), bdiff.read_record())
+        self.assertTupleEqual((11020, True, 2, ZygosityChange.HOMO_TO_HOMO.value, ['G', 'T', 'A', 'C'], ['G', 'T', 'A', 'C'], ()), bdiff.read_record())
+        self.assertTupleEqual((11027, False, 2, ZygosityChange.HOMO_TO_HOMO.value, ['A', 'AGT', 'AG'], ['A', 'AGT', 'AG'], ()), bdiff.read_record())
+        self.assertTupleEqual((11031, True, 2, ZygosityChange.HOMO_TO_HOMO.value, ['G', 'A', 'T', 'C'], ['G', 'A', 'T', 'C'], ()), bdiff.read_record())
+        self.assertTupleEqual((11037, False, 0, ZygosityChange.HOMO_TO_HOMO.value, ['GCG', 'G'], ['GCG', 'G'], ()), bdiff.read_record())
 
     def test_to_text_file(self):
         bdiff = BdiffIO()
 
         self._write_bdiff_record(bdiff, 11011, 2, ['A', 'G', 'T', 'C'])
-        bdiff._write_snv(11015, 3, ZygosityChange.HOMO_TO_HETERO, ['C', 'A', 'T', 'G'], ['C', 'A', 'G', 'T'], 0)
+        bdiff.write_snv(11015, 3, ZygosityChange.HOMO_TO_HETERO, ['C', 'A', 'T', 'G'], ['C', 'A', 'G', 'T'], beta_indices=[2, 4, 6])
         self._write_bdiff_record(bdiff, 11020, 2, ['G', 'T', 'A', 'C'])
         self._write_bdiff_record(bdiff, 11027, 2, ['A', 'AGT', 'AG'], False)
         self._write_bdiff_record(bdiff, 11031, 2, ['G', 'A', 'T', 'C'])
@@ -122,14 +122,14 @@ class TestBdiff(unittest.TestCase):
         self.assertDictEqual(self._header, bdiff.header)
         self.assertEqual(4, bdiff.snv_count)
         self.assertEqual(3, bdiff.indel_count)
-        self.assertTupleEqual((1010, True, 0, ZygosityChange.HOMO_TO_HOMO.value, ['C', 'A', 'T', 'G'], ['C', 'A', 'T', 'G'], 0), bdiff._read_record())
-        self.assertTupleEqual((1020, True, 1, ZygosityChange.HOMO_TO_HOMO.value, ['G', 'A', 'T', 'C'], ['G', 'A', 'T', 'C'], 0), bdiff._read_record())
-        self.assertTupleEqual((1030, False, 0, ZygosityChange.HOMO_TO_HOMO.value, ['AT', 'ATT', 'A'], ['AT', 'ATT', 'A'], 0), bdiff._read_record())
-        self.assertTupleEqual((1040, True, 2, ZygosityChange.HOMO_TO_HOMO.value, ['T', 'G', 'A', 'C'], ['T', 'G', 'A', 'C'], 0), bdiff._read_record())
-        self.assertTupleEqual((1050, False, 1, ZygosityChange.HOMO_TO_HOMO.value, ['T', 'TT'], ['T', 'TT'], 0), bdiff._read_record())
-        self.assertTupleEqual((1060, False, 2, ZygosityChange.HOMO_TO_HOMO.value, ['GCG', 'G', 'GCGCG'], ['GCG', 'G', 'GCGCG'], 0), bdiff._read_record())
-        self.assertTupleEqual((1070, True, 3, ZygosityChange.HOMO_TO_HOMO.value, ['G', 'C', 'A', 'T'], ['G', 'C', 'A', 'T'], 0), bdiff._read_record())
-        self.assertRaises(EOFError, lambda: bdiff._read_record())
+        self.assertTupleEqual((1010, True, 0, ZygosityChange.HOMO_TO_HOMO.value, ['C', 'A', 'T', 'G'], ['C', 'A', 'T', 'G'], ()), bdiff.read_record())
+        self.assertTupleEqual((1020, True, 1, ZygosityChange.HOMO_TO_HOMO.value, ['G', 'A', 'T', 'C'], ['G', 'A', 'T', 'C'], ()), bdiff.read_record())
+        self.assertTupleEqual((1030, False, 0, ZygosityChange.HOMO_TO_HOMO.value, ['AT', 'ATT', 'A'], ['AT', 'ATT', 'A'], ()), bdiff.read_record())
+        self.assertTupleEqual((1040, True, 2, ZygosityChange.HOMO_TO_HOMO.value, ['T', 'G', 'A', 'C'], ['T', 'G', 'A', 'C'], ()), bdiff.read_record())
+        self.assertTupleEqual((1050, False, 1, ZygosityChange.HOMO_TO_HOMO.value, ['T', 'TT'], ['T', 'TT'], ()), bdiff.read_record())
+        self.assertTupleEqual((1060, False, 2, ZygosityChange.HOMO_TO_HOMO.value, ['GCG', 'G', 'GCGCG'], ['GCG', 'G', 'GCGCG'], ()), bdiff.read_record())
+        self.assertTupleEqual((1070, True, 3, ZygosityChange.HOMO_TO_HOMO.value, ['G', 'C', 'A', 'T'], ['G', 'C', 'A', 'T'], ()), bdiff.read_record())
+        self.assertRaises(EOFError, lambda: bdiff.read_record())
 
     @staticmethod
     def _index2pos(bdiff: BdiffIO, search_index: int):
@@ -142,7 +142,7 @@ class TestBdiff(unittest.TestCase):
         saved_pos = bdiff.tell()
         pos = saved_pos
         while True:
-            index = bdiff._read_record()[0]
+            index = bdiff.read_record()[0]
             if index == search_index:
                 break
             pos = bdiff.tell()
@@ -161,7 +161,7 @@ class TestBdiff(unittest.TestCase):
 
         curr_id = 1
         while curr_id < record_id:
-            bdiff._read_record()
+            bdiff.read_record()
             curr_id += 1
 
         record_pos = self._bdiff_file.tell()

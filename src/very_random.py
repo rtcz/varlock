@@ -22,10 +22,6 @@ class VeryRandom:
 
         return VeryRandom(rnd, np_rnd)
 
-    @staticmethod
-    def seed_rng(seed: int) -> random.Random:
-        return random.Random(seed)
-
     # TODO remove optional parameters
     def __init__(self, rnd: random.Random = None, np_rnd: np.random.RandomState = None):
         """

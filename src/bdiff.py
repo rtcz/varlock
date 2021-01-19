@@ -4,6 +4,7 @@ import math
 import os
 import shutil
 import struct
+from typing import Union
 
 import src.common as cmn
 from src.po import ZygosityChange
@@ -105,7 +106,7 @@ class BdiffIO:
 
     def __next__(self):
         try:
-            return self._read_record()
+            return self.read_record()
         except EOFError:
             raise StopIteration
 
@@ -179,8 +180,7 @@ class BdiffIO:
         """
         return None if self.is_empty() else self._last_index
 
-    # TODO make public
-    def _read_record(self) -> (int, bool, int, int, list, list, int):
+    def read_record(self) -> (int, bool, int, int, list, list, tuple):
         """
         Reads next SNV or INDEL record
         :return: index, is_snv, reference_id, zygosity_byte, permutation_a, permutation_b, rng_seed
@@ -197,33 +197,24 @@ class BdiffIO:
             if zygosity_byte == ZygosityChange.HOMO_TO_HETERO.value \
                     or zygosity_byte == ZygosityChange.HETERO_TO_HOMO.value:
                 # use double mapping
-                mapping_b_byte, rng_seed = struct.unpack('<BI', self._bdiff_file.read(self.BYTE_SIZE + self.INT_SIZE))
+                mapping_b_byte, beta_indices_length = struct.unpack(
+                    '<BH',
+                    self._bdiff_file.read(self.BYTE_SIZE + self.SHORT_SIZE)
+                )
+                beta_indices = struct.unpack(
+                    'H' * beta_indices_length,
+                    self._bdiff_file.read(self.SHORT_SIZE * beta_indices_length)
+                )
                 return index, is_snv, ref_id, zygosity_byte, \
-                       cmn.byte2base_perm(mapping_a_byte), cmn.byte2base_perm(mapping_b_byte), rng_seed
+                       cmn.byte2base_perm(mapping_a_byte), cmn.byte2base_perm(mapping_b_byte), beta_indices
             else:
                 # use single mapping
                 permutation = cmn.byte2base_perm(mapping_a_byte)
-                return index, is_snv, ref_id, zygosity_byte, permutation, permutation, 0
+                return index, is_snv, ref_id, zygosity_byte, permutation, permutation, ()
         else:
             # TODO zygosity
             permutation = self._read_indel_alts(length)
-            return index, is_snv, ref_id, 0, permutation, permutation, 0
-
-    # def read_record(self) -> (int, VariantType, str, ZygosityChange, dict, dict):
-    #     """
-    #     :return: genomic_index, is_snv, reference_sequence, zygosity, mutation_map_a, mutation_map_b
-    #     """
-    #     index, is_snv, ref_id, zygosity, perm_a, perm_b, rng_seed = self._read_record()
-    #     if is_snv:
-    #         # SNV: stored alleles are the original ones
-    #         return index, VariantType.SNV, cmn.BASES[ref_id], ZygosityChange(zygosity), \
-    #                dict(zip(cmn.BASES, perm_a)), dict(zip(cmn.BASES, perm_b)), rng_seed
-    #     else:
-    #         # INDEL it is assumed that record was saved as:
-    #         # sorted(alleles) -> permuted(alleles)
-    #         # TODO zygosity
-    #         return index, VariantType.INDEL, perm_a[ref_id], zygosity, \
-    #                dict(zip(perm_a, sorted(perm_a))), dict(zip(perm_b, sorted(perm_b))), rng_seed
+            return index, is_snv, ref_id, 0, permutation, permutation, ()
 
     def _read_indel_alts(self, length):
         """
@@ -245,12 +236,22 @@ class BdiffIO:
         if (self._snv_count + self._indel_count) % self._index_resolution == 0:
             self._file_index.append((index, self._record_file.tell() - len(record)))
 
-    # TODO make public
-    def _write_snv(self, index: int, ref_id: int, zygosity: ZygosityChange, perm_a: list, perm_b: list, rng_seed: int):
+    def write_snv(
+            self,
+            index: int,
+            ref_id: int,
+            zygosity: ZygosityChange,
+            perm_a: list,
+            perm_b: list,
+            beta_indices: Union[list, tuple]
+    ):
         """
+        :param perm_a: permutation represents values of map with keys A,T,G,C in respective order
+        :param perm_b: permutation represents values of map with keys A,T,G,C in respective order
+        :param ref_id:
+        :param zygosity:
+        :param beta_indices:
         :param index: genomic index
-        :param base_perm: permutation of bases
-        permutation represent values of map with keys A,T,G,C in respective order
         :return:
         """
         assert not self.is_read_mode
@@ -259,42 +260,15 @@ class BdiffIO:
         record = struct.pack('<IBBBB', index, 0, ref_id, zygosity.value, cmn.base_perm2byte(perm_a))
 
         if zygosity.is_changed():
-            # add second mapping
-            record += struct.pack('<BI', cmn.base_perm2byte(perm_b), rng_seed)
+            # add second mapping with associated indices
+            record += struct.pack('<BH', cmn.base_perm2byte(perm_b), len(beta_indices))
+            record += struct.pack('H' * len(beta_indices), *beta_indices)
         else:
             # single mapping
             assert perm_a == perm_b
 
         self._snv_count += 1
         self._write_record(record, index)
-
-    # def write_snv(
-    #         self,
-    #         index: int,
-    #         ref_id: int,
-    #         zygosity: ZygosityChange,
-    #         mask_map_a: dict,
-    #         mask_map_b: dict,
-    #         rng_seed: int
-    # ):
-    #     """
-    #     :param rng_seed:
-    #     :param mask_map_b:
-    #     :param mask_map_a:
-    #     :param zygosity:
-    #     :param index:
-    #     :param ref_id: index of reference allele in the A,T,G,C list
-    #     :param mut_map:
-    #     :return:
-    #     """
-    #     self._write_snv(
-    #         index=index,
-    #         ref_id=ref_id,
-    #         zygosity=zygosity,
-    #         perm_a=[mask_map_a['A'], mask_map_a['T'], mask_map_a['G'], mask_map_a['C']],
-    #         perm_b=[mask_map_b['A'], mask_map_b['T'], mask_map_b['G'], mask_map_b['C']],
-    #         rng_seed=rng_seed
-    #     )
 
     def _write_indel(self, index: int, ref_id: int, seq_perm: list):
         """
@@ -407,7 +381,7 @@ class BdiffIO:
         indel_count = 0
         while True:
             try:
-                record = self._read_record()
+                record = self.read_record()
                 index = record[0]
                 is_snv = record[1]
             except EOFError:
@@ -439,7 +413,7 @@ class BdiffIO:
             file_index, snv_count, indel_count = self._build_index(from_index_pos, header[self.TO_INDEX])
 
             self._bdiff_file.seek(to_index_pos)
-            last_index = self._read_record()[0]
+            last_index = self.read_record()[0]
             end_pos = self._bdiff_file.tell()
 
             self._write_counts(bdiff_file, snv_count, indel_count)
@@ -545,10 +519,10 @@ class BdiffIO:
             curr_pos = self._indexed_pos(pivot_index)
             self._bdiff_file.seek(curr_pos)
 
-            curr_index = self._read_record()[0]  # type: int
+            curr_index = self.read_record()[0]  # type: int
             while curr_index < pivot_index:
                 curr_pos = self._bdiff_file.tell()
-                curr_index = self._read_record()[0]  # type: int
+                curr_index = self.read_record()[0]  # type: int
 
             self._bdiff_file.seek(saved_pos)
             return curr_pos
@@ -572,7 +546,7 @@ class BdiffIO:
             while True:
                 next_pos = self._bdiff_file.tell()
                 try:
-                    next_index = self._read_record()[0]  # type: int
+                    next_index = self.read_record()[0]  # type: int
                 except EOFError:
                     break
                 if next_index <= pivot_index:
@@ -627,6 +601,7 @@ class BdiffIO:
                     record_list[1] = int(record[1])
                     record_list[4] = ','.join(record[4])
                     record_list[5] = ','.join(record[5])
+                    record_list[6] = ','.join(map(str, record[6]))
                 else:
                     record_list = list(record[:5])
                     record_list[1] = int(record[1])
@@ -672,11 +647,15 @@ class BdiffIO:
                     break
                 segments = line.split('\t')
                 if len(segments) == 7:
-                    raw_index, raw_is_snv, raw_ref_id, raw_zygosity, raw_perm_a, raw_perm_b, raw_rng_seed = segments
+                    raw_index, raw_is_snv, raw_ref_id, raw_zygosity, raw_perm_a, raw_perm_b, raw_beta_indices = segments
+                    perm_a = raw_perm_a.split(',')
+                    perm_b = raw_perm_b.split(',')
+                    beta_indices = tuple(map(int, raw_beta_indices.split(',')))
                 elif len(segments) == 5:
                     raw_index, raw_is_snv, raw_ref_id, raw_zygosity, raw_perm_a = segments
-                    raw_perm_b = raw_perm_a
-                    raw_rng_seed = 0
+                    perm_a = raw_perm_a.split(',')
+                    perm_b = perm_a
+                    beta_indices = ()
                 else:
                     raise ValueError
 
@@ -684,12 +663,9 @@ class BdiffIO:
                 is_snv = raw_is_snv == '1'
                 ref_id = int(raw_ref_id)
                 zygosity = ZygosityChange(int(raw_zygosity))
-                perm_a = raw_perm_a.split(',')
-                perm_b = raw_perm_b.split(',')
-                rng_seed = int(raw_rng_seed)
                 if is_snv:
                     # snvs
-                    bdiff._write_snv(index, ref_id, zygosity, perm_a, perm_b, rng_seed)
+                    bdiff.write_snv(index, ref_id, zygosity, perm_a, perm_b, beta_indices)
                 else:
                     # indel
                     bdiff._write_indel(index, ref_id, perm_a)

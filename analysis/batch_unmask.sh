@@ -22,8 +22,7 @@ do
       --include_unmapped \
       --verbose \
   "
-#  echo "$cmd"
-#  break
+
   eval "$cmd" \
     1> "${project_dir}/log/unmask_${bam_filename}.out" \
     2> "${project_dir}/log/unmask_${bam_filename}.err" \

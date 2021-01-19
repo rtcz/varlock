@@ -1,5 +1,3 @@
-from random import Random
-
 from src.very_random import VeryRandom
 
 
@@ -8,10 +6,6 @@ class VeryRandomMockup(VeryRandom):
         super().__init__()
         self._multirand_counter = 0
         self._random_counter = -1
-
-    @staticmethod
-    def seed_rng(seed: int) -> Random:
-        return RandomMockup()
 
     def random(self) -> float:
         self._random_counter += 1
@@ -37,13 +31,3 @@ class VeryRandomMockup(VeryRandom):
             self._multirand_counter = 0
 
         return not_zero_indices[curr_index]
-
-
-class RandomMockup(Random):
-    def __init__(self):
-        super().__init__()
-        self._random_counter = -1
-
-    def random(self) -> float:
-        self._random_counter += 1
-        return self._random_counter % 2

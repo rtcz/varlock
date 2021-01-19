@@ -156,8 +156,6 @@ class Varlocker:
         if self._verbose:
             print('--- Unmutating BAM ---')
 
-        rng = VeryRandom.create(seed)
-
         # make sure that BAM is indexed
         pysam.index(bam_filename)
         with io.BytesIO() as diff_file, \
@@ -172,7 +170,6 @@ class Varlocker:
             mut.unmutate(
                 diff_file,
                 out_bam_filename,
-                rng,
                 start_ref_name,
                 start_ref_pos,
                 end_ref_name,

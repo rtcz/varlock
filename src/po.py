@@ -80,7 +80,7 @@ class VariantDiff(Variant):
             mut_map_a: dict,
             mut_map_b: dict,
             ref_allele: str,
-            rng_seed: int
+            beta_indices: tuple
     ):
         super().__init__(
             position,
@@ -91,11 +91,11 @@ class VariantDiff(Variant):
         self._mut_map_a = mut_map_a
         self._mut_map_b = mut_map_b
         self._zygosity = zygosity
-        self._rng_seed = rng_seed
+        self._beta_indices = beta_indices
 
     @property
-    def rng_seed(self) -> int:
-        return self._rng_seed
+    def beta_indices(self) -> tuple:
+        return self._beta_indices
 
     @property
     def mut_map_a(self) -> dict:

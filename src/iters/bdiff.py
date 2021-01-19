@@ -64,7 +64,7 @@ class BdiffIterator:
     def _next(self) -> po.VariantDiff:
         record = None
         if self._bdiff_io.tell() <= self._end_pos:
-            index, is_snv, ref_id, zygosity, perm_a, perm_b, rng_seed = self._bdiff_io._read_record()
+            index, is_snv, ref_id, zygosity, perm_a, perm_b, beta_indices = self._bdiff_io.read_record()
 
             if is_snv:
                 # SNV: stored alleles are the original ones
@@ -89,7 +89,7 @@ class BdiffIterator:
                 mut_map_a=mut_map_a,
                 mut_map_b=mut_map_b,
                 ref_allele=ref_seq,
-                rng_seed=rng_seed
+                beta_indices=beta_indices
             )
 
         return record

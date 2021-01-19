@@ -78,6 +78,7 @@ class Analyser:
         self._personal_df['alt_freq'] = self._personal_df.apply(
             lambda row: altfreq(row['FORMAT'], row[self._personal_df.columns.get_loc("FORMAT") + 1]), axis=1
         )
+        # this is deep
         self._personal_df = self._personal_df[(self._personal_df['depth'] > 30) & (self._personal_df['QUAL'] > 30)]
 
         self._masked_df = vcf2df(masked_vcf)
@@ -91,6 +92,7 @@ class Analyser:
         self._masked_df['alt_freq'] = self._masked_df.apply(
             lambda row: altfreq(row['FORMAT'], row[self._masked_df.columns.get_loc("FORMAT") + 1]), axis=1
         )
+        # this is deep
         self._masked_df = self._masked_df[(self._masked_df['depth'] > 30) & (self._masked_df['QUAL'] > 30)]
 
         self._population_df = vac2df(vac)
@@ -458,8 +460,7 @@ if __name__ == '__main__':
 
     analyser = Analyser(
         personal_vcf='/data/projects/exome/variant/grch38_decoy_alt-one/original/one_ZinaBednarikova.vcf',
-        masked_vcf='/data/projects/varlock/variant/grch38_decoy_alt-one/original_masked_gnomad3nfe_onepanel/'
-                   'one_ZinaBednarikova.deepvariant.vcf',
+        masked_vcf='/data/projects/varlock/variant/grch38_decoy_alt-one/masked_original/one_ZinaBednarikova.deepvariant.vcf',
         vac='/data/projects/varlock/vac/gnomad3nfe_pass_sorted_multisnp_onepanel.vac',
         out_dir='/data/projects/varlock/analysis/gnomad3nfe_pass_deep'
     )

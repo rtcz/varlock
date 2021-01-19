@@ -159,7 +159,6 @@ class BamMutator:
             self,
             bdiff_file: io.BytesIO,
             out_bam_filename: str,
-            rng: VeryRandom,
             start_ref_name: str = None,
             start_ref_pos: int = None,
             end_ref_name: str = None,
@@ -233,7 +232,6 @@ class BamMutator:
                         end_index=end_index
                     ),
                     out_bam_file=out_bam_file,
-                    rng=rng,
                     secret=secret
                 )
 
