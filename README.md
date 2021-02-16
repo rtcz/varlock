@@ -1,4 +1,4 @@
-# Varlock: privacy preserving storage and dissemination of sequenced genomic data
+# Varlock: privacy preserving storage of sequenced genomic data
 
 ## Introduction
 Varlock is a command line interface utility for reversible masking of personal alleles contained within a BAM file. The differences between the original and the masked BAM file are stored in encrypted form, so only an authorized user can restore the original BAM file. Varlock uses RSA asymmetric encryption for encryption and decryption of masked personal alleles.

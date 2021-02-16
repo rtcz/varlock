@@ -34,8 +34,7 @@ class TestUnmaskSnv(unittest.TestCase):
         with BdiffIO.from_text_file(self.RESOURCE_PATH + 'input.diff.txt') as bdiff_file:
             self.mut.unmutate(
                 bdiff_file=bdiff_file,
-                out_bam_filename=self.RESOURCE_PATH + 'output.bam',
-                rng=self._rng
+                out_bam_filename=self.RESOURCE_PATH + 'output.bam'
             )
 
         bam2sam(self.RESOURCE_PATH + 'output.bam', self.RESOURCE_PATH + 'output.sam')
