@@ -1,5 +1,5 @@
 varlock_dir='/data/projects/varlock'
-pca_dir="${varlock_dir}/pca/horsa2_onepanel"
+pca_dir="${varlock_dir}/pca/gnomad3nfe_onepanel"
 
 mkdir -p "${pca_dir}/plink"
 
